@@ -75,6 +75,12 @@ class BitcoinGame {
             }
         });
 
+        // Update amount unit options when from asset changes
+        document.getElementById('fromAsset').addEventListener('change', () => {
+            this.updateAmountUnitOptions();
+            this.updateAmountHelper();
+        });
+
         // Update amount helper text
         document.getElementById('amountUnit').addEventListener('change', () => {
             this.updateAmountHelper();
@@ -417,53 +423,90 @@ class BitcoinGame {
     populateAssetSelects() {
         const fromSelect = document.getElementById('fromAsset');
         const toSelect = document.getElementById('toAsset');
-        
+
         fromSelect.innerHTML = '';
         toSelect.innerHTML = '';
-        
+
         // Sort assets to put Bitcoin first
         const sortedAssets = [...this.assets].sort((a, b) => {
             if (a.symbol === 'BTC') return -1;
             if (b.symbol === 'BTC') return 1;
             return a.name.localeCompare(b.name);
         });
-        
+
         sortedAssets.forEach(asset => {
             const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
             const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            
+
             fromSelect.appendChild(option1);
             toSelect.appendChild(option2);
         });
+
+        // Initialize unit options for the default selection
+        this.updateAmountUnitOptions();
+    }
+
+    updateAmountUnitOptions() {
+        const fromAsset = document.getElementById('fromAsset').value;
+        const unitSelect = document.getElementById('amountUnit');
+        const currentValue = unitSelect.value;
+
+        // Clear existing options
+        unitSelect.innerHTML = '';
+
+        if (fromAsset === 'BTC') {
+            // When selling BTC, show BTC units
+            unitSelect.innerHTML = `
+                <option value="btc">BTC</option>
+                <option value="msat">mSats</option>
+                <option value="ksat">kSats</option>
+                <option value="sat">Sats</option>
+            `;
+        } else {
+            // When selling other assets, show the asset symbol
+            unitSelect.innerHTML = `<option value="asset">${fromAsset}</option>`;
+        }
+
+        // Try to maintain the previous selection if possible
+        if (fromAsset === 'BTC' && ['btc', 'msat', 'ksat', 'sat'].includes(currentValue)) {
+            unitSelect.value = currentValue;
+        }
     }
 
     updateAmountHelper() {
         const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
         const unit = document.getElementById('amountUnit').value;
         const helper = document.getElementById('amountHelper');
-        
-        let sats = 0;
-        let btc = 0;
-        
-        switch(unit) {
-            case 'btc':
-                sats = amount * 100000000;
-                helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'msat':
-                sats = amount * 1000000;
-                btc = amount / 100;
-                helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'ksat':
-                sats = amount * 1000;
-                btc = amount / 100000;
-                helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'sat':
-                btc = amount / 100000000;
-                helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
-                break;
+        const fromAsset = document.getElementById('fromAsset').value;
+
+        if (unit === 'asset' && fromAsset !== 'BTC') {
+            // When selling non-BTC assets, show the asset amount
+            helper.textContent = `${amount} ${fromAsset}`;
+        } else {
+            // BTC units
+            let sats = 0;
+            let btc = 0;
+
+            switch(unit) {
+                case 'btc':
+                    sats = amount * 100000000;
+                    helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'msat':
+                    sats = amount * 1000000;
+                    btc = amount / 100;
+                    helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'ksat':
+                    sats = amount * 1000;
+                    btc = amount / 100000;
+                    helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'sat':
+                    btc = amount / 100000000;
+                    helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
+                    break;
+            }
         }
     }
 
@@ -501,27 +544,12 @@ class BitcoinGame {
                     break;
             }
         } else {
-            // For non-BTC assets, we need to convert based on what the user selected
-            // If they're entering BTC amounts for a non-BTC asset, convert to the asset's stored units
-            if (unit === 'btc' || unit === 'msat' || unit === 'ksat' || unit === 'sat') {
-                // User is specifying how much BTC worth of the asset they want to trade
-                // We need to convert this to the asset's units (stored as integer with 8 decimal precision)
-                switch(unit) {
-                    case 'btc':
-                        tradeAmount = Math.round(amount * 100000000); // BTC to internal units
-                        break;
-                    case 'msat':
-                        tradeAmount = Math.round(amount * 1000000); // mBTC to internal units
-                        break;
-                    case 'ksat':
-                        tradeAmount = Math.round(amount * 1000); // kSats to internal units
-                        break;
-                    case 'sat':
-                        tradeAmount = Math.round(amount); // Sats to internal units
-                        break;
-                }
+            // For non-BTC assets, the amount is in asset units
+            if (unit === 'asset') {
+                // Amount is in the asset's native units - convert to integer storage
+                tradeAmount = Math.round(amount * 100000000);
             } else {
-                // Amount is in the asset's native units - still needs to be integer
+                // This shouldn't happen with the new UI, but handle it just in case
                 tradeAmount = Math.round(amount * 100000000);
             }
         }
