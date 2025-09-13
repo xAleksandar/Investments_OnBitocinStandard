@@ -6,20 +6,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bitcoin Investment Game - A gamified investment platform where users start with 1 virtual Bitcoin and attempt to outperform holding BTC by trading it for stocks and commodities. All values are measured in satoshis instead of fiat currency, providing a Bitcoin-centric perspective on investing.
 
+## Prerequisites
+
+### PostgreSQL Setup
+```bash
+# Install PostgreSQL
+sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib
+
+# Start PostgreSQL service
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Create database user (matches .env config)
+sudo -u postgres createuser -d plamenandonov
+
+# Configure PostgreSQL for local development (trust authentication)
+sudo sed -i "s/local   all             all                                     peer/local   all             all                                     trust/" /etc/postgresql/16/main/pg_hba.conf
+sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             127.0.0.1\/32            trust/" /etc/postgresql/16/main/pg_hba.conf
+sudo systemctl restart postgresql
+```
+
 ## Development Commands
 
 ```bash
 # Install dependencies
 npm install
 
+# Initialize database (run once after PostgreSQL setup)
+npm run setup-db
+
 # Run development server with auto-reload (port 3000)
 npm run dev
 
+# Magic links appear in server console (email not configured)
+# Look for: "Magic link for [email]: http://localhost:3000/auth/verify?token=..."
+
+# To run server in background and monitor logs (Claude Code):
+# 1. Run with run_in_background: true - returns bash_id
+# 2. Monitor logs with BashOutput(bash_id: "xxxxx")
+
 # Run production server
 npm start
-
-# Initialize database tables
-npm run setup-db
 
 # Database management scripts
 node scripts/wipe-database.js        # Clear all data
@@ -84,7 +111,7 @@ Single-page application (`public/app.js`) with:
 5. Enforce 24-hour lock on new purchases
 
 ### Portfolio Calculation
-- Holdings value = sum of (quantity × current_price_in_sats)
+- Holdings value = sum of (quantity ï¿½ current_price_in_sats)
 - P&L = current_value - cost_basis
 - Cost basis tracked per trade for accurate calculations
 - All calculations done in satoshis to avoid floating point issues
@@ -133,3 +160,27 @@ Check PostgreSQL is running and `.env` credentials are correct
 - Check CoinGecko API status
 - Implement fallback to last known prices
 - Consider caching strategy for resilience
+
+## Recent Fixes (Sep 2025)
+
+### 1. Performance Calculation Bug
+Fixed missing performance calculation in frontend (`public/app.js` lines 234-252)
+- Calculates: `(current_value - initial_1BTC) / initial_1BTC * 100`
+- Updates color based on positive/negative performance
+
+### 2. 30-Second Auto-Refresh
+Implemented automatic price updates every 30 seconds
+- Added `startPriceAutoRefresh()` and `stopPriceAutoRefresh()` methods
+- Auto-starts on login, stops on logout
+- Refreshes both prices and portfolio values
+
+### 3. API Rate Limiting & Error Handling
+Added fallback handling for CoinGecko API rate limits
+- Falls back to last known database price when API fails
+- Default fallback price of $115,000 for BTC
+
+### 4. Gold Price Unit Conversion
+Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
+- CoinGecko returns gold price per gram
+- Multiply by 31.1035 to convert to troy ounces
+- Corrected stored amounts in database

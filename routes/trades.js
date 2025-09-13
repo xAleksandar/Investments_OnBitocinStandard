@@ -123,17 +123,20 @@ router.post('/', authenticateToken, async (req, res) => {
       // Other asset to BTC
       const assetPriceUsd = assetPrices[fromAsset];
       console.log(`Converting ${amount} ${fromAsset} to BTC at $${assetPriceUsd}`);
-      
+
       if (!assetPriceUsd) {
         await pool.query('ROLLBACK');
         return res.status(400).json({ error: `Price not available for ${fromAsset}` });
       }
-      
-      const usdValue = amount * assetPriceUsd;
+
+      // Amount is stored as integer with 8 decimal precision (like satoshis)
+      // Convert back to actual units: amount / 100M
+      const actualUnits = amount / 100000000;
+      const usdValue = actualUnits * assetPriceUsd;
       const btcAmount = usdValue / btcPrice;
       toAmount = Math.round(btcAmount * 100000000); // Convert to sats
-      
-      console.log(`${amount} ${fromAsset} = $${usdValue} = ${btcAmount} BTC = ${toAmount} sats`);
+
+      console.log(`${amount} stored units = ${actualUnits} ${fromAsset} = $${usdValue} = ${btcAmount} BTC = ${toAmount} sats`);
       
     } else {
       await pool.query('ROLLBACK');

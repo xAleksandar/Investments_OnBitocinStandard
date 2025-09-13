@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Calculation Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Performance Calculation Test</h1>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">Live Performance Display</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-orange-50 p-4 rounded">
+                    <h3 class="font-semibold text-orange-800">Total Value</h3>
+                    <p id="totalValue" class="text-2xl font-bold text-orange-600">0 BTC</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded">
+                    <h3 class="font-semibold text-blue-800">Bitcoin Price</h3>
+                    <p id="btcPrice" class="text-2xl font-bold text-blue-600">$45,000</p>
+                </div>
+                <div id="performanceContainer" class="bg-green-50 p-4 rounded">
+                    <h3 class="font-semibold text-green-800">Performance</h3>
+                    <p id="performance" class="text-2xl font-bold text-green-600">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-4">Test Scenarios</h2>
+            <div class="space-y-2">
+                <button onclick="testScenario1()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full text-left">
+                    Test 1: Lost 0.01% (0.9999 BTC) - Creator's Scenario
+                </button>
+                <button onclick="testScenario2()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full text-left">
+                    Test 2: Gained 10% (1.1 BTC)
+                </button>
+                <button onclick="testScenario3()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full text-left">
+                    Test 3: Lost 25% (0.75 BTC)
+                </button>
+                <button onclick="testScenario4()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full text-left">
+                    Test 4: Breakeven (1.0 BTC)
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-bold mb-4">Test Results</h2>
+            <pre id="testResults" class="text-sm bg-gray-100 p-4 rounded"></pre>
+        </div>
+    </div>
+
+    <script>
+        // This is the EXACT code from the fixed app.js
+        function displayPortfolio(data) {
+            const totalValueDiv = document.getElementById('totalValue');
+            const performanceDiv = document.getElementById('performance');
+
+            const totalSats = data.total_value_sats || 0;
+            const totalBTC = (totalSats / 100000000).toFixed(8);
+            totalValueDiv.textContent = `${totalBTC} BTC`;
+
+            // Calculate and display performance
+            const startingBalance = 100000000; // 1 BTC in sats
+            const totalCostBasis = data.total_cost_sats || startingBalance;
+            const currentValue = data.total_value_sats || 0;
+
+            const performanceValue = ((currentValue - totalCostBasis) / totalCostBasis) * 100;
+            const isPositive = performanceValue >= 0;
+
+            // Update performance display
+            performanceDiv.textContent = `${isPositive ? '+' : ''}${performanceValue.toFixed(2)}%`;
+
+            // Update color based on performance
+            const performanceParent = performanceDiv.parentElement;
+            if (isPositive) {
+                performanceParent.className = 'bg-green-50 p-4 rounded';
+                performanceDiv.className = 'text-2xl font-bold text-green-600';
+            } else {
+                performanceParent.className = 'bg-red-50 p-4 rounded';
+                performanceDiv.className = 'text-2xl font-bold text-red-600';
+            }
+
+            // Log results
+            document.getElementById('testResults').textContent =
+                `Data received:\n` +
+                `  total_value_sats: ${data.total_value_sats}\n` +
+                `  total_cost_sats: ${data.total_cost_sats}\n` +
+                `  BTC value: ${totalBTC}\n` +
+                `  Performance: ${performanceDiv.textContent}\n` +
+                `  Color: ${isPositive ? 'GREEN' : 'RED'}`;
+        }
+
+        function testScenario1() {
+            console.log("Testing: Lost 0.01% (Creator's scenario)");
+            displayPortfolio({
+                total_value_sats: 99990000,  // 0.9999 BTC
+                total_cost_sats: 100000000,  // 1.0 BTC starting
+                btc_price: 45000
+            });
+        }
+
+        function testScenario2() {
+            console.log("Testing: Gained 10%");
+            displayPortfolio({
+                total_value_sats: 110000000,  // 1.1 BTC
+                total_cost_sats: 100000000,   // 1.0 BTC starting
+                btc_price: 45000
+            });
+        }
+
+        function testScenario3() {
+            console.log("Testing: Lost 25%");
+            displayPortfolio({
+                total_value_sats: 75000000,   // 0.75 BTC
+                total_cost_sats: 100000000,   // 1.0 BTC starting
+                btc_price: 45000
+            });
+        }
+
+        function testScenario4() {
+            console.log("Testing: Breakeven");
+            displayPortfolio({
+                total_value_sats: 100000000,  // 1.0 BTC
+                total_cost_sats: 100000000,   // 1.0 BTC starting
+                btc_price: 45000
+            });
+        }
+
+        // Load with creator's scenario by default
+        window.onload = () => testScenario1();
+    </script>
+</body>
+</html>

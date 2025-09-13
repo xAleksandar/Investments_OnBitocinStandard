@@ -12,7 +12,7 @@ class BitcoinGame {
         // Check if we have a token from URL (magic link)
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = urlParams.get('token');
-        
+
         if (urlToken) {
             // Clean URL first
             window.history.replaceState({}, document.title, '/');
@@ -23,6 +23,8 @@ class BitcoinGame {
         if (this.token) {
             this.showMainApp();
             this.loadData();
+            // Start 30-second price auto-refresh
+            this.startPriceAutoRefresh();
         } else {
             this.showLoginForm();
         }
@@ -103,24 +105,49 @@ class BitcoinGame {
     async requestMagicLink() {
         const email = document.getElementById('email').value;
         const username = document.getElementById('username').value;
-        
+
         try {
             const response = await fetch('/api/auth/request-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, username })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 this.showMessage(data.message, 'success');
+
+                // If we have a magic link URL, show the open button
+                if (data.magicLink) {
+                    this.showMagicLinkButton(data.magicLink);
+                }
             } else {
                 this.showMessage(data.error, 'error');
             }
         } catch (error) {
             this.showMessage('Network error', 'error');
         }
+    }
+
+    showMagicLinkButton(magicLink) {
+        // Find the message div (where green text appears)
+        const messageDiv = document.getElementById('message');
+        if (!messageDiv) return;
+
+        // Add the open button right after the message
+        const buttonHtml = `
+            <button
+                type="button"
+                onclick="window.open('${magicLink}', '_blank')"
+                class="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+                Open Magic Link
+            </button>
+        `;
+
+        // Append button to the existing message
+        messageDiv.innerHTML = messageDiv.innerHTML + buttonHtml;
     }
 
     async verifyMagicLink(token) {
@@ -136,9 +163,11 @@ class BitcoinGame {
                 this.user = data.user;
                 localStorage.setItem('token', this.token);
                 localStorage.setItem('user', JSON.stringify(this.user));
-                
+
                 this.showMainApp();
                 this.loadData();
+                // Start 30-second price auto-refresh after successful login
+                this.startPriceAutoRefresh();
             } else {
                 this.showMessage(data.error, 'error');
                 this.showLoginForm();
@@ -173,9 +202,19 @@ class BitcoinGame {
         try {
             const response = await fetch('/api/assets/prices');
             const data = await response.json();
+
+            // Check if response contains valid data
+            if (data.error) {
+                console.error('Server error loading prices:', data.error);
+                return;
+            }
+
             this.prices = data.pricesInSats;
-            
-            document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+
+            // Update Bitcoin price display with error handling
+            if (data.btcPrice) {
+                document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+            }
         } catch (error) {
             console.error('Failed to load prices:', error);
         }
@@ -217,11 +256,12 @@ class BitcoinGame {
         totalValueDiv.textContent = `${totalBTC} BTC`;
 
         // Calculate and display performance
+        // Performance is always measured against the initial 1 BTC starting balance
         const startingBalance = 100000000; // 1 BTC in sats
-        const totalCostBasis = data.total_cost_sats || startingBalance;
         const currentValue = data.total_value_sats || 0;
 
-        const performanceValue = ((currentValue - totalCostBasis) / totalCostBasis) * 100;
+        // Performance = (current - initial) / initial * 100
+        const performanceValue = ((currentValue - startingBalance) / startingBalance) * 100;
         const isPositive = performanceValue >= 0;
 
         // Update performance display
@@ -444,8 +484,29 @@ class BitcoinGame {
                     break;
             }
         } else {
-            // For non-BTC assets, amount is in the asset's native units
-            tradeAmount = amount;
+            // For non-BTC assets, we need to convert based on what the user selected
+            // If they're entering BTC amounts for a non-BTC asset, convert to the asset's stored units
+            if (unit === 'btc' || unit === 'msat' || unit === 'ksat' || unit === 'sat') {
+                // User is specifying how much BTC worth of the asset they want to trade
+                // We need to convert this to the asset's units (stored as integer with 8 decimal precision)
+                switch(unit) {
+                    case 'btc':
+                        tradeAmount = Math.round(amount * 100000000); // BTC to internal units
+                        break;
+                    case 'msat':
+                        tradeAmount = Math.round(amount * 1000000); // mBTC to internal units
+                        break;
+                    case 'ksat':
+                        tradeAmount = Math.round(amount * 1000); // kSats to internal units
+                        break;
+                    case 'sat':
+                        tradeAmount = Math.round(amount); // Sats to internal units
+                        break;
+                }
+            } else {
+                // Amount is in the asset's native units - still needs to be integer
+                tradeAmount = Math.round(amount * 100000000);
+            }
         }
 
         // Check minimum trade amount (100k sats) - AFTER conversion
@@ -658,7 +719,25 @@ class BitcoinGame {
         localStorage.removeItem('user');
         this.token = null;
         this.user = {};
+        // Stop price auto-refresh when logging out
+        this.stopPriceAutoRefresh();
         this.showLoginForm();
+    }
+
+    startPriceAutoRefresh() {
+        // Refresh prices every 30 seconds
+        this.priceRefreshInterval = setInterval(() => {
+            this.loadPrices();
+            // Also reload portfolio to update values with new prices
+            this.loadPortfolio();
+        }, 30000); // 30 seconds
+    }
+
+    stopPriceAutoRefresh() {
+        if (this.priceRefreshInterval) {
+            clearInterval(this.priceRefreshInterval);
+            this.priceRefreshInterval = null;
+        }
     }
 }
 

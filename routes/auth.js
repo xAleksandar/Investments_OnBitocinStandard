@@ -56,9 +56,13 @@ router.post('/request-link', async (req, res) => {
     );
     
     // In production, send email here
-    console.log(`Magic link for ${email}: http://localhost:3000/auth/verify?token=${token}`);
-    
-    res.json({ message: 'Magic link sent! Check console for now.' });
+    const magicLinkUrl = `http://localhost:3000/auth/verify?token=${token}`;
+    console.log(`Magic link for ${email}: ${magicLinkUrl}`);
+
+    res.json({
+      message: 'Magic link sent! Check console for now.',
+      magicLink: magicLinkUrl // Include the link in response for dev mode
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
