@@ -702,16 +702,13 @@ class BitcoinGame {
                     `;
                     
                     data.sales.forEach(sale => {
-                        // For sales from this asset to BTC, from_amount is in asset units
-                        // We need to show BTC value that was represented by those asset units
-                        const soldAssetAmount = (sale.from_amount / 100000000).toFixed(8);
+                        const soldAmount = (sale.from_amount / 100000000).toFixed(8);
                         const receivedBTC = (sale.to_amount / 100000000).toFixed(8);
-
-                        // The BTC value sold is what we received back
+                        
                         content += `
                             <tr class="border-b">
                                 <td class="p-2">${new Date(sale.created_at).toLocaleDateString()}</td>
-                                <td class="p-2">${receivedBTC} BTC worth</td>
+                                <td class="p-2">${soldAmount} ${symbol}</td>
                                 <td class="p-2">${receivedBTC} BTC</td>
                             </tr>
                         `;
