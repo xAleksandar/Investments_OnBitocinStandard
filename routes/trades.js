@@ -81,8 +81,11 @@ router.post('/', authenticateToken, async (req, res) => {
     
     if (holding.rows[0].amount < amount) {
       await pool.query('ROLLBACK');
-      return res.status(400).json({ 
-        error: `Insufficient balance. You have ${holding.rows[0].amount} ${fromAsset}, but need ${amount}` 
+      // Convert raw stored values to decimal for display
+      const availableDecimal = (holding.rows[0].amount / 100000000).toFixed(8);
+      const requestedDecimal = (amount / 100000000).toFixed(8);
+      return res.status(400).json({
+        error: `Insufficient balance. You have ${availableDecimal} ${fromAsset}, but tried to sell ${requestedDecimal} ${fromAsset}`
       });
     }
     
