@@ -278,8 +278,25 @@ class BitcoinGame {
         }
 
         holdingsDiv.innerHTML = '';
-        
-        data.holdings.forEach(holding => {
+
+        // Sort holdings alphabetically, but keep BTC first
+        const sortedHoldings = [...data.holdings].sort((a, b) => {
+            // BTC always comes first
+            if (a.asset_symbol === 'BTC') return -1;
+            if (b.asset_symbol === 'BTC') return 1;
+
+            // Get asset names for comparison
+            const assetA = this.assets.find(asset => asset.symbol === a.asset_symbol);
+            const assetB = this.assets.find(asset => asset.symbol === b.asset_symbol);
+
+            const nameA = assetA?.name || a.asset_symbol;
+            const nameB = assetB?.name || b.asset_symbol;
+
+            // Sort alphabetically by name
+            return nameA.localeCompare(nameB);
+        });
+
+        sortedHoldings.forEach(holding => {
             const asset = this.assets.find(a => a.symbol === holding.asset_symbol);
             
             const holdingDiv = document.createElement('div');
