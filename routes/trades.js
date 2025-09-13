@@ -86,10 +86,24 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
     
-    // Check if asset is locked
-    if (holding.rows[0].locked_until && new Date(holding.rows[0].locked_until) > new Date()) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ error: 'Asset is locked until tomorrow' });
+    // Check if asset is locked (need to check purchases table for lock status)
+    if (fromAsset !== 'BTC') {
+      const lockedPurchases = await pool.query(
+        'SELECT SUM(amount) as locked_amount FROM purchases WHERE user_id = $1 AND asset_symbol = $2 AND locked_until > NOW()',
+        [req.user.userId, fromAsset]
+      );
+
+      const lockedAmount = lockedPurchases.rows[0]?.locked_amount || 0;
+
+      console.log(`Checking lock: ${fromAsset} requested: ${amount}, locked: ${lockedAmount}, available: ${holding.rows[0].amount - lockedAmount}`);
+
+      if (lockedAmount > 0 && amount > (holding.rows[0].amount - lockedAmount)) {
+        await pool.query('ROLLBACK');
+        const availableAmount = holding.rows[0].amount - lockedAmount;
+        return res.status(400).json({
+          error: `Cannot sell locked assets. You have ${lockedAmount / 100000000} ${fromAsset} locked. Available to sell: ${availableAmount / 100000000} ${fromAsset}`
+        });
+      }
     }
     
     // Calculate conversion
