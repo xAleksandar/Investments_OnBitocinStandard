@@ -1,0 +1,644 @@
+class BitcoinGame {
+    constructor() {
+        this.token = localStorage.getItem('token');
+        this.user = JSON.parse(localStorage.getItem('user') || '{}');
+        this.assets = [];
+        this.prices = {};
+        
+        this.init();
+    }
+
+    init() {
+        // Check if we have a token from URL (magic link)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        
+        if (urlToken) {
+            // Clean URL first
+            window.history.replaceState({}, document.title, '/');
+            this.verifyMagicLink(urlToken);
+            return;
+        }
+
+        if (this.token) {
+            this.showMainApp();
+            this.loadData();
+        } else {
+            this.showLoginForm();
+        }
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Auth form
+        document.getElementById('authForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.requestMagicLink();
+        });
+
+        // Trade form
+        document.getElementById('tradeForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.executeTrade();
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
+        // Show username field for new users
+        document.getElementById('email').addEventListener('blur', async () => {
+            const email = document.getElementById('email').value;
+            if (email) {
+                // Check if user exists
+                try {
+                    const response = await fetch('/api/auth/check-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+                    const data = await response.json();
+                    
+                    if (!data.exists) {
+                        document.getElementById('usernameField').style.display = 'block';
+                    } else {
+                        document.getElementById('usernameField').style.display = 'none';
+                    }
+                } catch (error) {
+                    // If check fails, show username field to be safe
+                    document.getElementById('usernameField').style.display = 'block';
+                }
+            }
+        });
+
+        // Update amount helper text
+        document.getElementById('amountUnit').addEventListener('change', () => {
+            this.updateAmountHelper();
+        });
+
+        document.getElementById('tradeAmount').addEventListener('input', () => {
+            this.updateAmountHelper();
+        });
+
+        // Close notification
+        document.getElementById('closeNotification').addEventListener('click', () => {
+            this.hideNotification();
+        });
+
+        // Close modal
+        document.getElementById('closeModal').addEventListener('click', () => {
+            this.hideAssetModal();
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('assetModal').addEventListener('click', (e) => {
+            if (e.target.id === 'assetModal') {
+                this.hideAssetModal();
+            }
+        });
+    }
+
+    async requestMagicLink() {
+        const email = document.getElementById('email').value;
+        const username = document.getElementById('username').value;
+        
+        try {
+            const response = await fetch('/api/auth/request-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, username })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                this.showMessage(data.message, 'success');
+            } else {
+                this.showMessage(data.error, 'error');
+            }
+        } catch (error) {
+            this.showMessage('Network error', 'error');
+        }
+    }
+
+    async verifyMagicLink(token) {
+        console.log('Verifying token:', token);
+        try {
+            const response = await fetch(`/api/auth/verify?token=${token}`);
+            const data = await response.json();
+            
+            console.log('Verification response:', response.status, data);
+            
+            if (response.ok) {
+                this.token = data.token;
+                this.user = data.user;
+                localStorage.setItem('token', this.token);
+                localStorage.setItem('user', JSON.stringify(this.user));
+                
+                this.showMainApp();
+                this.loadData();
+            } else {
+                this.showMessage(data.error, 'error');
+                this.showLoginForm();
+            }
+        } catch (error) {
+            console.error('Verification error:', error);
+            this.showMessage('Verification failed', 'error');
+            this.showLoginForm();
+        }
+    }
+
+    async loadData() {
+        await Promise.all([
+            this.loadAssets(),
+            this.loadPrices(),
+            this.loadPortfolio(),
+            this.loadTradeHistory()
+        ]);
+    }
+
+    async loadAssets() {
+        try {
+            const response = await fetch('/api/assets');
+            this.assets = await response.json();
+            this.populateAssetSelects();
+        } catch (error) {
+            console.error('Failed to load assets:', error);
+        }
+    }
+
+    async loadPrices() {
+        try {
+            const response = await fetch('/api/assets/prices');
+            const data = await response.json();
+            this.prices = data.pricesInSats;
+            
+            document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+        } catch (error) {
+            console.error('Failed to load prices:', error);
+        }
+    }
+
+    async loadPortfolio() {
+        try {
+            const response = await fetch('/api/portfolio', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            
+            const data = await response.json();
+            this.displayPortfolio(data);
+        } catch (error) {
+            console.error('Failed to load portfolio:', error);
+        }
+    }
+
+    async loadTradeHistory() {
+        try {
+            const response = await fetch('/api/trades/history', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            
+            const trades = await response.json();
+            this.displayTradeHistory(trades);
+        } catch (error) {
+            console.error('Failed to load trade history:', error);
+        }
+    }
+
+    displayPortfolio(data) {
+        const holdingsDiv = document.getElementById('holdings');
+        const totalValueDiv = document.getElementById('totalValue');
+        
+        const totalSats = data.total_value_sats || 0;
+        const totalBTC = (totalSats / 100000000).toFixed(8);
+        totalValueDiv.textContent = `${totalBTC} BTC`;
+        
+        holdingsDiv.innerHTML = '';
+        
+        data.holdings.forEach(holding => {
+            const asset = this.assets.find(a => a.symbol === holding.asset_symbol);
+            
+            const holdingDiv = document.createElement('div');
+            let bgClass = 'bg-gray-50';
+            if (holding.lock_status === 'locked') {
+                bgClass = 'bg-red-50 border-red-200';
+            } else if (holding.lock_status === 'partial') {
+                bgClass = 'bg-yellow-50 border-yellow-200';
+            }
+            
+            holdingDiv.className = `p-3 border rounded cursor-pointer hover:bg-gray-100 ${bgClass}`;
+            
+            let displayAmount;
+            if (holding.asset_symbol === 'BTC') {
+                displayAmount = `${(holding.amount / 100000000).toFixed(8)} BTC`;
+            } else {
+                // Convert back from stored integer to actual shares
+                const actualAmount = holding.amount / 100000000;
+                displayAmount = `${actualAmount.toFixed(8)} ${holding.asset_symbol}`;
+            }
+            
+            const currentValue = (holding.current_value_sats / 100000000).toFixed(8);
+            const costBasis = (holding.cost_basis_sats / 100000000).toFixed(8);
+            const pnl = holding.current_value_sats - holding.cost_basis_sats;
+            const pnlBTC = (pnl / 100000000).toFixed(8);
+            const pnlPercent = holding.cost_basis_sats > 0 ? ((pnl / holding.cost_basis_sats) * 100).toFixed(2) : '0.00';
+            const pnlColor = pnl >= 0 ? 'text-green-600' : 'text-red-600';
+            const pnlSign = pnl >= 0 ? '+' : '';
+            
+            const lastPurchaseDate = holding.last_purchase_date ? new Date(holding.last_purchase_date).toLocaleDateString() : 'Never';
+            
+            // Lock status display
+            let lockDisplay = '';
+            if (holding.lock_status === 'locked') {
+                lockDisplay = '<div class="text-xs text-red-600 font-medium">🔒 Fully Locked</div>';
+            } else if (holding.lock_status === 'partial') {
+                const lockedAmount = (holding.locked_amount / 100000000).toFixed(8);
+                lockDisplay = `<div class="text-xs text-yellow-600 font-medium">🔒 ${lockedAmount} Locked</div>`;
+            }
+            
+            holdingDiv.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="font-semibold">${asset?.name || holding.asset_symbol}</span>
+                                <div class="text-sm text-gray-600">${displayAmount}</div>
+                                ${holding.purchase_count > 0 ? `<div class="text-xs text-gray-500">${holding.purchase_count} purchases • Last: ${lastPurchaseDate}</div>` : ''}
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold">${currentValue} BTC</div>
+                                ${holding.asset_symbol !== 'BTC' ? `
+                                    <div class="text-xs text-gray-500">Cost: ${costBasis} BTC</div>
+                                    <div class="text-xs ${pnlColor}">${pnlSign}${pnlBTC} BTC (${pnlSign}${pnlPercent}%)</div>
+                                ` : ''}
+                                ${lockDisplay}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add click handler for non-BTC assets
+            if (holding.asset_symbol !== 'BTC' && holding.purchase_count > 0) {
+                holdingDiv.addEventListener('click', () => {
+                    this.showAssetDetails(holding.asset_symbol, asset?.name || holding.asset_symbol);
+                });
+            }
+            
+            holdingsDiv.appendChild(holdingDiv);
+        });
+    }
+
+    displayTradeHistory(trades) {
+        const historyDiv = document.getElementById('tradeHistory');
+        
+        if (trades.length === 0) {
+            historyDiv.innerHTML = '<p class="text-gray-500">No trades yet</p>';
+            return;
+        }
+        
+        const table = document.createElement('table');
+        table.className = 'w-full text-sm';
+        
+        table.innerHTML = `
+            <thead>
+                <tr class="border-b">
+                    <th class="text-left p-2">Date</th>
+                    <th class="text-left p-2">Sold</th>
+                    <th class="text-left p-2">Bought</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${trades.map(trade => {
+                    const fromAmount = trade.from_asset === 'BTC' 
+                        ? (trade.from_amount / 100000000).toFixed(8) + ' BTC'
+                        : (trade.from_amount / 100000000).toFixed(8) + ' ' + trade.from_asset;
+                    
+                    const toAmount = trade.to_asset === 'BTC'
+                        ? (trade.to_amount / 100000000).toFixed(8) + ' BTC'
+                        : (trade.to_amount / 100000000).toFixed(8) + ' ' + trade.to_asset;
+                    
+                    return `
+                        <tr class="border-b">
+                            <td class="p-2">${new Date(trade.created_at).toLocaleDateString()}</td>
+                            <td class="p-2 text-red-600">-${fromAmount}</td>
+                            <td class="p-2 text-green-600">+${toAmount}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        `;
+        
+        historyDiv.innerHTML = '';
+        historyDiv.appendChild(table);
+    }
+
+    populateAssetSelects() {
+        const fromSelect = document.getElementById('fromAsset');
+        const toSelect = document.getElementById('toAsset');
+        
+        fromSelect.innerHTML = '';
+        toSelect.innerHTML = '';
+        
+        // Sort assets to put Bitcoin first
+        const sortedAssets = [...this.assets].sort((a, b) => {
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+        
+        sortedAssets.forEach(asset => {
+            const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+            const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+            
+            fromSelect.appendChild(option1);
+            toSelect.appendChild(option2);
+        });
+    }
+
+    updateAmountHelper() {
+        const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
+        const unit = document.getElementById('amountUnit').value;
+        const helper = document.getElementById('amountHelper');
+        
+        let sats = 0;
+        let btc = 0;
+        
+        switch(unit) {
+            case 'btc':
+                sats = amount * 100000000;
+                helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
+                break;
+            case 'msat':
+                sats = amount * 1000000;
+                btc = amount / 100;
+                helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                break;
+            case 'ksat':
+                sats = amount * 1000;
+                btc = amount / 100000;
+                helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                break;
+            case 'sat':
+                btc = amount / 100000000;
+                helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
+                break;
+        }
+    }
+
+    async executeTrade() {
+        const fromAsset = document.getElementById('fromAsset').value;
+        const toAsset = document.getElementById('toAsset').value;
+        const amount = parseFloat(document.getElementById('tradeAmount').value);
+        const unit = document.getElementById('amountUnit').value;
+        
+        if (fromAsset === toAsset) {
+            this.showNotification('Cannot trade the same asset', 'error');
+            return;
+        }
+        
+        if (!amount || amount <= 0) {
+            this.showNotification('Please enter a valid amount', 'error');
+            return;
+        }
+        
+        // Convert amount to satoshis based on unit
+        let tradeAmount = amount;
+        if (fromAsset === 'BTC') {
+            switch(unit) {
+                case 'btc':
+                    tradeAmount = Math.round(amount * 100000000); // BTC to sats
+                    break;
+                case 'msat':
+                    tradeAmount = Math.round(amount * 1000000); // mSats to sats
+                    break;
+                case 'ksat':
+                    tradeAmount = Math.round(amount * 1000); // kSats to sats
+                    break;
+                case 'sat':
+                    tradeAmount = Math.round(amount); // Already in sats
+                    break;
+            }
+        } else {
+            // For non-BTC assets, amount is in the asset's native units
+            tradeAmount = amount;
+        }
+
+        // Check minimum trade amount (100k sats) - AFTER conversion
+        const MIN_TRADE_SATS = 100000;
+        if (fromAsset === 'BTC' && tradeAmount < MIN_TRADE_SATS) {
+            this.showNotification(`Minimum trade amount is ${MIN_TRADE_SATS.toLocaleString()} sats (100 kSats)`, 'error');
+            return;
+        }
+        
+        console.log('=== TRADE REQUEST DEBUG ===');
+        console.log('From Asset:', fromAsset);
+        console.log('To Asset:', toAsset);
+        console.log('Original Amount:', amount);
+        console.log('Unit:', unit);
+        console.log('Converted Amount (sats):', tradeAmount);
+        console.log('Min Trade Amount:', 100000);
+        console.log('Passes Min Check:', tradeAmount >= 100000);
+
+        try {
+            console.log('Sending HTTP request...');
+            
+            const response = await fetch('/api/trades', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    fromAsset,
+                    toAsset,
+                    amount: tradeAmount
+                })
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            const data = await response.json();
+            console.log('Response data:', data);
+            
+            if (response.ok) {
+                this.showNotification('Trade executed successfully!', 'success');
+                document.getElementById('tradeForm').reset();
+                this.loadData(); // Refresh data
+            } else {
+                this.showNotification(`Trade failed: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Trade request error:', error);
+            this.showNotification(`Trade failed: ${error.message}`, 'error');
+        }
+    }
+
+    showLoginForm() {
+        document.getElementById('loginForm').classList.remove('hidden');
+        document.getElementById('mainApp').classList.add('hidden');
+    }
+
+    showMainApp() {
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
+    }
+
+    showMessage(message, type) {
+        const messageDiv = document.getElementById('authMessage');
+        messageDiv.textContent = message;
+        messageDiv.className = `mt-4 text-center ${type === 'error' ? 'text-red-600' : 'text-green-600'}`;
+        messageDiv.classList.remove('hidden');
+    }
+
+    showNotification(message, type = 'success') {
+        const notification = document.getElementById('notification');
+        const messageEl = document.getElementById('notificationMessage');
+        const iconEl = document.getElementById('notificationIcon');
+        
+        messageEl.textContent = message;
+        
+        // Update styling based on type
+        const container = notification.querySelector('div');
+        if (type === 'success') {
+            container.className = 'bg-white border-l-4 border-green-500 rounded-lg shadow-lg p-4 max-w-sm';
+            iconEl.textContent = '✓';
+            iconEl.className = 'w-5 h-5 text-green-500';
+        } else if (type === 'error') {
+            container.className = 'bg-white border-l-4 border-red-500 rounded-lg shadow-lg p-4 max-w-sm';
+            iconEl.textContent = '✕';
+            iconEl.className = 'w-5 h-5 text-red-500';
+        }
+        
+        notification.classList.remove('hidden');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            this.hideNotification();
+        }, 5000);
+    }
+
+    hideNotification() {
+        document.getElementById('notification').classList.add('hidden');
+    }
+
+    async showAssetDetails(symbol, name) {
+        try {
+            const response = await fetch(`/api/portfolio/asset/${symbol}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            
+            const data = await response.json();
+            
+            document.getElementById('modalTitle').textContent = `${name} (${symbol}) Purchase History`;
+            
+            const modalContent = document.getElementById('modalContent');
+            
+            if (data.purchases.length === 0 && data.sales.length === 0) {
+                modalContent.innerHTML = '<p class="text-gray-500">No transactions found for this asset.</p>';
+            } else {
+                let content = '';
+                
+                // Show purchases
+                if (data.purchases.length > 0) {
+                    content += '<h4 class="font-semibold mb-2">Individual Purchases</h4>';
+                    content += '<div class="overflow-x-auto mb-4">';
+                    content += '<table class="w-full text-sm">';
+                    content += `
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left p-2">Date</th>
+                                <th class="text-left p-2">Amount</th>
+                                <th class="text-left p-2">BTC Spent</th>
+                                <th class="text-left p-2">Status</th>
+                                <th class="text-left p-2">Unlocks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    data.purchases.forEach(purchase => {
+                        const amount = (purchase.amount / 100000000).toFixed(8);
+                        const btcSpent = (purchase.btc_spent / 100000000).toFixed(8);
+                        const isLocked = purchase.is_locked;
+                        const unlockDate = purchase.locked_until ? new Date(purchase.locked_until).toLocaleString() : 'N/A';
+                        
+                        content += `
+                            <tr class="border-b ${isLocked ? 'bg-red-50' : 'bg-green-50'}">
+                                <td class="p-2">${new Date(purchase.created_at).toLocaleDateString()}</td>
+                                <td class="p-2">${amount} ${symbol}</td>
+                                <td class="p-2">${btcSpent} BTC</td>
+                                <td class="p-2">
+                                    <span class="${isLocked ? 'text-red-600' : 'text-green-600'}">
+                                        ${isLocked ? '🔒 Locked' : '✅ Unlocked'}
+                                    </span>
+                                </td>
+                                <td class="p-2 text-xs">${isLocked ? unlockDate : 'Available'}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    content += '</tbody></table></div>';
+                }
+                
+                // Show sales if any
+                if (data.sales.length > 0) {
+                    content += '<h4 class="font-semibold mb-2">Sales History</h4>';
+                    content += '<div class="overflow-x-auto">';
+                    content += '<table class="w-full text-sm">';
+                    content += `
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left p-2">Date</th>
+                                <th class="text-left p-2">Sold</th>
+                                <th class="text-left p-2">Received</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    data.sales.forEach(sale => {
+                        const soldAmount = (sale.from_amount / 100000000).toFixed(8);
+                        const receivedBTC = (sale.to_amount / 100000000).toFixed(8);
+                        
+                        content += `
+                            <tr class="border-b">
+                                <td class="p-2">${new Date(sale.created_at).toLocaleDateString()}</td>
+                                <td class="p-2">${soldAmount} ${symbol}</td>
+                                <td class="p-2">${receivedBTC} BTC</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    content += '</tbody></table></div>';
+                }
+                
+                modalContent.innerHTML = content;
+            }
+            
+            document.getElementById('assetModal').classList.remove('hidden');
+        } catch (error) {
+            console.error('Failed to load asset details:', error);
+            this.showNotification('Failed to load asset details', 'error');
+        }
+    }
+
+    hideAssetModal() {
+        document.getElementById('assetModal').classList.add('hidden');
+    }
+
+    logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        this.token = null;
+        this.user = {};
+        this.showLoginForm();
+    }
+}
+
+// Initialize the app
+new BitcoinGame();

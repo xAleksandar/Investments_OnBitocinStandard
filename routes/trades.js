@@ -1,0 +1,250 @@
+const express = require('express');
+const pool = require('../config/database');
+const authenticateToken = require('../middleware/auth');
+const router = express.Router();
+
+// Execute a trade
+router.post('/', authenticateToken, async (req, res) => {
+  const { fromAsset, toAsset, amount } = req.body;
+  
+  console.log('=== BACKEND TRADE DEBUG ===');
+  console.log('Request body:', req.body);
+  console.log('User:', req.user);
+  console.log('From Asset:', fromAsset);
+  console.log('To Asset:', toAsset);
+  console.log('Amount:', amount, typeof amount);
+  
+  // Validate minimum trade amount
+  const MIN_TRADE_SATS = 100000; // 100k sats
+  console.log('Min trade check:', fromAsset === 'BTC', amount < MIN_TRADE_SATS);
+  
+  if (fromAsset === 'BTC' && amount < MIN_TRADE_SATS) {
+    console.log('REJECTED: Below minimum trade amount');
+    return res.status(400).json({ 
+      error: `Minimum trade amount is ${MIN_TRADE_SATS.toLocaleString()} sats (100 kSats)` 
+    });
+  }
+  
+  console.log('Minimum trade check passed, proceeding...');
+  
+  try {
+    await pool.query('BEGIN');
+    
+    // First, update prices to ensure we have current data
+    try {
+      const axios = require('axios');
+      const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
+      const btcPrice = btcResponse.data.bitcoin.usd;
+      
+      // Update BTC price
+      await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [btcPrice, 'BTC']);
+      
+      // Update WTI price if needed
+      if (fromAsset === 'WTI' || toAsset === 'WTI') {
+        await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [75, 'WTI']);
+      }
+    } catch (priceError) {
+      console.log('Price update error:', priceError.message);
+    }
+    
+    // Get current prices
+    const assets = await pool.query('SELECT * FROM assets WHERE symbol = $1 OR symbol = $2', [fromAsset, toAsset]);
+    console.log('Found assets:', assets.rows);
+    
+    const assetPrices = {};
+    assets.rows.forEach(asset => {
+      assetPrices[asset.symbol] = asset.current_price_usd;
+    });
+    
+    console.log('Asset prices:', assetPrices);
+    
+    const btcPrice = assetPrices['BTC'];
+    
+    if (!btcPrice || !assetPrices[fromAsset] || !assetPrices[toAsset]) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ error: 'Asset prices not available' });
+    }
+    
+    // Check user has enough of fromAsset
+    const holding = await pool.query(
+      'SELECT * FROM holdings WHERE user_id = $1 AND asset_symbol = $2',
+      [req.user.userId, fromAsset]
+    );
+    
+    console.log('User holding:', holding.rows);
+    console.log('Required amount:', amount, 'Available:', holding.rows[0]?.amount);
+    
+    if (holding.rows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ error: `No ${fromAsset} holdings found` });
+    }
+    
+    if (holding.rows[0].amount < amount) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ 
+        error: `Insufficient balance. You have ${holding.rows[0].amount} ${fromAsset}, but need ${amount}` 
+      });
+    }
+    
+    // Check if asset is locked
+    if (holding.rows[0].locked_until && new Date(holding.rows[0].locked_until) > new Date()) {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ error: 'Asset is locked until tomorrow' });
+    }
+    
+    // Calculate conversion
+    let toAmount;
+    console.log('Starting conversion calculation...');
+    console.log('fromAsset:', fromAsset, 'toAsset:', toAsset);
+    console.log('BTC price:', btcPrice);
+    
+    if (fromAsset === 'BTC') {
+      // BTC to other asset
+      const assetPriceUsd = assetPrices[toAsset];
+      console.log(`Converting ${amount} sats to ${toAsset} at $${assetPriceUsd}`);
+      
+      if (!assetPriceUsd) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ error: `Price not available for ${toAsset}` });
+      }
+      
+      // Convert: (sats / 100M) * btcPrice / assetPrice
+      const btcAmount = amount / 100000000;
+      const usdValue = btcAmount * btcPrice;
+      const rawAmount = usdValue / assetPriceUsd;
+      
+      // Store as integer with 8 decimal precision (like satoshis)
+      // So 1.5 shares becomes 150000000 (1.5 * 100M)
+      toAmount = Math.round(rawAmount * 100000000);
+      
+      console.log(`${amount} sats = ${btcAmount} BTC = $${usdValue} = ${rawAmount} raw shares = ${toAmount} stored units`);
+      
+    } else if (toAsset === 'BTC') {
+      // Other asset to BTC
+      const assetPriceUsd = assetPrices[fromAsset];
+      console.log(`Converting ${amount} ${fromAsset} to BTC at $${assetPriceUsd}`);
+      
+      if (!assetPriceUsd) {
+        await pool.query('ROLLBACK');
+        return res.status(400).json({ error: `Price not available for ${fromAsset}` });
+      }
+      
+      const usdValue = amount * assetPriceUsd;
+      const btcAmount = usdValue / btcPrice;
+      toAmount = Math.round(btcAmount * 100000000); // Convert to sats
+      
+      console.log(`${amount} ${fromAsset} = $${usdValue} = ${btcAmount} BTC = ${toAmount} sats`);
+      
+    } else {
+      await pool.query('ROLLBACK');
+      return res.status(400).json({ error: 'One asset must be BTC' });
+    }
+    
+    console.log('Final toAmount:', toAmount);
+    
+    // Update fromAsset holding
+    console.log(`Updating ${fromAsset} holding: subtracting ${amount}`);
+    const updateResult = await pool.query(
+      'UPDATE holdings SET amount = amount - $1 WHERE user_id = $2 AND asset_symbol = $3 RETURNING *',
+      [amount, req.user.userId, fromAsset]
+    );
+    console.log('Update result:', updateResult.rows);
+    
+    // Handle toAsset - different logic for BTC vs other assets
+    let lockUntil = null; // Initialize lockUntil for all trades
+    
+    if (toAsset === 'BTC') {
+      // For BTC, just update the holdings (no lock)
+      console.log(`Adding ${toAmount} sats to BTC holding`);
+      const toHolding = await pool.query(
+        'SELECT * FROM holdings WHERE user_id = $1 AND asset_symbol = $2',
+        [req.user.userId, toAsset]
+      );
+      
+      if (toHolding.rows.length === 0) {
+        await pool.query(
+          'INSERT INTO holdings (user_id, asset_symbol, amount) VALUES ($1, $2, $3)',
+          [req.user.userId, toAsset, toAmount]
+        );
+      } else {
+        await pool.query(
+          'UPDATE holdings SET amount = amount + $1 WHERE user_id = $2 AND asset_symbol = $3',
+          [toAmount, req.user.userId, toAsset]
+        );
+      }
+      // lockUntil remains null for BTC
+    } else {
+      // For other assets, create individual purchase record
+      lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      console.log(`Creating individual purchase record for ${toAmount} ${toAsset}`);
+      await pool.query(
+        'INSERT INTO purchases (user_id, asset_symbol, amount, btc_spent, purchase_price_usd, btc_price_usd, locked_until) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [req.user.userId, toAsset, toAmount, amount, assetPrices[toAsset], btcPrice, lockUntil]
+      );
+      
+      // Update or create aggregate holding for display
+      const toHolding = await pool.query(
+        'SELECT * FROM holdings WHERE user_id = $1 AND asset_symbol = $2',
+        [req.user.userId, toAsset]
+      );
+      
+      if (toHolding.rows.length === 0) {
+        await pool.query(
+          'INSERT INTO holdings (user_id, asset_symbol, amount) VALUES ($1, $2, $3)',
+          [req.user.userId, toAsset, toAmount]
+        );
+      } else {
+        await pool.query(
+          'UPDATE holdings SET amount = amount + $1 WHERE user_id = $2 AND asset_symbol = $3',
+          [toAmount, req.user.userId, toAsset]
+        );
+      }
+    }
+    
+    // Record trade
+    console.log('Recording trade in history...');
+    const tradeResult = await pool.query(
+      'INSERT INTO trades (user_id, from_asset, to_asset, from_amount, to_amount, btc_price_usd, asset_price_usd) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [req.user.userId, fromAsset, toAsset, amount, toAmount, btcPrice, assetPrices[toAsset === 'BTC' ? fromAsset : toAsset]]
+    );
+    console.log('Trade recorded:', tradeResult.rows);
+    
+    await pool.query('COMMIT');
+    
+    res.json({
+      success: true,
+      trade: {
+        fromAsset,
+        toAsset,
+        fromAmount: amount,
+        toAmount,
+        lockedUntil: lockUntil
+      }
+    });
+    
+  } catch (error) {
+    await pool.query('ROLLBACK');
+    console.error('FULL TRADE ERROR:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error message:', error.message);
+    res.status(500).json({ error: `Trade failed: ${error.message}` });
+  }
+});
+
+// Get trade history
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const trades = await pool.query(
+      'SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [req.user.userId]
+    );
+    
+    res.json(trades.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch trade history' });
+  }
+});
+
+module.exports = router;
