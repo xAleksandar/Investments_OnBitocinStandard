@@ -138,7 +138,7 @@ class BitcoinGame {
 
     showMagicLinkButton(magicLink) {
         // Find the message div (where green text appears)
-        const messageDiv = document.getElementById('message');
+        const messageDiv = document.getElementById('authMessage');
         if (!messageDiv) return;
 
         // Add the open button right after the message
