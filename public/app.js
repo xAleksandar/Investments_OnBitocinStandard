@@ -210,11 +210,33 @@ class BitcoinGame {
     displayPortfolio(data) {
         const holdingsDiv = document.getElementById('holdings');
         const totalValueDiv = document.getElementById('totalValue');
-        
+        const performanceDiv = document.getElementById('performance');
+
         const totalSats = data.total_value_sats || 0;
         const totalBTC = (totalSats / 100000000).toFixed(8);
         totalValueDiv.textContent = `${totalBTC} BTC`;
-        
+
+        // Calculate and display performance
+        const startingBalance = 100000000; // 1 BTC in sats
+        const totalCostBasis = data.total_cost_sats || startingBalance;
+        const currentValue = data.total_value_sats || 0;
+
+        const performanceValue = ((currentValue - totalCostBasis) / totalCostBasis) * 100;
+        const isPositive = performanceValue >= 0;
+
+        // Update performance display
+        performanceDiv.textContent = `${isPositive ? '+' : ''}${performanceValue.toFixed(2)}%`;
+
+        // Update color based on performance
+        const performanceParent = performanceDiv.parentElement;
+        if (isPositive) {
+            performanceParent.className = 'bg-green-50 p-4 rounded';
+            performanceDiv.className = 'text-2xl font-bold text-green-600';
+        } else {
+            performanceParent.className = 'bg-red-50 p-4 rounded';
+            performanceDiv.className = 'text-2xl font-bold text-red-600';
+        }
+
         holdingsDiv.innerHTML = '';
         
         data.holdings.forEach(holding => {
