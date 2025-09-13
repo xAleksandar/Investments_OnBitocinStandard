@@ -104,14 +104,13 @@ router.post('/', authenticateToken, async (req, res) => {
         await pool.query('ROLLBACK');
         const availableAmount = holding.rows[0].amount - lockedAmount;
 
-        // Convert to BTC values for display
-        const assetPriceUsd = assetPrices[fromAsset];
-        const btcValue = (amount / 100000000) * assetPriceUsd / btcPrice;
-        const lockedBtcValue = (lockedAmount / 100000000) * assetPriceUsd / btcPrice;
-        const availableBtcValue = (availableAmount / 100000000) * assetPriceUsd / btcPrice;
+        // Convert to decimal asset amounts for display
+        const requestedDecimal = (amount / 100000000).toFixed(8);
+        const lockedDecimal = (lockedAmount / 100000000).toFixed(8);
+        const availableDecimal = (availableAmount / 100000000).toFixed(8);
 
         return res.status(400).json({
-          error: `Cannot sell locked assets. You tried to sell ${btcValue.toFixed(8)} BTC worth of ${fromAsset}. Currently locked: ${lockedBtcValue.toFixed(8)} BTC worth. Available to sell: ${availableBtcValue > 0 ? availableBtcValue.toFixed(8) : '0'} BTC worth.`
+          error: `Cannot sell locked assets. You tried to sell ${requestedDecimal} ${fromAsset}. Currently locked: ${lockedDecimal} ${fromAsset}. Available to sell: ${availableDecimal} ${fromAsset}.`
         });
       }
     }
