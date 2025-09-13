@@ -100,8 +100,15 @@ router.post('/', authenticateToken, async (req, res) => {
       if (lockedAmount > 0 && amount > (holding.rows[0].amount - lockedAmount)) {
         await pool.query('ROLLBACK');
         const availableAmount = holding.rows[0].amount - lockedAmount;
+
+        // Convert to BTC values for display
+        const assetPriceUsd = assetPrices[fromAsset];
+        const btcValue = (amount / 100000000) * assetPriceUsd / btcPrice;
+        const lockedBtcValue = (lockedAmount / 100000000) * assetPriceUsd / btcPrice;
+        const availableBtcValue = (availableAmount / 100000000) * assetPriceUsd / btcPrice;
+
         return res.status(400).json({
-          error: `Cannot sell locked assets. You have ${lockedAmount / 100000000} ${fromAsset} locked. Available to sell: ${availableAmount / 100000000} ${fromAsset}`
+          error: `Cannot sell locked assets. You tried to sell ${btcValue.toFixed(8)} BTC worth of ${fromAsset}. Currently locked: ${lockedBtcValue.toFixed(8)} BTC worth. Available to sell: ${availableBtcValue > 0 ? availableBtcValue.toFixed(8) : '0'} BTC worth.`
         });
       }
     }
