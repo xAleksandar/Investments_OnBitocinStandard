@@ -12,7 +12,7 @@ class BitcoinGame {
         // Check if we have a token from URL (magic link)
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = urlParams.get('token');
-        
+
         if (urlToken) {
             // Clean URL first
             window.history.replaceState({}, document.title, '/');
@@ -23,6 +23,8 @@ class BitcoinGame {
         if (this.token) {
             this.showMainApp();
             this.loadData();
+            // Start 30-second price auto-refresh
+            this.startPriceAutoRefresh();
         } else {
             this.showLoginForm();
         }
@@ -73,6 +75,12 @@ class BitcoinGame {
             }
         });
 
+        // Update amount unit options when from asset changes
+        document.getElementById('fromAsset').addEventListener('change', () => {
+            this.updateAmountUnitOptions();
+            this.updateAmountHelper();
+        });
+
         // Update amount helper text
         document.getElementById('amountUnit').addEventListener('change', () => {
             this.updateAmountHelper();
@@ -103,24 +111,49 @@ class BitcoinGame {
     async requestMagicLink() {
         const email = document.getElementById('email').value;
         const username = document.getElementById('username').value;
-        
+
         try {
             const response = await fetch('/api/auth/request-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, username })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 this.showMessage(data.message, 'success');
+
+                // If we have a magic link URL, show the open button
+                if (data.magicLink) {
+                    this.showMagicLinkButton(data.magicLink);
+                }
             } else {
                 this.showMessage(data.error, 'error');
             }
         } catch (error) {
             this.showMessage('Network error', 'error');
         }
+    }
+
+    showMagicLinkButton(magicLink) {
+        // Find the message div (where green text appears)
+        const messageDiv = document.getElementById('authMessage');
+        if (!messageDiv) return;
+
+        // Add the open button right after the message
+        const buttonHtml = `
+            <button
+                type="button"
+                onclick="window.open('${magicLink}', '_blank')"
+                class="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+                Open Magic Link
+            </button>
+        `;
+
+        // Append button to the existing message
+        messageDiv.innerHTML = messageDiv.innerHTML + buttonHtml;
     }
 
     async verifyMagicLink(token) {
@@ -136,9 +169,11 @@ class BitcoinGame {
                 this.user = data.user;
                 localStorage.setItem('token', this.token);
                 localStorage.setItem('user', JSON.stringify(this.user));
-                
+
                 this.showMainApp();
                 this.loadData();
+                // Start 30-second price auto-refresh after successful login
+                this.startPriceAutoRefresh();
             } else {
                 this.showMessage(data.error, 'error');
                 this.showLoginForm();
@@ -173,9 +208,19 @@ class BitcoinGame {
         try {
             const response = await fetch('/api/assets/prices');
             const data = await response.json();
+
+            // Check if response contains valid data
+            if (data.error) {
+                console.error('Server error loading prices:', data.error);
+                return;
+            }
+
             this.prices = data.pricesInSats;
-            
-            document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+
+            // Update Bitcoin price display with error handling
+            if (data.btcPrice) {
+                document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
+            }
         } catch (error) {
             console.error('Failed to load prices:', error);
         }
@@ -210,14 +255,54 @@ class BitcoinGame {
     displayPortfolio(data) {
         const holdingsDiv = document.getElementById('holdings');
         const totalValueDiv = document.getElementById('totalValue');
-        
+        const performanceDiv = document.getElementById('performance');
+
         const totalSats = data.total_value_sats || 0;
         const totalBTC = (totalSats / 100000000).toFixed(8);
         totalValueDiv.textContent = `${totalBTC} BTC`;
-        
+
+        // Calculate and display performance
+        // Performance is always measured against the initial 1 BTC starting balance
+        const startingBalance = 100000000; // 1 BTC in sats
+        const currentValue = data.total_value_sats || 0;
+
+        // Performance = (current - initial) / initial * 100
+        const performanceValue = ((currentValue - startingBalance) / startingBalance) * 100;
+        const isPositive = performanceValue >= 0;
+
+        // Update performance display
+        performanceDiv.textContent = `${isPositive ? '+' : ''}${performanceValue.toFixed(2)}%`;
+
+        // Update color based on performance
+        const performanceParent = performanceDiv.parentElement;
+        if (isPositive) {
+            performanceParent.className = 'bg-green-50 p-4 rounded';
+            performanceDiv.className = 'text-2xl font-bold text-green-600';
+        } else {
+            performanceParent.className = 'bg-red-50 p-4 rounded';
+            performanceDiv.className = 'text-2xl font-bold text-red-600';
+        }
+
         holdingsDiv.innerHTML = '';
-        
-        data.holdings.forEach(holding => {
+
+        // Sort holdings alphabetically, but keep BTC first
+        const sortedHoldings = [...data.holdings].sort((a, b) => {
+            // BTC always comes first
+            if (a.asset_symbol === 'BTC') return -1;
+            if (b.asset_symbol === 'BTC') return 1;
+
+            // Get asset names for comparison
+            const assetA = this.assets.find(asset => asset.symbol === a.asset_symbol);
+            const assetB = this.assets.find(asset => asset.symbol === b.asset_symbol);
+
+            const nameA = assetA?.name || a.asset_symbol;
+            const nameB = assetB?.name || b.asset_symbol;
+
+            // Sort alphabetically by name
+            return nameA.localeCompare(nameB);
+        });
+
+        sortedHoldings.forEach(holding => {
             const asset = this.assets.find(a => a.symbol === holding.asset_symbol);
             
             const holdingDiv = document.createElement('div');
@@ -338,53 +423,90 @@ class BitcoinGame {
     populateAssetSelects() {
         const fromSelect = document.getElementById('fromAsset');
         const toSelect = document.getElementById('toAsset');
-        
+
         fromSelect.innerHTML = '';
         toSelect.innerHTML = '';
-        
+
         // Sort assets to put Bitcoin first
         const sortedAssets = [...this.assets].sort((a, b) => {
             if (a.symbol === 'BTC') return -1;
             if (b.symbol === 'BTC') return 1;
             return a.name.localeCompare(b.name);
         });
-        
+
         sortedAssets.forEach(asset => {
             const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
             const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            
+
             fromSelect.appendChild(option1);
             toSelect.appendChild(option2);
         });
+
+        // Initialize unit options for the default selection
+        this.updateAmountUnitOptions();
+    }
+
+    updateAmountUnitOptions() {
+        const fromAsset = document.getElementById('fromAsset').value;
+        const unitSelect = document.getElementById('amountUnit');
+        const currentValue = unitSelect.value;
+
+        // Clear existing options
+        unitSelect.innerHTML = '';
+
+        if (fromAsset === 'BTC') {
+            // When selling BTC, show BTC units
+            unitSelect.innerHTML = `
+                <option value="btc">BTC</option>
+                <option value="msat">mSats</option>
+                <option value="ksat">kSats</option>
+                <option value="sat">Sats</option>
+            `;
+        } else {
+            // When selling other assets, show the asset symbol
+            unitSelect.innerHTML = `<option value="asset">${fromAsset}</option>`;
+        }
+
+        // Try to maintain the previous selection if possible
+        if (fromAsset === 'BTC' && ['btc', 'msat', 'ksat', 'sat'].includes(currentValue)) {
+            unitSelect.value = currentValue;
+        }
     }
 
     updateAmountHelper() {
         const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
         const unit = document.getElementById('amountUnit').value;
         const helper = document.getElementById('amountHelper');
-        
-        let sats = 0;
-        let btc = 0;
-        
-        switch(unit) {
-            case 'btc':
-                sats = amount * 100000000;
-                helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'msat':
-                sats = amount * 1000000;
-                btc = amount / 100;
-                helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'ksat':
-                sats = amount * 1000;
-                btc = amount / 100000;
-                helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'sat':
-                btc = amount / 100000000;
-                helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
-                break;
+        const fromAsset = document.getElementById('fromAsset').value;
+
+        if (unit === 'asset' && fromAsset !== 'BTC') {
+            // When selling non-BTC assets, show the asset amount
+            helper.textContent = `${amount} ${fromAsset}`;
+        } else {
+            // BTC units
+            let sats = 0;
+            let btc = 0;
+
+            switch(unit) {
+                case 'btc':
+                    sats = amount * 100000000;
+                    helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'msat':
+                    sats = amount * 1000000;
+                    btc = amount / 100;
+                    helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'ksat':
+                    sats = amount * 1000;
+                    btc = amount / 100000;
+                    helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'sat':
+                    btc = amount / 100000000;
+                    helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
+                    break;
+            }
         }
     }
 
@@ -422,8 +544,14 @@ class BitcoinGame {
                     break;
             }
         } else {
-            // For non-BTC assets, amount is in the asset's native units
-            tradeAmount = amount;
+            // For non-BTC assets, the amount is in asset units
+            if (unit === 'asset') {
+                // Amount is in the asset's native units - convert to integer storage
+                tradeAmount = Math.round(amount * 100000000);
+            } else {
+                // This shouldn't happen with the new UI, but handle it just in case
+                tradeAmount = Math.round(amount * 100000000);
+            }
         }
 
         // Check minimum trade amount (100k sats) - AFTER conversion
@@ -636,7 +764,25 @@ class BitcoinGame {
         localStorage.removeItem('user');
         this.token = null;
         this.user = {};
+        // Stop price auto-refresh when logging out
+        this.stopPriceAutoRefresh();
         this.showLoginForm();
+    }
+
+    startPriceAutoRefresh() {
+        // Refresh prices every 30 seconds
+        this.priceRefreshInterval = setInterval(() => {
+            this.loadPrices();
+            // Also reload portfolio to update values with new prices
+            this.loadPortfolio();
+        }, 30000); // 30 seconds
+    }
+
+    stopPriceAutoRefresh() {
+        if (this.priceRefreshInterval) {
+            clearInterval(this.priceRefreshInterval);
+            this.priceRefreshInterval = null;
+        }
     }
 }
 

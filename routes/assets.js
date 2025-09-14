@@ -6,9 +6,21 @@ const router = express.Router();
 // Get current prices and update database
 router.get('/prices', async (req, res) => {
   try {
-    // Get Bitcoin price
-    const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
-    const btcPrice = btcResponse.data.bitcoin.usd;
+    // Get Bitcoin price with error handling
+    let btcPrice = 115000; // Fallback price
+    try {
+      const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
+      btcPrice = btcResponse.data.bitcoin.usd;
+    } catch (error) {
+      console.log('Bitcoin API error, using fallback price:', btcPrice);
+      // Try to get last known price from database
+      const lastPriceResult = await pool.query(
+        "SELECT current_price_usd FROM assets WHERE symbol = 'BTC' LIMIT 1"
+      );
+      if (lastPriceResult.rows.length > 0 && lastPriceResult.rows[0].current_price_usd) {
+        btcPrice = parseFloat(lastPriceResult.rows[0].current_price_usd);
+      }
+    }
     
     // Get stock prices (using a simple mapping for demo)
     const stockSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'];
@@ -25,18 +37,23 @@ router.get('/prices', async (req, res) => {
     };
     
     // Get commodity prices from CoinGecko (with fallbacks)
+    // Note: CoinGecko returns gold/silver price per GRAM, not per ounce
+    // 1 troy ounce = 31.1035 grams
     let commodityPrices = {};
     try {
       const commodityResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=gold,silver&vs_currencies=usd`);
+      // Convert from per gram to per troy ounce
+      const goldPerGram = commodityResponse.data.gold?.usd || 64.29;
+      const silverPerGram = commodityResponse.data.silver?.usd || 0.80;
       commodityPrices = {
-        'XAU': commodityResponse.data.gold?.usd || 2000,
-        'XAG': commodityResponse.data.silver?.usd || 25,
+        'XAU': goldPerGram * 31.1035,  // Convert to per troy ounce
+        'XAG': silverPerGram * 31.1035, // Convert to per troy ounce
       };
     } catch (error) {
       console.log('Commodity API error, using fallback prices');
       commodityPrices = {
-        'XAU': 2000,
-        'XAG': 25,
+        'XAU': 2000,  // Gold per troy ounce
+        'XAG': 25,    // Silver per troy ounce
       };
     }
     

@@ -81,15 +81,38 @@ router.post('/', authenticateToken, async (req, res) => {
     
     if (holding.rows[0].amount < amount) {
       await pool.query('ROLLBACK');
-      return res.status(400).json({ 
-        error: `Insufficient balance. You have ${holding.rows[0].amount} ${fromAsset}, but need ${amount}` 
+      // Convert raw stored values to decimal for display
+      const availableDecimal = (holding.rows[0].amount / 100000000).toFixed(8);
+      const requestedDecimal = (amount / 100000000).toFixed(8);
+      return res.status(400).json({
+        error: `Insufficient balance. You have ${availableDecimal} ${fromAsset}, but tried to sell ${requestedDecimal} ${fromAsset}`
       });
     }
     
-    // Check if asset is locked
-    if (holding.rows[0].locked_until && new Date(holding.rows[0].locked_until) > new Date()) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ error: 'Asset is locked until tomorrow' });
+    // Check if asset is locked (need to check purchases table for lock status)
+    if (fromAsset !== 'BTC') {
+      const lockedPurchases = await pool.query(
+        'SELECT SUM(amount) as locked_amount FROM purchases WHERE user_id = $1 AND asset_symbol = $2 AND locked_until > NOW()',
+        [req.user.userId, fromAsset]
+      );
+
+      const lockedAmount = lockedPurchases.rows[0]?.locked_amount || 0;
+
+      console.log(`Checking lock: ${fromAsset} requested: ${amount}, locked: ${lockedAmount}, available: ${holding.rows[0].amount - lockedAmount}`);
+
+      if (lockedAmount > 0 && amount > (holding.rows[0].amount - lockedAmount)) {
+        await pool.query('ROLLBACK');
+        const availableAmount = holding.rows[0].amount - lockedAmount;
+
+        // Convert to decimal asset amounts for display
+        const requestedDecimal = (amount / 100000000).toFixed(8);
+        const lockedDecimal = (lockedAmount / 100000000).toFixed(8);
+        const availableDecimal = (availableAmount / 100000000).toFixed(8);
+
+        return res.status(400).json({
+          error: `Cannot sell locked assets. You tried to sell ${requestedDecimal} ${fromAsset}. Currently locked: ${lockedDecimal} ${fromAsset}. Available to sell: ${availableDecimal} ${fromAsset}.`
+        });
+      }
     }
     
     // Calculate conversion
@@ -123,17 +146,20 @@ router.post('/', authenticateToken, async (req, res) => {
       // Other asset to BTC
       const assetPriceUsd = assetPrices[fromAsset];
       console.log(`Converting ${amount} ${fromAsset} to BTC at $${assetPriceUsd}`);
-      
+
       if (!assetPriceUsd) {
         await pool.query('ROLLBACK');
         return res.status(400).json({ error: `Price not available for ${fromAsset}` });
       }
-      
-      const usdValue = amount * assetPriceUsd;
+
+      // Amount is stored as integer with 8 decimal precision (like satoshis)
+      // Convert back to actual units: amount / 100M
+      const actualUnits = amount / 100000000;
+      const usdValue = actualUnits * assetPriceUsd;
       const btcAmount = usdValue / btcPrice;
       toAmount = Math.round(btcAmount * 100000000); // Convert to sats
-      
-      console.log(`${amount} ${fromAsset} = $${usdValue} = ${btcAmount} BTC = ${toAmount} sats`);
+
+      console.log(`${amount} stored units = ${actualUnits} ${fromAsset} = $${usdValue} = ${btcAmount} BTC = ${toAmount} sats`);
       
     } else {
       await pool.query('ROLLBACK');

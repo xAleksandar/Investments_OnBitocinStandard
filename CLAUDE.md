@@ -1,0 +1,186 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Bitcoin Investment Game - A gamified investment platform where users start with 1 virtual Bitcoin and attempt to outperform holding BTC by trading it for stocks and commodities. All values are measured in satoshis instead of fiat currency, providing a Bitcoin-centric perspective on investing.
+
+## Prerequisites
+
+### PostgreSQL Setup
+```bash
+# Install PostgreSQL
+sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib
+
+# Start PostgreSQL service
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Create database user (matches .env config)
+sudo -u postgres createuser -d plamenandonov
+
+# Configure PostgreSQL for local development (trust authentication)
+sudo sed -i "s/local   all             all                                     peer/local   all             all                                     trust/" /etc/postgresql/16/main/pg_hba.conf
+sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             127.0.0.1\/32            trust/" /etc/postgresql/16/main/pg_hba.conf
+sudo systemctl restart postgresql
+```
+
+## Development Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Initialize database (run once after PostgreSQL setup)
+npm run setup-db
+
+# Run development server with auto-reload (port 3000)
+npm run dev
+
+# Magic links appear in server console (email not configured)
+# Look for: "Magic link for [email]: http://localhost:3000/auth/verify?token=..."
+
+# To run server in background and monitor logs (Claude Code):
+# 1. Run with run_in_background: true - returns bash_id
+# 2. Monitor logs with BashOutput(bash_id: "xxxxx")
+
+# Run production server
+npm start
+
+# Database management scripts
+node scripts/wipe-database.js        # Clear all data
+node scripts/rebuild-from-trades.js  # Rebuild portfolio from trade history
+node scripts/rebuild-holdings.js     # Recalculate holdings
+node scripts/fix-portfolio.js        # Fix portfolio inconsistencies
+node scripts/debug-portfolio.js      # Debug portfolio data
+```
+
+## Architecture
+
+### Backend Structure
+
+**Express API Server** (`server.js`)
+- Main routes mounted at `/api/*`:
+  - `/api/auth` - Magic link authentication and JWT management
+  - `/api/portfolio` - Portfolio tracking and valuation
+  - `/api/trades` - Trade execution and history
+  - `/api/assets` - Asset prices and market data
+- Static frontend served from `/public`
+- PostgreSQL connection pooling via `config/database.js`
+
+### Database Schema
+
+Key tables created in `scripts/setup-database.js`:
+- **users**: User accounts with email-based auth
+- **holdings**: Current asset positions per user
+- **trades**: Complete trade history with BTC costs
+- **magic_links**: Temporary auth tokens
+- **purchases**: Asset purchase tracking with 24-hour lock
+
+### Trading Logic
+
+The core trading system (`routes/trades.js`) implements:
+1. **24-hour Lock**: Assets cannot be sold back to BTC for 24 hours after purchase
+2. **Cost Basis Tracking**: FIFO (First In, First Out) for tax-like calculations
+3. **Real-time Pricing**: Integration with CoinGecko API for live BTC and asset prices
+4. **Portfolio Valuation**: All values calculated in satoshis (100M sats = 1 BTC)
+
+### Frontend Architecture
+
+Single-page application (`public/app.js`) with:
+- Vanilla JavaScript with no framework dependencies
+- State management via global `window.app` object
+- Real-time price updates every 30 seconds
+- Tailwind CSS for styling
+- Custom notification system for user feedback
+
+## Key Implementation Details
+
+### Authentication Flow
+1. User requests magic link via email
+2. Server generates JWT and stores in `magic_links` table
+3. Email contains verification link with token
+4. Frontend stores JWT in localStorage for session persistence
+
+### Trade Execution Process
+1. Validate user has sufficient BTC balance
+2. Fetch current prices from CoinGecko
+3. Calculate satoshi amounts based on USD prices
+4. Create trade record and update holdings
+5. Enforce 24-hour lock on new purchases
+
+### Portfolio Calculation
+- Holdings value = sum of (quantity � current_price_in_sats)
+- P&L = current_value - cost_basis
+- Cost basis tracked per trade for accurate calculations
+- All calculations done in satoshis to avoid floating point issues
+
+## External Dependencies
+
+### Critical APIs
+- **CoinGecko API**: Real-time price data for BTC and assets
+  - No API key required for basic usage
+  - Rate limits apply (50 calls/minute)
+  - Fallback to cached prices if API fails
+
+### Environment Variables
+Required in `.env`:
+- `DB_*`: PostgreSQL connection details
+- `JWT_SECRET`: Token signing key
+- `PORT`: Server port (default 3000)
+- `EMAIL_*`: SMTP settings for magic links (optional in dev)
+
+## Development Workflow
+
+### Adding New Assets
+1. Update asset list in `routes/assets.js`
+2. Add CoinGecko ID mapping for price fetching
+3. Update frontend UI to display new asset
+
+### Database Migrations
+- Manual SQL scripts in `scripts/` directory
+- Run setup script to create initial schema
+- Use rebuild scripts to fix data inconsistencies
+
+### Testing Price Calculations
+- All monetary values stored as BIGINT satoshis
+- Use `Math.floor()` to avoid decimal satoshi amounts
+- Test with extreme values (0.01 sats to 100M sats)
+
+## Common Issues & Solutions
+
+### Portfolio Discrepancies
+Run `node scripts/rebuild-from-trades.js` to recalculate from trade history
+
+### Database Connection Issues
+Check PostgreSQL is running and `.env` credentials are correct
+
+### Price Fetching Failures
+- Check CoinGecko API status
+- Implement fallback to last known prices
+- Consider caching strategy for resilience
+
+## Recent Fixes (Sep 2025)
+
+### 1. Performance Calculation Bug
+Fixed missing performance calculation in frontend (`public/app.js` lines 234-252)
+- Calculates: `(current_value - initial_1BTC) / initial_1BTC * 100`
+- Updates color based on positive/negative performance
+
+### 2. 30-Second Auto-Refresh
+Implemented automatic price updates every 30 seconds
+- Added `startPriceAutoRefresh()` and `stopPriceAutoRefresh()` methods
+- Auto-starts on login, stops on logout
+- Refreshes both prices and portfolio values
+
+### 3. API Rate Limiting & Error Handling
+Added fallback handling for CoinGecko API rate limits
+- Falls back to last known database price when API fails
+- Default fallback price of $115,000 for BTC
+
+### 4. Gold Price Unit Conversion
+Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
+- CoinGecko returns gold price per gram
+- Multiply by 31.1035 to convert to troy ounces
+- Corrected stored amounts in database
