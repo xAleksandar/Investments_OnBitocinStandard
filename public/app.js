@@ -33,47 +33,73 @@ class BitcoinGame {
     }
 
     setupEventListeners() {
-        // Auth form
-        document.getElementById('authForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.requestMagicLink();
-        });
+        // Auth form - always available
+        const authForm = document.getElementById('authForm');
+        if (authForm) {
+            authForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.requestMagicLink();
+            });
+        }
+
+        // Show username field for new users - always available
+        const emailInput = document.getElementById('email');
+        if (emailInput) {
+            emailInput.addEventListener('blur', async () => {
+                const email = document.getElementById('email').value;
+                if (email) {
+                    // Check if user exists
+                    try {
+                        const response = await fetch('/api/auth/check-user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email })
+                        });
+                        const data = await response.json();
+                        
+                        const usernameField = document.getElementById('usernameField');
+                        if (usernameField) {
+                            if (!data.exists) {
+                                usernameField.style.display = 'block';
+                            } else {
+                                usernameField.style.display = 'none';
+                            }
+                        }
+                    } catch (error) {
+                        // If check fails, show username field to be safe
+                        const usernameField = document.getElementById('usernameField');
+                        if (usernameField) {
+                            usernameField.style.display = 'block';
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    setupMainAppEventListeners() {
+        // Prevent duplicate listeners by checking if already set up
+        if (this.mainAppListenersSetup) {
+            return;
+        }
+        this.mainAppListenersSetup = true;
 
         // Trade form
-        document.getElementById('tradeForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.executeTrade();
-        });
+        const tradeForm = document.getElementById('tradeForm');
+        if (tradeForm) {
+            tradeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.executeTrade();
+            });
+        }
 
         // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            this.logout();
-        });
-
-        // Show username field for new users
-        document.getElementById('email').addEventListener('blur', async () => {
-            const email = document.getElementById('email').value;
-            if (email) {
-                // Check if user exists
-                try {
-                    const response = await fetch('/api/auth/check-user', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email })
-                    });
-                    const data = await response.json();
-                    
-                    if (!data.exists) {
-                        document.getElementById('usernameField').style.display = 'block';
-                    } else {
-                        document.getElementById('usernameField').style.display = 'none';
-                    }
-                } catch (error) {
-                    // If check fails, show username field to be safe
-                    document.getElementById('usernameField').style.display = 'block';
-                }
-            }
-        });
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                this.logout();
+            });
+        }
 
         // Update amount unit options when from asset changes
         document.getElementById('fromAsset').addEventListener('change', () => {
@@ -82,30 +108,45 @@ class BitcoinGame {
         });
 
         // Update amount helper text
-        document.getElementById('amountUnit').addEventListener('change', () => {
-            this.updateAmountHelper();
-        });
+        const amountUnit = document.getElementById('amountUnit');
+        if (amountUnit) {
+            amountUnit.addEventListener('change', () => {
+                this.updateAmountHelper();
+            });
+        }
 
-        document.getElementById('tradeAmount').addEventListener('input', () => {
-            this.updateAmountHelper();
-        });
+        const tradeAmount = document.getElementById('tradeAmount');
+        if (tradeAmount) {
+            tradeAmount.addEventListener('input', () => {
+                this.updateAmountHelper();
+            });
+        }
 
         // Close notification
-        document.getElementById('closeNotification').addEventListener('click', () => {
-            this.hideNotification();
-        });
+        const closeNotification = document.getElementById('closeNotification');
+        if (closeNotification) {
+            closeNotification.addEventListener('click', () => {
+                this.hideNotification();
+            });
+        }
 
         // Close modal
-        document.getElementById('closeModal').addEventListener('click', () => {
-            this.hideAssetModal();
-        });
+        const closeModal = document.getElementById('closeModal');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => {
+                this.hideAssetModal();
+            });
+        }
 
         // Close modal on backdrop click
-        document.getElementById('assetModal').addEventListener('click', (e) => {
-            if (e.target.id === 'assetModal') {
-                this.hideAssetModal();
-            }
-        });
+        const assetModal = document.getElementById('assetModal');
+        if (assetModal) {
+            assetModal.addEventListener('click', (e) => {
+                if (e.target.id === 'assetModal') {
+                    this.hideAssetModal();
+                }
+            });
+        }
     }
 
     async requestMagicLink() {
@@ -192,6 +233,9 @@ class BitcoinGame {
             this.loadPortfolio(),
             this.loadTradeHistory()
         ]);
+        
+        // Initialize the amount helper after data is loaded
+        this.updateAmountHelper();
     }
 
     async loadAssets() {
@@ -423,7 +467,12 @@ class BitcoinGame {
     populateAssetSelects() {
         const fromSelect = document.getElementById('fromAsset');
         const toSelect = document.getElementById('toAsset');
-
+        
+        // Check if elements exist and we have assets data
+        if (!fromSelect || !toSelect || !this.assets || this.assets.length === 0) {
+            return;
+        }
+        
         fromSelect.innerHTML = '';
         toSelect.innerHTML = '';
 
@@ -474,13 +523,26 @@ class BitcoinGame {
     }
 
     updateAmountHelper() {
-        const amount = parseFloat(document.getElementById('tradeAmount').value) || 0;
-        const unit = document.getElementById('amountUnit').value;
+        const amountInput = document.getElementById('tradeAmount');
+        const unitSelect = document.getElementById('amountUnit');
         const helper = document.getElementById('amountHelper');
-        const fromAsset = document.getElementById('fromAsset').value;
+        const fromAsset = document.getElementById('fromAsset')?.value;
 
-        if (unit === 'asset' && fromAsset !== 'BTC') {
-            // When selling non-BTC assets, show the asset amount
+        // Check if elements exist (they might not during initial load)
+        if (!amountInput || !unitSelect || !helper) {
+            return;
+        }
+
+        const amount = parseFloat(amountInput.value) || 0;
+        const unit = unitSelect.value;
+
+        if (amount === 0) {
+            helper.textContent = 'Minimum: 100 kSats. Enter amount above.';
+            return;
+        }
+
+        // When selling non-BTC assets, show the asset amount
+        if (unit === 'asset' && fromAsset && fromAsset !== 'BTC') {
             helper.textContent = `${amount} ${fromAsset}`;
         } else {
             // BTC units
@@ -614,6 +676,9 @@ class BitcoinGame {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
+        
+        // Ensure event listeners are set up for the main app
+        this.setupMainAppEventListeners();
     }
 
     showMessage(message, type) {
