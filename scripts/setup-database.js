@@ -91,20 +91,6 @@ async function setupDatabase() {
       )
     `);
 
-    await gamePool.query(`
-      CREATE TABLE purchases (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        asset_symbol VARCHAR(10) NOT NULL,
-        amount BIGINT NOT NULL,
-        btc_spent BIGINT NOT NULL,
-        purchase_price_usd DECIMAL(15,8),
-        btc_price_usd DECIMAL(15,2),
-        locked_until TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
     console.log('All tables created successfully');
 
     // Insert initial assets
@@ -129,6 +115,7 @@ async function setupDatabase() {
     }
 
     console.log('Initial assets inserted');
+    await gamePool.end();
 
   } catch (error) {
     console.error('Error setting up database:', error);
