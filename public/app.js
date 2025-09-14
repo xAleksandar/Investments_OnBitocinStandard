@@ -526,42 +526,49 @@ class BitcoinGame {
         const amountInput = document.getElementById('tradeAmount');
         const unitSelect = document.getElementById('amountUnit');
         const helper = document.getElementById('amountHelper');
-        
+        const fromAsset = document.getElementById('fromAsset')?.value;
+
         // Check if elements exist (they might not during initial load)
         if (!amountInput || !unitSelect || !helper) {
             return;
         }
-        
+
         const amount = parseFloat(amountInput.value) || 0;
         const unit = unitSelect.value;
-        
+
         if (amount === 0) {
             helper.textContent = 'Minimum: 100 kSats. Enter amount above.';
             return;
         }
-        
-        let sats = 0;
-        let btc = 0;
-        
-        switch(unit) {
-            case 'btc':
-                sats = amount * 100000000;
-                helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'msat':
-                sats = amount * 1000000;
-                btc = amount / 100;
-                helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'ksat':
-                sats = amount * 1000;
-                btc = amount / 100000;
-                helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                break;
-            case 'sat':
-                btc = amount / 100000000;
-                helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
-                break;
+
+        // When selling non-BTC assets, show the asset amount
+        if (unit === 'asset' && fromAsset && fromAsset !== 'BTC') {
+            helper.textContent = `${amount} ${fromAsset}`;
+        } else {
+            // BTC units
+            let sats = 0;
+            let btc = 0;
+
+            switch(unit) {
+                case 'btc':
+                    sats = amount * 100000000;
+                    helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'msat':
+                    sats = amount * 1000000;
+                    btc = amount / 100;
+                    helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'ksat':
+                    sats = amount * 1000;
+                    btc = amount / 100000;
+                    helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'sat':
+                    btc = amount / 100000000;
+                    helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
+                    break;
+            }
         }
     }
 
