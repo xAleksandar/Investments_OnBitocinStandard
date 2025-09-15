@@ -161,12 +161,11 @@ class BitcoinGame {
     }
 
     setupCustomDropdowns() {
-        // Setup custom dropdown functionality
+        // Setup basic dropdown toggle functionality
         const customSelects = document.querySelectorAll('.custom-select');
 
         customSelects.forEach(select => {
             const trigger = select.querySelector('.custom-select-trigger');
-            const options = select.querySelectorAll('.custom-select-option');
 
             // Toggle dropdown
             trigger.addEventListener('click', (e) => {
@@ -179,42 +178,46 @@ class BitcoinGame {
                 });
                 select.classList.toggle('open');
             });
-
-            // Handle option selection
-            options.forEach(option => {
-                option.addEventListener('click', (e) => {
-                    e.stopPropagation();
-
-                    // Update selected option
-                    options.forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
-
-                    // Update trigger text
-                    const text = select.querySelector('.custom-select-text');
-                    text.textContent = option.textContent;
-
-                    // Update corresponding native select
-                    const value = option.dataset.value;
-                    if (select.id === 'fromAssetCustom') {
-                        document.getElementById('fromAsset').value = value;
-                        document.getElementById('fromAsset').dispatchEvent(new Event('change'));
-                    } else if (select.id === 'toAssetCustom') {
-                        document.getElementById('toAsset').value = value;
-                    } else if (select.id === 'amountUnitCustom') {
-                        document.getElementById('amountUnit').value = value;
-                        document.getElementById('amountUnit').dispatchEvent(new Event('change'));
-                    }
-
-                    // Close dropdown
-                    select.classList.remove('open');
-                });
-            });
         });
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', () => {
             customSelects.forEach(select => {
                 select.classList.remove('open');
+            });
+        });
+    }
+
+    setupCustomDropdownOptions(selectElement) {
+        const options = selectElement.querySelectorAll('.custom-select-option');
+
+        // Handle option selection
+        options.forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                // Update selected option
+                options.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+
+                // Update trigger text
+                const text = selectElement.querySelector('.custom-select-text');
+                text.textContent = option.textContent;
+
+                // Update corresponding native select
+                const value = option.dataset.value;
+                if (selectElement.id === 'fromAssetCustom') {
+                    document.getElementById('fromAsset').value = value;
+                    document.getElementById('fromAsset').dispatchEvent(new Event('change'));
+                } else if (selectElement.id === 'toAssetCustom') {
+                    document.getElementById('toAsset').value = value;
+                } else if (selectElement.id === 'amountUnitCustom') {
+                    document.getElementById('amountUnit').value = value;
+                    document.getElementById('amountUnit').dispatchEvent(new Event('change'));
+                }
+
+                // Close dropdown
+                selectElement.classList.remove('open');
             });
         });
     }
@@ -612,6 +615,15 @@ class BitcoinGame {
         if (toTriggerText && sortedAssets.length > 0) {
             toTriggerText.textContent = `${sortedAssets[0].name} (${sortedAssets[0].symbol})`;
         }
+
+        // Setup event listeners for the newly created options
+        const fromCustomSelect = document.getElementById('fromAssetCustom');
+        const toCustomSelect = document.getElementById('toAssetCustom');
+        const amountUnitCustomSelect = document.getElementById('amountUnitCustom');
+
+        if (fromCustomSelect) this.setupCustomDropdownOptions(fromCustomSelect);
+        if (toCustomSelect) this.setupCustomDropdownOptions(toCustomSelect);
+        if (amountUnitCustomSelect) this.setupCustomDropdownOptions(amountUnitCustomSelect);
     }
 
     updateAmountUnitOptions() {
