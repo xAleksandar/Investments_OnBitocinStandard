@@ -705,9 +705,57 @@ class BitcoinGame {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
-        
+
         // Ensure event listeners are set up for the main app
         this.setupMainAppEventListeners();
+
+        // Initialize TradingView chart
+        this.initTradingViewChart();
+    }
+
+    initTradingViewChart() {
+        const container = document.getElementById('tradingview-widget-container');
+        if (!container) return;
+
+        // Check if chart already initialized
+        if (container.querySelector('iframe')) return;
+
+        // Create TradingView widget iframe
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.innerHTML = `
+            new TradingView.widget({
+                "width": "100%",
+                "height": 500,
+                "symbol": "BITSTAMP:BTCUSD",
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "light",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": false,
+                "container_id": "tradingview-widget-container",
+                "hide_side_toolbar": false,
+                "studies": [],
+                "show_popup_button": false,
+                "popup_width": "1000",
+                "popup_height": "650"
+            });
+        `;
+
+        // Add TradingView library script first
+        const tvScript = document.createElement('script');
+        tvScript.type = 'text/javascript';
+        tvScript.src = 'https://s3.tradingview.com/tv.js';
+        tvScript.onload = () => {
+            // After library loads, add widget configuration
+            container.appendChild(script);
+        };
+
+        // Append the TradingView library script
+        document.head.appendChild(tvScript);
     }
 
     showMessage(message, type) {
