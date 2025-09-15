@@ -876,36 +876,46 @@ class BitcoinGame {
         this.initTradingViewChart();
     }
 
-    initTradingViewChart(symbol = 'BTCBTC') {
+    initTradingViewChart(symbol = 'BTC') {
         const container = document.getElementById('tradingview-widget-container');
         if (!container) return;
 
         // Clear existing chart
         container.innerHTML = '';
 
-        // Map assets to TradingView symbols
-        const symbolMap = {
-            'BTC': 'BTCBTC',  // BTC/BTC = 1 (flat line)
-            'AAPL': 'NASDAQ:AAPL/BITSTAMP:BTCUSD',  // Apple price / BTC price
-            'TSLA': 'NASDAQ:TSLA/BITSTAMP:BTCUSD',  // Tesla price / BTC price
-            'MSFT': 'NASDAQ:MSFT/BITSTAMP:BTCUSD',  // Microsoft price / BTC price
-            'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD', // Google price / BTC price
-            'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',  // Amazon price / BTC price
-            'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',   // Nvidia price / BTC price
-            'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',       // Gold price / BTC price
-            'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD'      // Silver price / BTC price
-        };
+        // Map assets to TradingView symbols showing asset/BTC ratios
+        let tvSymbol;
+        if (symbol === 'BTC') {
+            // For BTC/BTC, just show Bitcoin price chart
+            tvSymbol = 'BITSTAMP:BTCUSD';
+        } else {
+            // For other assets, create ratio expressions
+            const symbolMap = {
+                'AAPL': 'NASDAQ:AAPL/BITSTAMP:BTCUSD',  // Apple price / BTC price
+                'TSLA': 'NASDAQ:TSLA/BITSTAMP:BTCUSD',  // Tesla price / BTC price
+                'MSFT': 'NASDAQ:MSFT/BITSTAMP:BTCUSD',  // Microsoft price / BTC price
+                'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD', // Google price / BTC price
+                'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',  // Amazon price / BTC price
+                'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',   // Nvidia price / BTC price
+                'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',       // Gold price / BTC price
+                'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',     // Silver price / BTC price
+                'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'       // Oil price / BTC price
+            };
+            tvSymbol = symbolMap[symbol] || 'BITSTAMP:BTCUSD';
+        }
 
-        const tvSymbol = symbolMap[symbol] || 'BTCBTC';
+        // Create unique container ID for this widget
+        const widgetId = 'tv-widget-' + Date.now();
+        const widgetContainer = document.createElement('div');
+        widgetContainer.id = widgetId;
+        container.appendChild(widgetContainer);
 
-        // Create TradingView widget iframe
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.innerHTML = `
-            new TradingView.widget({
+        // Function to create the widget
+        const createWidget = () => {
+            new window.TradingView.widget({
                 "width": "100%",
                 "height": 500,
-                "symbol": "${tvSymbol}",
+                "symbol": tvSymbol,
                 "interval": "D",
                 "timezone": "Etc/UTC",
                 "theme": "light",
@@ -914,27 +924,27 @@ class BitcoinGame {
                 "toolbar_bg": "#f1f3f6",
                 "enable_publishing": false,
                 "allow_symbol_change": false,
-                "container_id": "tradingview-widget-container",
+                "container_id": widgetId,
                 "hide_side_toolbar": false,
                 "studies": [],
                 "show_popup_button": false,
                 "popup_width": "1000",
                 "popup_height": "650"
             });
-        `;
+        };
 
         // Check if TradingView library is already loaded
         if (window.TradingView) {
-            // Library already loaded, just add widget
-            container.appendChild(script);
+            // Library already loaded, create widget
+            createWidget();
         } else {
             // Add TradingView library script first
             const tvScript = document.createElement('script');
             tvScript.type = 'text/javascript';
             tvScript.src = 'https://s3.tradingview.com/tv.js';
             tvScript.onload = () => {
-                // After library loads, add widget configuration
-                container.appendChild(script);
+                // After library loads, create widget
+                createWidget();
             };
             // Append the TradingView library script
             document.head.appendChild(tvScript);
