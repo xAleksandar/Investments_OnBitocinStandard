@@ -533,43 +533,72 @@ class BitcoinGame {
             return;
         }
 
-        const amount = parseFloat(amountInput.value) || 0;
+        const amount = parseFloat(amountInput.value);
         const unit = unitSelect.value;
 
-        if (amount === 0) {
-            helper.textContent = 'Minimum: 100 kSats. Enter amount above.';
+        // If no amount entered, show default conversion for 1 BTC
+        if (!amount || amount <= 0) {
+            helper.textContent = '1 BTC = 100 mSats = 100,000 kSats = 100,000,000 sats';
+            helper.className = 'text-gray-500';
             return;
         }
 
         // When selling non-BTC assets, show the asset amount
         if (unit === 'asset' && fromAsset && fromAsset !== 'BTC') {
             helper.textContent = `${amount} ${fromAsset}`;
-        } else {
-            // BTC units
-            let sats = 0;
-            let btc = 0;
-
-            switch(unit) {
-                case 'btc':
-                    sats = amount * 100000000;
-                    helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
-                    break;
-                case 'msat':
-                    sats = amount * 1000000;
-                    btc = amount / 100;
-                    helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                    break;
-                case 'ksat':
-                    sats = amount * 1000;
-                    btc = amount / 100000;
-                    helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
-                    break;
-                case 'sat':
-                    btc = amount / 100000000;
-                    helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
-                    break;
-            }
+            helper.className = 'text-gray-500';
+            return;
         }
+
+        // Calculate all conversions for BTC units
+        let sats = 0;
+        let btc = 0;
+        let msats = 0;
+        let ksats = 0;
+
+        switch(unit) {
+            case 'btc':
+                btc = amount;
+                msats = amount * 100;
+                ksats = amount * 100000;
+                sats = amount * 100000000;
+                break;
+            case 'msat':
+                btc = amount / 100;
+                msats = amount;
+                ksats = amount * 1000;
+                sats = amount * 1000000;
+                break;
+            case 'ksat':
+                btc = amount / 100000;
+                msats = amount / 1000;
+                ksats = amount;
+                sats = amount * 1000;
+                break;
+            case 'sat':
+                btc = amount / 100000000;
+                msats = amount / 1000000;
+                ksats = amount / 1000;
+                sats = amount;
+                break;
+        }
+
+        // Check if it's below minimum (only for BTC trades)
+        const MIN_TRADE_SATS = 100000;
+        if (fromAsset === 'BTC' && sats < MIN_TRADE_SATS) {
+            helper.textContent = `⚠️ Minimum trade: 100 kSats (${MIN_TRADE_SATS.toLocaleString()} sats)`;
+            helper.className = 'text-red-600 font-medium';
+            return;
+        }
+
+        // Show full conversion
+        const btcStr = btc.toFixed(8).replace(/\.?0+$/, '');
+        const msatStr = msats.toLocaleString();
+        const ksatStr = ksats.toLocaleString();
+        const satStr = sats.toLocaleString();
+
+        helper.textContent = `${btcStr} BTC = ${msatStr} mSats = ${ksatStr} kSats = ${satStr} sats`;
+        helper.className = 'text-gray-500';
     }
 
     async executeTrade() {

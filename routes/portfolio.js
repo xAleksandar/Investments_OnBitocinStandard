@@ -26,12 +26,25 @@ router.get('/', authenticateToken, async (req, res) => {
         COUNT(*) as purchase_count,
         MAX(created_at) as last_purchase_date,
         SUM(CASE WHEN locked_until > NOW() THEN amount ELSE 0 END) as locked_amount,
-        SUM(amount) as total_amount
+        SUM(amount) as total_purchased_amount
       FROM purchases 
       WHERE user_id = $1
       GROUP BY asset_symbol
     `;
+    
+    // Get sales data for each asset
+    const salesQuery = `
+      SELECT 
+        from_asset as asset_symbol,
+        SUM(from_amount) as total_sold_amount,
+        SUM(to_amount) as total_received_sats
+      FROM trades 
+      WHERE user_id = $1 AND to_asset = 'BTC' AND from_asset != 'BTC'
+      GROUP BY from_asset
+    `;
     const purchases = await pool.query(purchasesQuery, [req.user.userId]);
+    const sales = await pool.query(salesQuery, [req.user.userId]);
+    
     const purchaseMap = {};
     purchases.rows.forEach(row => {
       purchaseMap[row.asset_symbol] = {
@@ -39,7 +52,15 @@ router.get('/', authenticateToken, async (req, res) => {
         purchase_count: parseInt(row.purchase_count),
         last_purchase_date: row.last_purchase_date,
         locked_amount: parseInt(row.locked_amount),
-        total_amount: parseInt(row.total_amount)
+        total_purchased_amount: parseInt(row.total_purchased_amount)
+      };
+    });
+    
+    const salesMap = {};
+    sales.rows.forEach(row => {
+      salesMap[row.asset_symbol] = {
+        total_sold_amount: parseInt(row.total_sold_amount),
+        total_received_sats: parseInt(row.total_received_sats)
       };
     });
 
@@ -79,13 +100,21 @@ router.get('/', authenticateToken, async (req, res) => {
         purchase_count: 0, 
         last_purchase_date: null,
         locked_amount: 0,
-        total_amount: 0
+        total_purchased_amount: 0
+      };
+      
+      const salesInfo = salesMap[holding.asset_symbol] || {
+        total_sold_amount: 0,
+        total_received_sats: 0
       };
       
       let valueSats = 0;
+      let adjustedCostBasis = 0;
+      
       if (holding.asset_symbol === 'BTC') {
         valueSats = parseInt(holding.amount) || 0;
-        totalCostSats += valueSats; // BTC cost basis is itself
+        adjustedCostBasis = valueSats; // BTC cost basis is itself
+        totalCostSats += valueSats;
       } else {
         // Amount is stored as integer with 8 decimal precision
         // Convert back to actual shares: amount / 100M
@@ -93,7 +122,14 @@ router.get('/', authenticateToken, async (req, res) => {
         const actualShares = holdingAmount / 100000000;
         const usdValue = actualShares * priceUsd;
         valueSats = Math.round((usdValue / btcPrice) * 100000000);
-        totalCostSats += purchaseInfo.total_spent_sats || 0;
+        
+        // Calculate adjusted cost basis for remaining holdings
+        const totalPurchased = purchaseInfo.total_purchased_amount || 0;
+        const totalSold = salesInfo.total_sold_amount || 0;
+        const remainingRatio = totalPurchased > 0 ? holdingAmount / totalPurchased : 0;
+        adjustedCostBasis = Math.round((purchaseInfo.total_spent_sats || 0) * remainingRatio);
+        
+        totalCostSats += adjustedCostBasis;
       }
       
       totalValueSats += valueSats;
@@ -112,12 +148,15 @@ router.get('/', authenticateToken, async (req, res) => {
       return {
         ...holding,
         current_value_sats: valueSats,
-        cost_basis_sats: purchaseInfo.total_spent_sats || 0,
+        cost_basis_sats: adjustedCostBasis,
         purchase_count: purchaseInfo.purchase_count || 0,
         last_purchase_date: purchaseInfo.last_purchase_date,
         locked_amount: purchaseInfo.locked_amount || 0,
         lock_status: lockStatus,
-        current_price_usd: priceUsd
+        current_price_usd: priceUsd,
+        // Additional info for debugging
+        total_spent_sats: purchaseInfo.total_spent_sats || 0,
+        total_received_from_sales: salesInfo.total_received_sats || 0
       };
     });
     
