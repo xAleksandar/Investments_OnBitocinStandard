@@ -355,9 +355,7 @@ class BitcoinGame {
             this.prices = data.pricesInSats;
 
             // Update Bitcoin price display with error handling
-            if (data.btcPrice) {
-                document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
-            }
+            // Bitcoin price display removed - no longer showing USD prices
         } catch (error) {
             console.error('Failed to load prices:', error);
         }
