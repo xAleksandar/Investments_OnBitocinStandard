@@ -101,6 +101,14 @@ class BitcoinGame {
             });
         }
 
+        // Mobile logout
+        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
+        if (logoutBtnMobile) {
+            logoutBtnMobile.addEventListener('click', () => {
+                this.logout();
+            });
+        }
+
         // Update amount unit options when from asset changes
         document.getElementById('fromAsset').addEventListener('change', () => {
             this.updateAmountUnitOptions();
@@ -841,6 +849,11 @@ class BitcoinGame {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
+        // Also update mobile user info
+        const userInfoMobile = document.getElementById('userInfoMobile');
+        if (userInfoMobile) {
+            userInfoMobile.textContent = `Welcome, ${this.user.username}!`;
+        }
 
         // Ensure event listeners are set up for the main app
         this.setupMainAppEventListeners();
