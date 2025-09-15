@@ -598,6 +598,11 @@ class BitcoinGame {
 
         // Initialize unit options for the default selection
         this.updateAmountUnitOptions();
+
+        // Apply exclusions based on initial selections
+        // This removes BTC from To Asset and AMZN from From Asset
+        this.updateToAssetDropdown();  // Removes BTC from To
+        this.updateFromAssetDropdown(); // Removes AMZN from From
     }
 
     populateCustomDropdowns(sortedAssets) {
