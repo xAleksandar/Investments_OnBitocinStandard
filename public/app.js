@@ -574,25 +574,23 @@ class BitcoinGame {
             return a.name.localeCompare(b.name);
         });
 
-        // First populate From Asset dropdown and set BTC as default
+        // Populate both dropdowns with all assets initially
         sortedAssets.forEach(asset => {
-            const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            if (asset.symbol === 'BTC') {
-                option.selected = true;
-            }
-            fromSelect.appendChild(option);
-        });
+            const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+            const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
 
-        // Now populate To Asset dropdown, excluding BTC (the selected From Asset)
-        sortedAssets.forEach(asset => {
-            if (asset.symbol !== 'BTC') {  // Exclude BTC since it's selected in From
-                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-                // Set AMZN as default for To Asset
-                if (asset.symbol === 'AMZN') {
-                    option.selected = true;
-                }
-                toSelect.appendChild(option);
+            // Set BTC as default for From Asset
+            if (asset.symbol === 'BTC') {
+                option1.selected = true;
             }
+
+            // Set AMZN as default for To Asset
+            if (asset.symbol === 'AMZN') {
+                option2.selected = true;
+            }
+
+            fromSelect.appendChild(option1);
+            toSelect.appendChild(option2);
         });
 
         // Populate custom dropdowns for mobile
@@ -998,8 +996,7 @@ class BitcoinGame {
             return a.name.localeCompare(b.name);
         });
 
-        // Populate From Asset dropdown, excluding the selected To Asset
-        let needsNewSelection = false;
+        // Populate From Asset dropdown, excluding whatever is selected in To Asset
         sortedAssets.forEach(asset => {
             if (asset.symbol !== selectedToAsset) {
                 const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
@@ -1008,18 +1005,13 @@ class BitcoinGame {
                 if (asset.symbol === currentFromAsset) {
                     option.selected = true;
                 }
-                // Otherwise, default to BTC if available and not selected in To
-                else if (asset.symbol === 'BTC' && currentFromAsset === selectedToAsset) {
-                    option.selected = true;
-                    needsNewSelection = true;
-                }
 
                 fromSelect.appendChild(option);
             }
         });
 
         // If the current From Asset was removed, select the first available option
-        if (currentFromAsset === selectedToAsset && !needsNewSelection) {
+        if (currentFromAsset === selectedToAsset) {
             fromSelect.selectedIndex = 0;
         }
 
@@ -1047,8 +1039,7 @@ class BitcoinGame {
             return a.name.localeCompare(b.name);
         });
 
-        // Populate To Asset dropdown, excluding the selected From Asset
-        let needsNewSelection = false;
+        // Populate To Asset dropdown, excluding whatever is selected in From Asset
         sortedAssets.forEach(asset => {
             if (asset.symbol !== selectedFromAsset) {
                 const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
@@ -1057,18 +1048,13 @@ class BitcoinGame {
                 if (asset.symbol === currentToAsset) {
                     option.selected = true;
                 }
-                // Otherwise, default to AMZN if available and not selected in From
-                else if (asset.symbol === 'AMZN' && currentToAsset === selectedFromAsset) {
-                    option.selected = true;
-                    needsNewSelection = true;
-                }
 
                 toSelect.appendChild(option);
             }
         });
 
         // If the current To Asset was removed, select the first available option
-        if (currentToAsset === selectedFromAsset && !needsNewSelection) {
+        if (currentToAsset === selectedFromAsset) {
             toSelect.selectedIndex = 0;
         }
     }
