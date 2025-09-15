@@ -120,6 +120,8 @@ class BitcoinGame {
         });
 
         document.getElementById('toAsset').addEventListener('change', () => {
+            // Update From Asset dropdown to exclude the selected To Asset
+            this.updateFromAssetDropdown();
             // Update chart when dropdown changes
             this.updateChartFromTradeDropdowns();
         });
@@ -574,22 +576,25 @@ class BitcoinGame {
             return a.name.localeCompare(b.name);
         });
 
+        // First populate From Asset dropdown and set BTC as default
         sortedAssets.forEach(asset => {
-            const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-            // Set BTC as default for From Asset
+            const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
             if (asset.symbol === 'BTC') {
-                option1.selected = true;
+                option.selected = true;
             }
+            fromSelect.appendChild(option);
+        });
 
-            // Set AMZN as default for To Asset
-            if (asset.symbol === 'AMZN') {
-                option2.selected = true;
+        // Now populate To Asset dropdown, excluding BTC (the selected From Asset)
+        sortedAssets.forEach(asset => {
+            if (asset.symbol !== 'BTC') {  // Exclude BTC since it's selected in From
+                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+                // Set AMZN as default for To Asset
+                if (asset.symbol === 'AMZN') {
+                    option.selected = true;
+                }
+                toSelect.appendChild(option);
             }
-
-            fromSelect.appendChild(option1);
-            toSelect.appendChild(option2);
         });
 
         // Populate custom dropdowns for mobile
@@ -974,6 +979,55 @@ class BitcoinGame {
             // Append the TradingView library script
             document.head.appendChild(tvScript);
         }
+    }
+
+    updateFromAssetDropdown() {
+        const fromSelect = document.getElementById('fromAsset');
+        const toSelect = document.getElementById('toAsset');
+
+        if (!fromSelect || !toSelect || !this.assets) return;
+
+        const selectedToAsset = toSelect.value;
+        const currentFromAsset = fromSelect.value;
+
+        // Clear From Asset dropdown
+        fromSelect.innerHTML = '';
+
+        // Sort assets to put Bitcoin first
+        const sortedAssets = [...this.assets].sort((a, b) => {
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Populate From Asset dropdown, excluding the selected To Asset
+        let needsNewSelection = false;
+        sortedAssets.forEach(asset => {
+            if (asset.symbol !== selectedToAsset) {
+                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+
+                // Keep the current selection if it's still valid
+                if (asset.symbol === currentFromAsset) {
+                    option.selected = true;
+                }
+                // Otherwise, default to BTC if available and not selected in To
+                else if (asset.symbol === 'BTC' && currentFromAsset === selectedToAsset) {
+                    option.selected = true;
+                    needsNewSelection = true;
+                }
+
+                fromSelect.appendChild(option);
+            }
+        });
+
+        // If the current From Asset was removed, select the first available option
+        if (currentFromAsset === selectedToAsset && !needsNewSelection) {
+            fromSelect.selectedIndex = 0;
+        }
+
+        // Update amount unit options after changing From Asset
+        this.updateAmountUnitOptions();
+        this.updateAmountHelper();
     }
 
     updateToAssetDropdown() {
