@@ -4,7 +4,7 @@ class BitcoinGame {
         this.user = JSON.parse(localStorage.getItem('user') || '{}');
         this.assets = [];
         this.prices = {};
-        
+
         this.init();
     }
 
@@ -56,7 +56,7 @@ class BitcoinGame {
                             body: JSON.stringify({ email })
                         });
                         const data = await response.json();
-                        
+
                         const usernameField = document.getElementById('usernameField');
                         if (usernameField) {
                             if (!data.exists) {
@@ -171,6 +171,14 @@ class BitcoinGame {
                 }
             } else {
                 this.showMessage(data.error, 'error');
+
+                // If user not found, show the username field
+                if (data.error && data.error.includes('User not found')) {
+                    const usernameField = document.getElementById('usernameField');
+                    if (usernameField) {
+                        usernameField.style.display = 'block';
+                    }
+                }
             }
         } catch (error) {
             this.showMessage('Network error', 'error');
@@ -202,9 +210,9 @@ class BitcoinGame {
         try {
             const response = await fetch(`/api/auth/verify?token=${token}`);
             const data = await response.json();
-            
+
             console.log('Verification response:', response.status, data);
-            
+
             if (response.ok) {
                 this.token = data.token;
                 this.user = data.user;
@@ -233,7 +241,7 @@ class BitcoinGame {
             this.loadPortfolio(),
             this.loadTradeHistory()
         ]);
-        
+
         // Initialize the amount helper after data is loaded
         this.updateAmountHelper();
     }
@@ -275,7 +283,7 @@ class BitcoinGame {
             const response = await fetch('/api/portfolio', {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            
+
             const data = await response.json();
             this.displayPortfolio(data);
         } catch (error) {
@@ -288,7 +296,7 @@ class BitcoinGame {
             const response = await fetch('/api/trades/history', {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            
+
             const trades = await response.json();
             this.displayTradeHistory(trades);
         } catch (error) {
@@ -348,7 +356,7 @@ class BitcoinGame {
 
         sortedHoldings.forEach(holding => {
             const asset = this.assets.find(a => a.symbol === holding.asset_symbol);
-            
+
             const holdingDiv = document.createElement('div');
             let bgClass = 'bg-gray-50';
             if (holding.lock_status === 'locked') {
@@ -356,9 +364,9 @@ class BitcoinGame {
             } else if (holding.lock_status === 'partial') {
                 bgClass = 'bg-yellow-50 border-yellow-200';
             }
-            
+
             holdingDiv.className = `p-3 border rounded cursor-pointer hover:bg-gray-100 ${bgClass}`;
-            
+
             let displayAmount;
             if (holding.asset_symbol === 'BTC') {
                 displayAmount = `${(holding.amount / 100000000).toFixed(8)} BTC`;
@@ -367,7 +375,7 @@ class BitcoinGame {
                 const actualAmount = holding.amount / 100000000;
                 displayAmount = `${actualAmount.toFixed(8)} ${holding.asset_symbol}`;
             }
-            
+
             const currentValue = (holding.current_value_sats / 100000000).toFixed(8);
             const costBasis = (holding.cost_basis_sats / 100000000).toFixed(8);
             const pnl = holding.current_value_sats - holding.cost_basis_sats;
@@ -375,9 +383,9 @@ class BitcoinGame {
             const pnlPercent = holding.cost_basis_sats > 0 ? ((pnl / holding.cost_basis_sats) * 100).toFixed(2) : '0.00';
             const pnlColor = pnl >= 0 ? 'text-green-600' : 'text-red-600';
             const pnlSign = pnl >= 0 ? '+' : '';
-            
+
             const lastPurchaseDate = holding.last_purchase_date ? new Date(holding.last_purchase_date).toLocaleDateString() : 'Never';
-            
+
             // Lock status display
             let lockDisplay = '';
             if (holding.lock_status === 'locked') {
@@ -386,7 +394,7 @@ class BitcoinGame {
                 const lockedAmount = (holding.locked_amount / 100000000).toFixed(8);
                 lockDisplay = `<div class="text-xs text-yellow-600 font-medium">🔒 ${lockedAmount} Locked</div>`;
             }
-            
+
             holdingDiv.innerHTML = `
                 <div class="flex justify-between items-center">
                     <div class="flex-1">
@@ -408,29 +416,29 @@ class BitcoinGame {
                     </div>
                 </div>
             `;
-            
+
             // Add click handler for non-BTC assets
             if (holding.asset_symbol !== 'BTC' && holding.purchase_count > 0) {
                 holdingDiv.addEventListener('click', () => {
                     this.showAssetDetails(holding.asset_symbol, asset?.name || holding.asset_symbol);
                 });
             }
-            
+
             holdingsDiv.appendChild(holdingDiv);
         });
     }
 
     displayTradeHistory(trades) {
         const historyDiv = document.getElementById('tradeHistory');
-        
+
         if (trades.length === 0) {
             historyDiv.innerHTML = '<p class="text-gray-500">No trades yet</p>';
             return;
         }
-        
+
         const table = document.createElement('table');
         table.className = 'w-full text-sm';
-        
+
         table.innerHTML = `
             <thead>
                 <tr class="border-b">
@@ -441,25 +449,25 @@ class BitcoinGame {
             </thead>
             <tbody>
                 ${trades.map(trade => {
-                    const fromAmount = trade.from_asset === 'BTC' 
-                        ? (trade.from_amount / 100000000).toFixed(8) + ' BTC'
-                        : (trade.from_amount / 100000000).toFixed(8) + ' ' + trade.from_asset;
-                    
-                    const toAmount = trade.to_asset === 'BTC'
-                        ? (trade.to_amount / 100000000).toFixed(8) + ' BTC'
-                        : (trade.to_amount / 100000000).toFixed(8) + ' ' + trade.to_asset;
-                    
-                    return `
+            const fromAmount = trade.from_asset === 'BTC'
+                ? (trade.from_amount / 100000000).toFixed(8) + ' BTC'
+                : (trade.from_amount / 100000000).toFixed(8) + ' ' + trade.from_asset;
+
+            const toAmount = trade.to_asset === 'BTC'
+                ? (trade.to_amount / 100000000).toFixed(8) + ' BTC'
+                : (trade.to_amount / 100000000).toFixed(8) + ' ' + trade.to_asset;
+
+            return `
                         <tr class="border-b">
                             <td class="p-2">${new Date(trade.created_at).toLocaleDateString()}</td>
                             <td class="p-2 text-red-600">-${fromAmount}</td>
                             <td class="p-2 text-green-600">+${toAmount}</td>
                         </tr>
                     `;
-                }).join('')}
+        }).join('')}
             </tbody>
         `;
-        
+
         historyDiv.innerHTML = '';
         historyDiv.appendChild(table);
     }
@@ -467,12 +475,12 @@ class BitcoinGame {
     populateAssetSelects() {
         const fromSelect = document.getElementById('fromAsset');
         const toSelect = document.getElementById('toAsset');
-        
+
         // Check if elements exist and we have assets data
         if (!fromSelect || !toSelect || !this.assets || this.assets.length === 0) {
             return;
         }
-        
+
         fromSelect.innerHTML = '';
         toSelect.innerHTML = '';
 
@@ -548,6 +556,31 @@ class BitcoinGame {
             helper.textContent = `${amount} ${fromAsset}`;
             helper.className = 'text-gray-500';
             return;
+        } else {
+            // BTC units
+            let sats = 0;
+            let btc = 0;
+
+            switch (unit) {
+                case 'btc':
+                    sats = amount * 100000000;
+                    helper.textContent = `${amount} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'msat':
+                    sats = amount * 1000000;
+                    btc = amount / 100;
+                    helper.textContent = `${amount} mSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'ksat':
+                    sats = amount * 1000;
+                    btc = amount / 100000;
+                    helper.textContent = `${amount} kSats = ${btc.toFixed(8)} BTC = ${sats.toLocaleString()} sats`;
+                    break;
+                case 'sat':
+                    btc = amount / 100000000;
+                    helper.textContent = `${amount} sats = ${btc.toFixed(8)} BTC`;
+                    break;
+            }
         }
 
         // Calculate all conversions for BTC units
@@ -606,21 +639,21 @@ class BitcoinGame {
         const toAsset = document.getElementById('toAsset').value;
         const amount = parseFloat(document.getElementById('tradeAmount').value);
         const unit = document.getElementById('amountUnit').value;
-        
+
         if (fromAsset === toAsset) {
             this.showNotification('Cannot trade the same asset', 'error');
             return;
         }
-        
+
         if (!amount || amount <= 0) {
             this.showNotification('Please enter a valid amount', 'error');
             return;
         }
-        
+
         // Convert amount to satoshis based on unit
         let tradeAmount = amount;
         if (fromAsset === 'BTC') {
-            switch(unit) {
+            switch (unit) {
                 case 'btc':
                     tradeAmount = Math.round(amount * 100000000); // BTC to sats
                     break;
@@ -651,7 +684,7 @@ class BitcoinGame {
             this.showNotification(`Minimum trade amount is ${MIN_TRADE_SATS.toLocaleString()} sats (100 kSats)`, 'error');
             return;
         }
-        
+
         console.log('=== TRADE REQUEST DEBUG ===');
         console.log('From Asset:', fromAsset);
         console.log('To Asset:', toAsset);
@@ -663,7 +696,7 @@ class BitcoinGame {
 
         try {
             console.log('Sending HTTP request...');
-            
+
             const response = await fetch('/api/trades', {
                 method: 'POST',
                 headers: {
@@ -676,13 +709,13 @@ class BitcoinGame {
                     amount: tradeAmount
                 })
             });
-            
+
             console.log('Response status:', response.status);
             console.log('Response headers:', response.headers);
-            
+
             const data = await response.json();
             console.log('Response data:', data);
-            
+
             if (response.ok) {
                 this.showNotification('Trade executed successfully!', 'success');
                 document.getElementById('tradeForm').reset();
@@ -705,7 +738,7 @@ class BitcoinGame {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
-        
+
         // Ensure event listeners are set up for the main app
         this.setupMainAppEventListeners();
     }
@@ -721,9 +754,9 @@ class BitcoinGame {
         const notification = document.getElementById('notification');
         const messageEl = document.getElementById('notificationMessage');
         const iconEl = document.getElementById('notificationIcon');
-        
+
         messageEl.textContent = message;
-        
+
         // Update styling based on type
         const container = notification.querySelector('div');
         if (type === 'success') {
@@ -735,9 +768,9 @@ class BitcoinGame {
             iconEl.textContent = '✕';
             iconEl.className = 'w-5 h-5 text-red-500';
         }
-        
+
         notification.classList.remove('hidden');
-        
+
         // Auto-hide after 5 seconds
         setTimeout(() => {
             this.hideNotification();
@@ -753,18 +786,18 @@ class BitcoinGame {
             const response = await fetch(`/api/portfolio/asset/${symbol}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            
+
             const data = await response.json();
-            
+
             document.getElementById('modalTitle').textContent = `${name} (${symbol}) Purchase History`;
-            
+
             const modalContent = document.getElementById('modalContent');
-            
+
             if (data.purchases.length === 0 && data.sales.length === 0) {
                 modalContent.innerHTML = '<p class="text-gray-500">No transactions found for this asset.</p>';
             } else {
                 let content = '';
-                
+
                 // Show purchases
                 if (data.purchases.length > 0) {
                     content += '<h4 class="font-semibold mb-2">Individual Purchases</h4>';
@@ -782,13 +815,13 @@ class BitcoinGame {
                         </thead>
                         <tbody>
                     `;
-                    
+
                     data.purchases.forEach(purchase => {
                         const amount = (purchase.amount / 100000000).toFixed(8);
                         const btcSpent = (purchase.btc_spent / 100000000).toFixed(8);
                         const isLocked = purchase.is_locked;
                         const unlockDate = purchase.locked_until ? new Date(purchase.locked_until).toLocaleString() : 'N/A';
-                        
+
                         content += `
                             <tr class="border-b ${isLocked ? 'bg-red-50' : 'bg-green-50'}">
                                 <td class="p-2">${new Date(purchase.created_at).toLocaleDateString()}</td>
@@ -803,10 +836,10 @@ class BitcoinGame {
                             </tr>
                         `;
                     });
-                    
+
                     content += '</tbody></table></div>';
                 }
-                
+
                 // Show sales if any
                 if (data.sales.length > 0) {
                     content += '<h4 class="font-semibold mb-2">Sales History</h4>';
@@ -822,11 +855,11 @@ class BitcoinGame {
                         </thead>
                         <tbody>
                     `;
-                    
+
                     data.sales.forEach(sale => {
                         const soldAmount = (sale.from_amount / 100000000).toFixed(8);
                         const receivedBTC = (sale.to_amount / 100000000).toFixed(8);
-                        
+
                         content += `
                             <tr class="border-b">
                                 <td class="p-2">${new Date(sale.created_at).toLocaleDateString()}</td>
@@ -835,13 +868,13 @@ class BitcoinGame {
                             </tr>
                         `;
                     });
-                    
+
                     content += '</tbody></table></div>';
                 }
-                
+
                 modalContent.innerHTML = content;
             }
-            
+
             document.getElementById('assetModal').classList.remove('hidden');
         } catch (error) {
             console.error('Failed to load asset details:', error);
