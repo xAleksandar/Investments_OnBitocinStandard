@@ -147,6 +147,68 @@ class BitcoinGame {
                 }
             });
         }
+
+        // Setup custom dropdowns for mobile
+        this.setupCustomDropdowns();
+    }
+
+    setupCustomDropdowns() {
+        // Setup custom dropdown functionality
+        const customSelects = document.querySelectorAll('.custom-select');
+
+        customSelects.forEach(select => {
+            const trigger = select.querySelector('.custom-select-trigger');
+            const options = select.querySelectorAll('.custom-select-option');
+
+            // Toggle dropdown
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close other dropdowns
+                customSelects.forEach(otherSelect => {
+                    if (otherSelect !== select) {
+                        otherSelect.classList.remove('open');
+                    }
+                });
+                select.classList.toggle('open');
+            });
+
+            // Handle option selection
+            options.forEach(option => {
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+
+                    // Update selected option
+                    options.forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+
+                    // Update trigger text
+                    const text = select.querySelector('.custom-select-text');
+                    text.textContent = option.textContent;
+
+                    // Update corresponding native select
+                    const value = option.dataset.value;
+                    if (select.id === 'fromAssetCustom') {
+                        document.getElementById('fromAsset').value = value;
+                        document.getElementById('fromAsset').dispatchEvent(new Event('change'));
+                    } else if (select.id === 'toAssetCustom') {
+                        document.getElementById('toAsset').value = value;
+                    } else if (select.id === 'amountUnitCustom') {
+                        document.getElementById('amountUnit').value = value;
+                        document.getElementById('amountUnit').dispatchEvent(new Event('change'));
+                    }
+
+                    // Close dropdown
+                    select.classList.remove('open');
+                });
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            customSelects.forEach(select => {
+                select.classList.remove('open');
+            });
+        });
     }
 
     async requestMagicLink() {
@@ -499,8 +561,49 @@ class BitcoinGame {
             toSelect.appendChild(option2);
         });
 
+        // Populate custom dropdowns for mobile
+        this.populateCustomDropdowns(sortedAssets);
+
         // Initialize unit options for the default selection
         this.updateAmountUnitOptions();
+    }
+
+    populateCustomDropdowns(sortedAssets) {
+        const fromCustomOptions = document.querySelector('#fromAssetCustom .custom-select-options');
+        const toCustomOptions = document.querySelector('#toAssetCustom .custom-select-options');
+
+        if (!fromCustomOptions || !toCustomOptions) return;
+
+        // Clear existing options
+        fromCustomOptions.innerHTML = '';
+        toCustomOptions.innerHTML = '';
+
+        // Populate custom dropdowns
+        sortedAssets.forEach((asset, index) => {
+            const fromOption = document.createElement('div');
+            fromOption.className = `custom-select-option ${index === 0 ? 'selected' : ''}`;
+            fromOption.dataset.value = asset.symbol;
+            fromOption.textContent = `${asset.name} (${asset.symbol})`;
+
+            const toOption = document.createElement('div');
+            toOption.className = 'custom-select-option';
+            toOption.dataset.value = asset.symbol;
+            toOption.textContent = `${asset.name} (${asset.symbol})`;
+
+            fromCustomOptions.appendChild(fromOption);
+            toCustomOptions.appendChild(toOption);
+        });
+
+        // Update trigger text for first option
+        const fromTriggerText = document.querySelector('#fromAssetCustom .custom-select-text');
+        const toTriggerText = document.querySelector('#toAssetCustom .custom-select-text');
+
+        if (fromTriggerText && sortedAssets.length > 0) {
+            fromTriggerText.textContent = `${sortedAssets[0].name} (${sortedAssets[0].symbol})`;
+        }
+        if (toTriggerText && sortedAssets.length > 0) {
+            toTriggerText.textContent = `${sortedAssets[0].name} (${sortedAssets[0].symbol})`;
+        }
     }
 
     updateAmountUnitOptions() {
