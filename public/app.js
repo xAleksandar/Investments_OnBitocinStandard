@@ -324,6 +324,7 @@ class BitcoinGame {
             const response = await fetch('/api/assets');
             this.assets = await response.json();
             this.populateAssetSelects();
+            this.setupChartDropdown();
         } catch (error) {
             console.error('Failed to load assets:', error);
         }
@@ -875,12 +876,27 @@ class BitcoinGame {
         this.initTradingViewChart();
     }
 
-    initTradingViewChart() {
+    initTradingViewChart(symbol = 'BTCBTC') {
         const container = document.getElementById('tradingview-widget-container');
         if (!container) return;
 
-        // Check if chart already initialized
-        if (container.querySelector('iframe')) return;
+        // Clear existing chart
+        container.innerHTML = '';
+
+        // Map assets to TradingView symbols
+        const symbolMap = {
+            'BTC': 'BTCBTC',  // BTC/BTC = 1 (flat line)
+            'AAPL': 'NASDAQ:AAPL/BITSTAMP:BTCUSD',  // Apple price / BTC price
+            'TSLA': 'NASDAQ:TSLA/BITSTAMP:BTCUSD',  // Tesla price / BTC price
+            'MSFT': 'NASDAQ:MSFT/BITSTAMP:BTCUSD',  // Microsoft price / BTC price
+            'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD', // Google price / BTC price
+            'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',  // Amazon price / BTC price
+            'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',   // Nvidia price / BTC price
+            'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',       // Gold price / BTC price
+            'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD'      // Silver price / BTC price
+        };
+
+        const tvSymbol = symbolMap[symbol] || 'BTCBTC';
 
         // Create TradingView widget iframe
         const script = document.createElement('script');
@@ -889,7 +905,7 @@ class BitcoinGame {
             new TradingView.widget({
                 "width": "100%",
                 "height": 500,
-                "symbol": "BITSTAMP:BTCUSD",
+                "symbol": "${tvSymbol}",
                 "interval": "D",
                 "timezone": "Etc/UTC",
                 "theme": "light",
@@ -907,17 +923,49 @@ class BitcoinGame {
             });
         `;
 
-        // Add TradingView library script first
-        const tvScript = document.createElement('script');
-        tvScript.type = 'text/javascript';
-        tvScript.src = 'https://s3.tradingview.com/tv.js';
-        tvScript.onload = () => {
-            // After library loads, add widget configuration
+        // Check if TradingView library is already loaded
+        if (window.TradingView) {
+            // Library already loaded, just add widget
             container.appendChild(script);
-        };
+        } else {
+            // Add TradingView library script first
+            const tvScript = document.createElement('script');
+            tvScript.type = 'text/javascript';
+            tvScript.src = 'https://s3.tradingview.com/tv.js';
+            tvScript.onload = () => {
+                // After library loads, add widget configuration
+                container.appendChild(script);
+            };
+            // Append the TradingView library script
+            document.head.appendChild(tvScript);
+        }
+    }
 
-        // Append the TradingView library script
-        document.head.appendChild(tvScript);
+    setupChartDropdown() {
+        const chartSelect = document.getElementById('chartAsset');
+        if (!chartSelect) return;
+
+        // Clear and populate with assets
+        chartSelect.innerHTML = '<option value="BTC">Bitcoin (BTC)</option>';
+
+        // Sort assets for dropdown (BTC first, then alphabetical)
+        const sortedAssets = [...this.assets].sort((a, b) => {
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        sortedAssets.forEach(asset => {
+            if (asset.symbol !== 'BTC') {
+                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+                chartSelect.appendChild(option);
+            }
+        });
+
+        // Add change event listener
+        chartSelect.addEventListener('change', (e) => {
+            this.initTradingViewChart(e.target.value);
+        });
     }
 
     showMessage(message, type) {
