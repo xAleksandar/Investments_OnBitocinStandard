@@ -113,6 +113,13 @@ class BitcoinGame {
         document.getElementById('fromAsset').addEventListener('change', () => {
             this.updateAmountUnitOptions();
             this.updateAmountHelper();
+            // Update chart when dropdown changes
+            this.updateChartFromTradeDropdowns();
+        });
+
+        document.getElementById('toAsset').addEventListener('change', () => {
+            // Update chart when dropdown changes
+            this.updateChartFromTradeDropdowns();
         });
 
         // Update amount helper text
@@ -324,7 +331,7 @@ class BitcoinGame {
             const response = await fetch('/api/assets');
             this.assets = await response.json();
             this.populateAssetSelects();
-            this.setupChartDropdown();
+            // Chart will use existing trade dropdowns
         } catch (error) {
             console.error('Failed to load assets:', error);
         }
@@ -872,36 +879,42 @@ class BitcoinGame {
         // Ensure event listeners are set up for the main app
         this.setupMainAppEventListeners();
 
-        // Initialize TradingView chart
-        this.initTradingViewChart();
+        // Initialize TradingView chart with default BTC/BTC
+        this.initTradingViewChart('BTC', 'BTC');
     }
 
-    initTradingViewChart(symbol = 'BTC') {
+    initTradingViewChart(fromSymbol = 'BTC', toSymbol = 'BTC') {
         const container = document.getElementById('tradingview-widget-container');
         if (!container) return;
 
         // Clear existing chart
         container.innerHTML = '';
 
-        // Map assets to TradingView symbols showing asset/BTC ratios
+        // Map assets to TradingView symbols
+        const symbolMap = {
+            'BTC': 'BITSTAMP:BTCUSD',
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'NVDA': 'NASDAQ:NVDA',
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER',
+            'WTI': 'TVC:USOIL'
+        };
+
+        // Create ratio symbol
         let tvSymbol;
-        if (symbol === 'BTC') {
-            // For BTC/BTC, just show Bitcoin price chart
-            tvSymbol = 'BITSTAMP:BTCUSD';
+        const fromTv = symbolMap[fromSymbol] || 'BITSTAMP:BTCUSD';
+        const toTv = symbolMap[toSymbol] || 'BITSTAMP:BTCUSD';
+
+        if (fromSymbol === toSymbol) {
+            // Same asset ratio would be 1, so just show the asset price
+            tvSymbol = fromTv;
         } else {
-            // For other assets, create ratio expressions
-            const symbolMap = {
-                'AAPL': 'NASDAQ:AAPL/BITSTAMP:BTCUSD',  // Apple price / BTC price
-                'TSLA': 'NASDAQ:TSLA/BITSTAMP:BTCUSD',  // Tesla price / BTC price
-                'MSFT': 'NASDAQ:MSFT/BITSTAMP:BTCUSD',  // Microsoft price / BTC price
-                'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD', // Google price / BTC price
-                'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',  // Amazon price / BTC price
-                'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',   // Nvidia price / BTC price
-                'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',       // Gold price / BTC price
-                'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',     // Silver price / BTC price
-                'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'       // Oil price / BTC price
-            };
-            tvSymbol = symbolMap[symbol] || 'BITSTAMP:BTCUSD';
+            // Create ratio expression: from/to
+            tvSymbol = `${fromTv}/${toTv}`;
         }
 
         // Create unique container ID for this widget
@@ -951,31 +964,13 @@ class BitcoinGame {
         }
     }
 
-    setupChartDropdown() {
-        const chartSelect = document.getElementById('chartAsset');
-        if (!chartSelect) return;
+    updateChartFromTradeDropdowns() {
+        const fromAsset = document.getElementById('fromAsset');
+        const toAsset = document.getElementById('toAsset');
 
-        // Clear and populate with assets
-        chartSelect.innerHTML = '<option value="BTC">Bitcoin (BTC)</option>';
-
-        // Sort assets for dropdown (BTC first, then alphabetical)
-        const sortedAssets = [...this.assets].sort((a, b) => {
-            if (a.symbol === 'BTC') return -1;
-            if (b.symbol === 'BTC') return 1;
-            return a.name.localeCompare(b.name);
-        });
-
-        sortedAssets.forEach(asset => {
-            if (asset.symbol !== 'BTC') {
-                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-                chartSelect.appendChild(option);
-            }
-        });
-
-        // Add change event listener
-        chartSelect.addEventListener('change', (e) => {
-            this.initTradingViewChart(e.target.value);
-        });
+        if (fromAsset && toAsset) {
+            this.initTradingViewChart(fromAsset.value, toAsset.value);
+        }
     }
 
     showMessage(message, type) {
