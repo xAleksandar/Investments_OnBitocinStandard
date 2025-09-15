@@ -113,6 +113,17 @@ class BitcoinGame {
         document.getElementById('fromAsset').addEventListener('change', () => {
             this.updateAmountUnitOptions();
             this.updateAmountHelper();
+            // Update To Asset dropdown to exclude the selected From Asset
+            this.updateToAssetDropdown();
+            // Update chart when dropdown changes
+            this.updateChartFromTradeDropdowns();
+        });
+
+        document.getElementById('toAsset').addEventListener('change', () => {
+            // Update From Asset dropdown to exclude the selected To Asset
+            this.updateFromAssetDropdown();
+            // Update chart when dropdown changes
+            this.updateChartFromTradeDropdowns();
         });
 
         // Update amount helper text
@@ -324,6 +335,7 @@ class BitcoinGame {
             const response = await fetch('/api/assets');
             this.assets = await response.json();
             this.populateAssetSelects();
+            // Chart will use existing trade dropdowns
         } catch (error) {
             console.error('Failed to load assets:', error);
         }
@@ -343,9 +355,7 @@ class BitcoinGame {
             this.prices = data.pricesInSats;
 
             // Update Bitcoin price display with error handling
-            if (data.btcPrice) {
-                document.getElementById('btcPrice').textContent = `$${data.btcPrice.toLocaleString()}`;
-            }
+            // Bitcoin price display removed - no longer showing USD prices
         } catch (error) {
             console.error('Failed to load prices:', error);
         }
@@ -564,9 +574,20 @@ class BitcoinGame {
             return a.name.localeCompare(b.name);
         });
 
+        // Populate both dropdowns with all assets initially
         sortedAssets.forEach(asset => {
             const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
             const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+
+            // Set BTC as default for From Asset
+            if (asset.symbol === 'BTC') {
+                option1.selected = true;
+            }
+
+            // Set AMZN as default for To Asset
+            if (asset.symbol === 'AMZN') {
+                option2.selected = true;
+            }
 
             fromSelect.appendChild(option1);
             toSelect.appendChild(option2);
@@ -577,6 +598,11 @@ class BitcoinGame {
 
         // Initialize unit options for the default selection
         this.updateAmountUnitOptions();
+
+        // Apply exclusions based on initial selections
+        // This removes BTC from To Asset and AMZN from From Asset
+        this.updateToAssetDropdown();  // Removes BTC from To
+        this.updateFromAssetDropdown(); // Removes AMZN from From
     }
 
     populateCustomDropdowns(sortedAssets) {
@@ -861,6 +887,7 @@ class BitcoinGame {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
+
         // Also update mobile user info
         const userInfoMobile = document.getElementById('userInfoMobile');
         if (userInfoMobile) {
@@ -869,6 +896,181 @@ class BitcoinGame {
 
         // Ensure event listeners are set up for the main app
         this.setupMainAppEventListeners();
+
+        // Initialize TradingView chart with default BTC/AMZN
+        this.initTradingViewChart('BTC', 'AMZN');
+    }
+
+    initTradingViewChart(fromSymbol = 'BTC', toSymbol = 'BTC') {
+        const container = document.getElementById('tradingview-widget-container');
+        if (!container) return;
+
+        // Clear existing chart
+        container.innerHTML = '';
+
+        // Map assets to TradingView symbols
+        const symbolMap = {
+            'BTC': 'BITSTAMP:BTCUSD',
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'NVDA': 'NASDAQ:NVDA',
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER',
+            'WTI': 'TVC:USOIL'
+        };
+
+        // Create ratio symbol
+        let tvSymbol;
+        const fromTv = symbolMap[fromSymbol] || 'BITSTAMP:BTCUSD';
+        const toTv = symbolMap[toSymbol] || 'BITSTAMP:BTCUSD';
+
+        if (fromSymbol === toSymbol) {
+            // Same asset ratio would be 1, so just show the asset price
+            tvSymbol = fromTv;
+        } else {
+            // Create ratio expression: from/to
+            tvSymbol = `${fromTv}/${toTv}`;
+        }
+
+        // Create unique container ID for this widget
+        const widgetId = 'tv-widget-' + Date.now();
+        const widgetContainer = document.createElement('div');
+        widgetContainer.id = widgetId;
+        container.appendChild(widgetContainer);
+
+        // Function to create the widget
+        const createWidget = () => {
+            new window.TradingView.widget({
+                "width": "100%",
+                "height": 500,
+                "symbol": tvSymbol,
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "light",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": false,
+                "container_id": widgetId,
+                "hide_side_toolbar": false,
+                "studies": [],
+                "show_popup_button": false,
+                "popup_width": "1000",
+                "popup_height": "650"
+            });
+        };
+
+        // Check if TradingView library is already loaded
+        if (window.TradingView) {
+            // Library already loaded, create widget
+            createWidget();
+        } else {
+            // Add TradingView library script first
+            const tvScript = document.createElement('script');
+            tvScript.type = 'text/javascript';
+            tvScript.src = 'https://s3.tradingview.com/tv.js';
+            tvScript.onload = () => {
+                // After library loads, create widget
+                createWidget();
+            };
+            // Append the TradingView library script
+            document.head.appendChild(tvScript);
+        }
+    }
+
+    updateFromAssetDropdown() {
+        const fromSelect = document.getElementById('fromAsset');
+        const toSelect = document.getElementById('toAsset');
+
+        if (!fromSelect || !toSelect || !this.assets) return;
+
+        const selectedToAsset = toSelect.value;
+        const currentFromAsset = fromSelect.value;
+
+        // Clear From Asset dropdown
+        fromSelect.innerHTML = '';
+
+        // Sort assets to put Bitcoin first
+        const sortedAssets = [...this.assets].sort((a, b) => {
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Populate From Asset dropdown, excluding whatever is selected in To Asset
+        sortedAssets.forEach(asset => {
+            if (asset.symbol !== selectedToAsset) {
+                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+
+                // Keep the current selection if it's still valid
+                if (asset.symbol === currentFromAsset) {
+                    option.selected = true;
+                }
+
+                fromSelect.appendChild(option);
+            }
+        });
+
+        // If the current From Asset was removed, select the first available option
+        if (currentFromAsset === selectedToAsset) {
+            fromSelect.selectedIndex = 0;
+        }
+
+        // Update amount unit options after changing From Asset
+        this.updateAmountUnitOptions();
+        this.updateAmountHelper();
+    }
+
+    updateToAssetDropdown() {
+        const fromSelect = document.getElementById('fromAsset');
+        const toSelect = document.getElementById('toAsset');
+
+        if (!fromSelect || !toSelect || !this.assets) return;
+
+        const selectedFromAsset = fromSelect.value;
+        const currentToAsset = toSelect.value;
+
+        // Clear To Asset dropdown
+        toSelect.innerHTML = '';
+
+        // Sort assets to put Bitcoin first
+        const sortedAssets = [...this.assets].sort((a, b) => {
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Populate To Asset dropdown, excluding whatever is selected in From Asset
+        sortedAssets.forEach(asset => {
+            if (asset.symbol !== selectedFromAsset) {
+                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+
+                // Keep the current selection if it's still valid
+                if (asset.symbol === currentToAsset) {
+                    option.selected = true;
+                }
+
+                toSelect.appendChild(option);
+            }
+        });
+
+        // If the current To Asset was removed, select the first available option
+        if (currentToAsset === selectedFromAsset) {
+            toSelect.selectedIndex = 0;
+        }
+    }
+
+    updateChartFromTradeDropdowns() {
+        const fromAsset = document.getElementById('fromAsset');
+        const toAsset = document.getElementById('toAsset');
+
+        if (fromAsset && toAsset) {
+            this.initTradingViewChart(fromAsset.value, toAsset.value);
+        }
     }
 
     showMessage(message, type) {

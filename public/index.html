@@ -159,19 +159,23 @@
                 <!-- Portfolio Overview -->
                 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                     <h2 class="text-xl font-bold mb-4">Portfolio Overview</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="bg-orange-50 p-4 rounded">
                             <h3 class="font-semibold text-orange-800">Total Value</h3>
                             <p id="totalValue" class="text-2xl font-bold text-orange-600">0 sats</p>
-                        </div>
-                        <div class="bg-blue-50 p-4 rounded">
-                            <h3 class="font-semibold text-blue-800">Bitcoin Price</h3>
-                            <p id="btcPrice" class="text-2xl font-bold text-blue-600">$0</p>
                         </div>
                         <div class="bg-green-50 p-4 rounded">
                             <h3 class="font-semibold text-green-800">Performance</h3>
                             <p id="performance" class="text-2xl font-bold text-green-600">0%</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- TradingView Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-4">Price Chart</h2>
+                    <div id="tradingview-widget-container" style="height: 500px;">
+                        <!-- TradingView Widget - Shows ratio based on Trade Assets dropdowns -->
                     </div>
                 </div>
 
