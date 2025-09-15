@@ -5,6 +5,103 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Investment Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom dropdown styles */
+        .custom-select {
+            position: relative;
+            display: block;
+            width: 100%;
+        }
+        
+        .custom-select-trigger {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .custom-select-trigger:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .custom-select-arrow {
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid #6b7280;
+            transition: transform 0.2s;
+        }
+        
+        .custom-select.open .custom-select-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .custom-select-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-top: none;
+            border-radius: 0 0 0.5rem 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .custom-select.open .custom-select-options {
+            display: block;
+        }
+        
+        .custom-select-option {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .custom-select-option:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .custom-select-option:last-child {
+            border-bottom: none;
+        }
+        
+        .custom-select-option.selected {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        /* Hide native selects on mobile */
+        @media (max-width: 768px) {
+            .native-select {
+                display: none;
+            }
+            .custom-select {
+                display: block;
+            }
+        }
+        
+        /* Show native selects on desktop */
+        @media (min-width: 769px) {
+            .native-select {
+                display: block;
+            }
+            .custom-select {
+                display: none;
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div id="app">
@@ -35,11 +132,25 @@
         <!-- Main App -->
         <div id="mainApp" class="hidden">
             <nav class="bg-orange-500 text-white p-4">
-                <div class="max-w-6xl mx-auto flex justify-between items-center">
-                    <h1 class="text-xl font-bold">Bitcoin Investment Game</h1>
-                    <div class="flex items-center space-x-4">
-                        <span id="userInfo"></span>
-                        <button id="logoutBtn" class="bg-orange-600 px-3 py-1 rounded">Logout</button>
+                <div class="max-w-6xl mx-auto">
+                    <!-- Desktop layout -->
+                    <div class="hidden md:flex justify-between items-center">
+                        <h1 class="text-xl font-bold">Bitcoin Investment Game</h1>
+                        <div class="flex items-center space-x-4">
+                            <span id="userInfo"></span>
+                            <button id="logoutBtn" class="bg-orange-600 px-3 py-1 rounded">Logout</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile layout -->
+                    <div class="md:hidden">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h1 class="text-xl font-bold">Bitcoin Investment Game</h1>
+                                <span id="userInfoMobile" class="text-sm"></span>
+                            </div>
+                            <button id="logoutBtnMobile" class="bg-orange-600 px-3 py-1 rounded text-sm">Logout</button>
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -74,31 +185,67 @@
                     </div>
 
                     <!-- Trading -->
-                    <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="bg-white rounded-lg shadow-md p-6 trade-form-container">
                         <h2 class="text-xl font-bold mb-4">Trade Assets</h2>
                         <form id="tradeForm">
                             <div class="mb-4">
                                 <label class="block text-gray-700 text-sm font-bold mb-2">From Asset</label>
-                                <select id="fromAsset" class="w-full px-3 py-2 border rounded-lg">
+                                <!-- Native select for desktop -->
+                                <select id="fromAsset" class="native-select w-full px-3 py-2 border rounded-lg">
                                     <!-- Options populated by JS -->
                                 </select>
+                                <!-- Custom select for mobile -->
+                                <div id="fromAssetCustom" class="custom-select">
+                                    <div class="custom-select-trigger">
+                                        <span class="custom-select-text">Select asset...</span>
+                                        <div class="custom-select-arrow"></div>
+                                    </div>
+                                    <div class="custom-select-options">
+                                        <!-- Options populated by JS -->
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-4">
                                 <label class="block text-gray-700 text-sm font-bold mb-2">To Asset</label>
-                                <select id="toAsset" class="w-full px-3 py-2 border rounded-lg">
+                                <!-- Native select for desktop -->
+                                <select id="toAsset" class="native-select w-full px-3 py-2 border rounded-lg">
                                     <!-- Options populated by JS -->
                                 </select>
+                                <!-- Custom select for mobile -->
+                                <div id="toAssetCustom" class="custom-select">
+                                    <div class="custom-select-trigger">
+                                        <span class="custom-select-text">Select asset...</span>
+                                        <div class="custom-select-arrow"></div>
+                                    </div>
+                                    <div class="custom-select-options">
+                                        <!-- Options populated by JS -->
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-4">
                                 <label class="block text-gray-700 text-sm font-bold mb-2">Amount</label>
                                 <div class="flex space-x-2">
                                     <input type="number" id="tradeAmount" step="0.00000001" class="flex-1 px-3 py-2 border rounded-lg">
-                                    <select id="amountUnit" class="px-3 py-2 border rounded-lg bg-white">
+                                    <!-- Native select for desktop -->
+                                    <select id="amountUnit" class="native-select px-3 py-2 border rounded-lg bg-white">
                                         <option value="btc">BTC</option>
                                         <option value="msat">mSats</option>
                                         <option value="ksat">kSats</option>
                                         <option value="sat">Sats</option>
                                     </select>
+                                    <!-- Custom select for mobile -->
+                                    <div id="amountUnitCustom" class="custom-select" style="min-width: 80px;">
+                                        <div class="custom-select-trigger">
+                                            <span class="custom-select-text">BTC</span>
+                                            <div class="custom-select-arrow"></div>
+                                        </div>
+                                        <div class="custom-select-options">
+                                            <div class="custom-select-option selected" data-value="btc">BTC</div>
+                                            <div class="custom-select-option" data-value="msat">mSats</div>
+                                            <div class="custom-select-option" data-value="ksat">kSats</div>
+                                            <div class="custom-select-option" data-value="sat">Sats</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="text-xs mt-1">
                                     <span id="amountHelper" class="text-gray-500">1 BTC = 100 mSats = 100,000 kSats = 100,000,000 sats</span>
