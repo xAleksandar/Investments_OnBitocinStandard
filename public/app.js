@@ -4,11 +4,16 @@ class BitcoinGame {
         this.user = JSON.parse(localStorage.getItem('user') || '{}');
         this.assets = [];
         this.prices = {};
+        this.currentPage = 'home';
+        this.priceRefreshInterval = null;
 
         this.init();
     }
 
     init() {
+        // Set up routing first
+        this.setupRouting();
+
         // Check if we have a token from URL (magic link)
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = urlParams.get('token');
@@ -21,15 +26,188 @@ class BitcoinGame {
         }
 
         if (this.token) {
-            this.showMainApp();
-            this.loadData();
-            // Start 30-second price auto-refresh
-            this.startPriceAutoRefresh();
-        } else {
-            this.showLoginForm();
+            // User is logged in - update nav but don't auto-navigate
+            this.updateNavForLoggedInUser();
         }
 
         this.setupEventListeners();
+
+        // Navigate to current hash or default to home
+        this.navigate(window.location.hash || '#home');
+    }
+
+    setupRouting() {
+        // Handle hash changes
+        window.addEventListener('hashchange', () => {
+            this.navigate(window.location.hash);
+        });
+
+        // Handle login buttons
+        ['heroLoginBtn', 'navLoginBtn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => this.showLoginForm());
+            }
+        });
+
+        // Handle logout button
+        const logoutBtn = document.getElementById('navLogoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        }
+    }
+
+    navigate(hash) {
+        // Hide all pages
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('assetsPage').classList.add('hidden');
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginForm').classList.add('hidden');
+
+        // Route to appropriate page
+        switch(hash) {
+            case '#assets':
+                this.currentPage = 'assets';
+                document.getElementById('assetsPage').classList.remove('hidden');
+                this.initAssetsPage();
+                break;
+            case '#portfolio':
+                this.currentPage = 'portfolio';
+                if (this.token) {
+                    document.getElementById('mainApp').classList.remove('hidden');
+                    if (!this.assets || this.assets.length === 0) {
+                        this.loadData();
+                        this.startPriceAutoRefresh();
+                    }
+                } else {
+                    this.showNotification('Please login to access your portfolio', 'error');
+                    this.showLoginForm();
+                }
+                break;
+            case '#home':
+            default:
+                this.currentPage = 'home';
+                document.getElementById('homePage').classList.remove('hidden');
+                this.initHomePage();
+                break;
+        }
+    }
+
+    initHomePage() {
+        // Initialize mini charts for popular assets
+        setTimeout(() => {
+            this.initMiniChart('chartGold', 'TVC:GOLD/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartSPY', 'AMEX:SPY/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartAAPL', 'NASDAQ:AAPL/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartTSLA', 'NASDAQ:TSLA/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartVNQ', 'NASDAQ:VNQ/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartOil', 'TVC:USOIL/BITSTAMP:BTCUSD');
+        }, 500);
+    }
+
+    initMiniChart(containerId, symbol) {
+        const container = document.getElementById(containerId);
+        if (!container || container.innerHTML !== '') return;
+
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+        script.innerHTML = JSON.stringify({
+            "symbol": symbol,
+            "width": "100%",
+            "height": "100%",
+            "locale": "en",
+            "dateRange": "12M",
+            "colorTheme": "light",
+            "trendLineColor": "rgba(255, 152, 0, 1)",
+            "underLineColor": "rgba(255, 152, 0, 0.1)",
+            "underLineBottomColor": "rgba(255, 152, 0, 0)",
+            "isTransparent": true,
+            "autosize": true,
+            "largeChartUrl": ""
+        });
+        container.appendChild(script);
+    }
+
+    initAssetsPage() {
+        const selector = document.getElementById('assetSelector');
+        if (!selector) return;
+
+        // Remove any existing listeners
+        const newSelector = selector.cloneNode(true);
+        selector.parentNode.replaceChild(newSelector, selector);
+
+        // Initialize chart for selected asset
+        this.updateAssetChart();
+
+        newSelector.addEventListener('change', () => {
+            this.updateAssetChart();
+        });
+    }
+
+    updateAssetChart() {
+        const selector = document.getElementById('assetSelector');
+        const container = document.getElementById('assetChart');
+        if (!selector || !container) return;
+
+        const asset = selector.value;
+        const symbolMap = {
+            'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',
+            'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',
+            'SPY': 'AMEX:SPY/BITSTAMP:BTCUSD',
+            'AAPL': 'NASDAQ:AAPL/BITSTAMP:BTCUSD',
+            'TSLA': 'NASDAQ:TSLA/BITSTAMP:BTCUSD',
+            'MSFT': 'NASDAQ:MSFT/BITSTAMP:BTCUSD',
+            'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD',
+            'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',
+            'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',
+            'VNQ': 'NASDAQ:VNQ/BITSTAMP:BTCUSD',
+            'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'
+        };
+
+        const symbol = symbolMap[asset] || 'BITSTAMP:BTCUSD';
+
+        container.innerHTML = '';
+        const widgetId = 'tv-widget-' + Date.now();
+        const widgetContainer = document.createElement('div');
+        widgetContainer.id = widgetId;
+        widgetContainer.style.height = '100%';
+        container.appendChild(widgetContainer);
+
+        const createWidget = () => {
+            new window.TradingView.widget({
+                "width": "100%",
+                "height": "100%",
+                "symbol": symbol,
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "light",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": false,
+                "container_id": widgetId
+            });
+        };
+
+        if (window.TradingView) {
+            createWidget();
+        } else {
+            const tvScript = document.createElement('script');
+            tvScript.type = 'text/javascript';
+            tvScript.src = 'https://s3.tradingview.com/tv.js';
+            tvScript.onload = createWidget;
+            document.head.appendChild(tvScript);
+        }
+    }
+
+    updateNavForLoggedInUser() {
+        document.getElementById('navLoginBtn').classList.add('hidden');
+        document.getElementById('navUserInfo').classList.remove('hidden');
+        if (this.user && this.user.username) {
+            document.getElementById('navUsername').textContent = this.user.username;
+        }
     }
 
     setupEventListeners() {
@@ -879,12 +1057,22 @@ class BitcoinGame {
     }
 
     showLoginForm() {
-        document.getElementById('loginForm').classList.remove('hidden');
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('assetsPage').classList.add('hidden');
         document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginForm').classList.remove('hidden');
     }
 
     showMainApp() {
+        // Update navigation bar
+        this.updateNavForLoggedInUser();
+
+        // Navigate to portfolio
+        window.location.hash = '#portfolio';
+
         document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('assetsPage').classList.add('hidden');
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${this.user.username}!`;
 
@@ -1223,7 +1411,14 @@ class BitcoinGame {
         this.user = {};
         // Stop price auto-refresh when logging out
         this.stopPriceAutoRefresh();
-        this.showLoginForm();
+
+        // Update navigation
+        document.getElementById('navLoginBtn').classList.remove('hidden');
+        document.getElementById('navUserInfo').classList.add('hidden');
+
+        // Navigate to home
+        window.location.hash = '#home';
+        this.navigate('#home');
     }
 
     startPriceAutoRefresh() {
