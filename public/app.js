@@ -100,7 +100,7 @@ class BitcoinGame {
             this.initMiniChart('chartSPY', 'AMEX:SPY/BITSTAMP:BTCUSD');
             this.initMiniChart('chartAAPL', 'NASDAQ:AAPL/BITSTAMP:BTCUSD');
             this.initMiniChart('chartTSLA', 'NASDAQ:TSLA/BITSTAMP:BTCUSD');
-            this.initMiniChart('chartVNQ', 'NASDAQ:VNQ/BITSTAMP:BTCUSD');
+            this.initMiniChart('chartVNQ', 'AMEX:VNQ/BITSTAMP:BTCUSD');
             this.initMiniChart('chartOil', 'TVC:USOIL/BITSTAMP:BTCUSD');
         }, 500);
     }
@@ -161,7 +161,7 @@ class BitcoinGame {
             'GOOGL': 'NASDAQ:GOOGL/BITSTAMP:BTCUSD',
             'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',
             'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',
-            'VNQ': 'NASDAQ:VNQ/BITSTAMP:BTCUSD',
+            'VNQ': 'AMEX:VNQ/BITSTAMP:BTCUSD',
             'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'
         };
 
