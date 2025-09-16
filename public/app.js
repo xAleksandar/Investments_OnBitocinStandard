@@ -234,7 +234,7 @@ class BitcoinGame {
                 '24h': document.getElementById('asset24h'),
                 '1y': document.getElementById('asset1y'),
                 '5y': document.getElementById('asset5y'),
-                'all': document.getElementById('assetAll')
+                'all': document.getElementById('assetAllTime')
             };
 
             // Mock performance data (in real app, would come from API)
