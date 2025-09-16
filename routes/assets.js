@@ -47,8 +47,8 @@ router.get('/prices', async (req, res) => {
       const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
       const apiBtcPrice = btcResponse.data.bitcoin.usd;
 
-      // Validate BTC price is reasonable (between $10k and $500k)
-      if (apiBtcPrice && apiBtcPrice > 10000 && apiBtcPrice < 500000) {
+      // Validate BTC price is reasonable (between $50k and $200k)
+      if (apiBtcPrice && apiBtcPrice > 50000 && apiBtcPrice < 200000) {
         currentBtcPrice = apiBtcPrice;
         lastValidPrices.btc = apiBtcPrice; // Update cache
         console.log(`BTC: Updated to API price: $${currentBtcPrice.toFixed(2)}`);
@@ -59,65 +59,107 @@ router.get('/prices', async (req, res) => {
       console.log(`Bitcoin API error, using last valid price: $${currentBtcPrice.toFixed(2)}`);
     }
 
-    // Get stock prices (using a simple mapping for demo)
-    const stockSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'];
-    const stockPrices = {};
+    // Get stock prices from Yahoo Finance (free, no API key required)
+    const stockSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'SPY', 'VNQ'];
+    let stockPrices = {};
 
-    // For demo, we'll use mock prices. In production, use a real stock API
-    const mockStockPrices = {
+    // Fallback prices if API fails
+    const fallbackStockPrices = {
       'AAPL': 175.50,
       'TSLA': 248.30,
       'MSFT': 378.20,
       'GOOGL': 138.45,
       'AMZN': 145.80,
       'NVDA': 485.60,
-      'SPY': 450.00,  // S&P 500 ETF
-      'VNQ': 95.00    // Real Estate ETF
+      'SPY': 450.00,
+      'VNQ': 95.00
     };
 
-    // Get commodity prices from CoinGecko (with fallbacks)
-    // Note: CoinGecko returns gold/silver price per GRAM, not per ounce
-    // 1 troy ounce = 31.1035 grams
+    // Fetch real stock prices from Yahoo Finance
+    try {
+      const stockPromises = stockSymbols.map(async symbol => {
+        try {
+          // Yahoo Finance API v8 (free, no key required)
+          const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+
+          const price = response.data.chart.result[0].meta.regularMarketPrice;
+          console.log(`${symbol}: Fetched real price: $${price}`);
+          return { symbol, price };
+        } catch (error) {
+          console.log(`${symbol}: Failed to fetch, using fallback price`);
+          return { symbol, price: fallbackStockPrices[symbol] };
+        }
+      });
+
+      const results = await Promise.all(stockPromises);
+      results.forEach(({ symbol, price }) => {
+        stockPrices[symbol] = price;
+      });
+    } catch (error) {
+      console.log('Failed to fetch stock prices, using fallback prices');
+      stockPrices = fallbackStockPrices;
+    }
+
+    // Get commodity prices - fallbacks first
     let commodityPrices = {
-      'XAU': lastValidPrices.gold || 2000,  // Use last valid or fallback
-      'XAG': lastValidPrices.silver || 25   // Use last valid or fallback
+      'XAU': 2700,  // Gold per troy ounce - default fallback
+      'XAG': 32,    // Silver per troy ounce - default fallback
+      'WTI': 75     // Oil per barrel - default fallback
     };
+
+    // Try to fetch gold and silver prices from Yahoo Finance
+    try {
+      // Gold futures (GC=F)
+      const goldResponse = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      const goldPrice = goldResponse.data.chart.result[0].meta.regularMarketPrice;
+      commodityPrices.XAU = goldPrice;
+      lastValidPrices.gold = goldPrice;
+      console.log(`Gold: Fetched real price: $${goldPrice.toFixed(2)}/oz`);
+    } catch (error) {
+      console.log('Gold: Failed to fetch from Yahoo, using fallback price');
+    }
 
     try {
-      const commodityResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=gold,silver&vs_currencies=usd`);
-
-      // Validate and convert from per gram to per troy ounce
-      const goldPerGram = commodityResponse.data.gold?.usd;
-      const silverPerGram = commodityResponse.data.silver?.usd;
-
-      // Validate prices are reasonable (gold should be $50-100 per gram, silver $0.5-2 per gram)
-      if (goldPerGram && goldPerGram > 50 && goldPerGram < 100) {
-        const goldPrice = goldPerGram * 31.1035; // Convert to per troy ounce
-        commodityPrices.XAU = goldPrice;
-        lastValidPrices.gold = goldPrice; // Update cache
-        console.log(`Gold: Updated to API price: $${goldPrice.toFixed(2)}/oz`);
-      } else {
-        console.log(`Gold: Invalid API price (${goldPerGram}), using last valid: $${commodityPrices.XAU.toFixed(2)}/oz`);
-      }
-
-      if (silverPerGram && silverPerGram > 0.5 && silverPerGram < 2) {
-        const silverPrice = silverPerGram * 31.1035; // Convert to per troy ounce
-        commodityPrices.XAG = silverPrice;
-        lastValidPrices.silver = silverPrice; // Update cache
-        console.log(`Silver: Updated to API price: $${silverPrice.toFixed(2)}/oz`);
-      } else {
-        console.log(`Silver: Invalid API price (${silverPerGram}), using last valid: $${commodityPrices.XAG.toFixed(2)}/oz`);
-      }
-
+      // Silver futures (SI=F)
+      const silverResponse = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/SI=F', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      const silverPrice = silverResponse.data.chart.result[0].meta.regularMarketPrice;
+      commodityPrices.XAG = silverPrice;
+      lastValidPrices.silver = silverPrice;
+      console.log(`Silver: Fetched real price: $${silverPrice.toFixed(2)}/oz`);
     } catch (error) {
-      console.log('Commodity API error, using last valid prices');
+      console.log('Silver: Failed to fetch from Yahoo, using fallback price');
+    }
+
+    // Try to fetch oil price from Yahoo Finance
+    try {
+      const oilResponse = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/CL=F', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      const oilPrice = oilResponse.data.chart.result[0].meta.regularMarketPrice;
+      commodityPrices.WTI = oilPrice;
+      console.log(`WTI Oil: Fetched real price: $${oilPrice}`);
+    } catch (error) {
+      console.log('WTI Oil: Failed to fetch, using fallback price');
     }
 
     const prices = {
       'BTC': currentBtcPrice,
-      'WTI': 75, // Oil per barrel - using fixed price for now
       ...commodityPrices,
-      ...mockStockPrices
+      ...stockPrices
     };
 
     // Update database
