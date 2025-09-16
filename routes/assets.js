@@ -70,7 +70,9 @@ router.get('/prices', async (req, res) => {
       'MSFT': 378.20,
       'GOOGL': 138.45,
       'AMZN': 145.80,
-      'NVDA': 485.60
+      'NVDA': 485.60,
+      'SPY': 450.00,  // S&P 500 ETF
+      'VNQ': 95.00    // Real Estate ETF
     };
 
     // Get commodity prices from CoinGecko (with fallbacks)
