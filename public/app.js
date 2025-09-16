@@ -79,6 +79,10 @@ class BitcoinGame {
                         this.loadData();
                         this.startPriceAutoRefresh();
                     }
+                    // Initialize TradingView chart when portfolio is shown
+                    setTimeout(() => {
+                        this.initTradingViewChart('BTC', 'AMZN');
+                    }, 100);
                 } else {
                     this.showNotification('Please login to access your portfolio', 'error');
                     this.showLoginForm();
@@ -1127,6 +1131,7 @@ class BitcoinGame {
         const widgetId = 'tv-widget-' + Date.now();
         const widgetContainer = document.createElement('div');
         widgetContainer.id = widgetId;
+        widgetContainer.style.height = '500px';
         container.appendChild(widgetContainer);
 
         // Function to create the widget
