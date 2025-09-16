@@ -116,6 +116,8 @@ async function setupDatabase() {
       ['GOOGL', 'Alphabet Inc.', 'stock'],
       ['AMZN', 'Amazon.com Inc.', 'stock'],
       ['NVDA', 'NVIDIA Corp.', 'stock'],
+      ['SPY', 'SPDR S&P 500 ETF', 'stock'],
+      ['VNQ', 'Vanguard Real Estate ETF', 'stock'],
       ['XAU', 'Gold', 'commodity'],
       ['XAG', 'Silver', 'commodity'],
       ['WTI', 'Crude Oil WTI', 'commodity']
