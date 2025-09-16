@@ -198,9 +198,66 @@ class BitcoinGame {
         // Initialize chart for selected asset
         this.updateAssetChart();
 
+        // Load metrics for assets page
+        this.loadAssetPageMetrics();
+
         newSelector.addEventListener('change', () => {
             this.updateAssetChart();
+            this.loadAssetPageMetrics();
         });
+    }
+
+    async loadAssetPageMetrics() {
+        try {
+            const selector = document.getElementById('assetSelector');
+            if (!selector) return;
+
+            const selectedAsset = selector.value;
+
+            // Fetch current prices
+            const response = await fetch('/api/assets/prices');
+            const data = await response.json();
+
+            if (!data || !data.pricesInSats) return;
+
+            const pricesInSats = data.pricesInSats;
+
+            // Update price display
+            const priceElement = document.getElementById('assetPriceBTC');
+            if (priceElement && pricesInSats[selectedAsset]) {
+                const priceInBTC = pricesInSats[selectedAsset] / 100000000;
+                priceElement.textContent = priceInBTC.toFixed(8);
+            }
+
+            // Update performance metrics (mock data for now)
+            const metrics = {
+                '24h': document.getElementById('asset24h'),
+                '1y': document.getElementById('asset1y'),
+                '5y': document.getElementById('asset5y'),
+                'all': document.getElementById('assetAll')
+            };
+
+            // Mock performance data (in real app, would come from API)
+            const mockPerformance = {
+                '24h': (Math.random() * 10 - 5).toFixed(2),
+                '1y': (Math.random() * -50 - 10).toFixed(2),
+                '5y': (Math.random() * -80 - 20).toFixed(2),
+                'all': (Math.random() * -95 - 5).toFixed(2)
+            };
+
+            // Update each metric
+            Object.keys(metrics).forEach(period => {
+                const element = metrics[period];
+                if (element) {
+                    const value = mockPerformance[period];
+                    element.textContent = `${value > 0 ? '+' : ''}${value}%`;
+                    element.className = `font-semibold ${value > 0 ? 'text-green-600' : 'text-red-600'}`;
+                }
+            });
+
+        } catch (error) {
+            console.error('Failed to load asset page metrics:', error);
+        }
     }
 
     updateAssetMetrics() {
@@ -214,7 +271,7 @@ class BitcoinGame {
         const changeElement = document.getElementById('asset24hChange');
 
         // This would be called when we have the price data
-        // For now it's a placeholder that will be populated by loadHomePageMetrics
+        // For now it's a placeholder that will be populated by loadAssetPageMetrics
     }
 
     updateAssetChart() {
