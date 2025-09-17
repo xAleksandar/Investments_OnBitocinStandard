@@ -646,26 +646,36 @@ class BitcoinGame {
             });
         }
 
-        // Close modal - remove existing listeners first to avoid duplicates
-        const closeModal = document.getElementById('closeModal');
-        if (closeModal) {
-            // Clone node to remove all existing listeners
-            const newCloseModal = closeModal.cloneNode(true);
-            closeModal.parentNode.replaceChild(newCloseModal, closeModal);
-            // Add single listener
-            newCloseModal.addEventListener('click', () => {
-                this.hideAssetModal();
-            });
-        }
+        // Setup modal close handlers with robust event delegation
+        if (!this.modalHandlersSetup) {
+            // Use event delegation on document for all modal interactions
+            document.addEventListener('click', (e) => {
+                // Check if clicked element is the close button or its child
+                const closeBtn = e.target.closest('#closeModal');
+                if (closeBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.hideAssetModal();
+                    return;
+                }
 
-        // Close modal on backdrop click - use event delegation on body
-        if (!this.modalBackdropListenerAdded) {
-            document.body.addEventListener('click', (e) => {
+                // Check if clicked on modal backdrop (outside modal content)
                 if (e.target.id === 'assetModal') {
                     this.hideAssetModal();
                 }
             });
-            this.modalBackdropListenerAdded = true;
+
+            // Add keyboard support - ESC key closes modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    const modal = document.getElementById('assetModal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        this.hideAssetModal();
+                    }
+                }
+            });
+
+            this.modalHandlersSetup = true;
         }
 
         // Setup custom dropdowns for mobile
