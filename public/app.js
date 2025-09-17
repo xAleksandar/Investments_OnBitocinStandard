@@ -116,29 +116,69 @@ class BitcoinGame {
         const container = document.getElementById(containerId);
         if (!container || container.innerHTML !== '') return;
 
-        // Create wrapper with relative positioning for overlay
+        // Clear and prepare container
+        container.style.position = 'relative';
+        container.style.overflow = 'hidden';
+
+        // Create wrapper for the chart
         const wrapper = document.createElement('div');
         wrapper.style.position = 'relative';
         wrapper.style.height = '100%';
         wrapper.style.width = '100%';
 
-        // Add 5-year performance overlay
-        const overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.top = '8px';
-        overlay.style.right = '8px';
-        overlay.style.zIndex = '10';
-        overlay.style.padding = '4px 8px';
-        overlay.style.background = 'rgba(255, 255, 255, 0.9)';
-        overlay.style.borderRadius = '4px';
-        overlay.style.fontSize = '12px';
-        overlay.style.fontWeight = '600';
-        overlay.id = `${containerId}-5y-overlay`;
-        overlay.textContent = '5Y: Loading...';
+        // Create performance overlay with BIG numbers
+        const performanceOverlay = document.createElement('div');
+        performanceOverlay.style.position = 'absolute';
+        performanceOverlay.style.top = '10px';
+        performanceOverlay.style.left = '10px';
+        performanceOverlay.style.zIndex = '10';
+        performanceOverlay.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+        performanceOverlay.style.padding = '12px';
+        performanceOverlay.style.borderRadius = '6px';
+        performanceOverlay.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        performanceOverlay.style.minWidth = '100px';
 
-        wrapper.appendChild(overlay);
+        // Symbol name
+        const symbolText = document.createElement('div');
+        const cleanSymbol = symbol.split('/')[0].replace('TVC:', '').replace('NASDAQ:', '').replace('AMEX:', '').replace('USOIL', 'OIL');
+        symbolText.textContent = cleanSymbol;
+        symbolText.style.fontSize = '12px';
+        symbolText.style.fontWeight = '600';
+        symbolText.style.color = '#374151';
+        symbolText.style.marginBottom = '4px';
+        performanceOverlay.appendChild(symbolText);
 
-        // Create the TradingView widget
+        // 5Y Performance in BIG numbers
+        const performanceText = document.createElement('div');
+        performanceText.id = `${containerId}-5y-perf`;
+        performanceText.textContent = 'Loading...';
+        performanceText.style.fontSize = '24px';
+        performanceText.style.fontWeight = '700';
+        performanceText.style.color = '#6b7280';
+        performanceText.style.lineHeight = '1';
+        performanceOverlay.appendChild(performanceText);
+
+        // 5Y label
+        const labelText = document.createElement('div');
+        labelText.textContent = '5 Year';
+        labelText.style.fontSize = '11px';
+        labelText.style.color = '#9ca3af';
+        labelText.style.marginTop = '2px';
+        performanceOverlay.appendChild(labelText);
+
+        container.appendChild(performanceOverlay);
+
+        // Fetch real 5-year performance data
+        this.fetchAndDisplay5YearPerformance(cleanSymbol, containerId);
+
+        // Create the TradingView chart
+        const chartDiv = document.createElement('div');
+        chartDiv.style.width = '100%';
+        chartDiv.style.height = '100%';
+        chartDiv.style.position = 'absolute';
+        chartDiv.style.top = '0';
+        chartDiv.style.left = '0';
+
         const script = document.createElement('script');
         script.type = 'text/javascript';
         script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
@@ -147,20 +187,20 @@ class BitcoinGame {
             "width": "100%",
             "height": "100%",
             "locale": "en",
-            "dateRange": "60M",  // 5 years
+            "dateRange": "60M",
             "colorTheme": "light",
-            "trendLineColor": "rgba(255, 152, 0, 1)",
-            "underLineColor": "rgba(255, 152, 0, 0.1)",
-            "underLineBottomColor": "rgba(255, 152, 0, 0)",
+            "trendLineColor": "rgba(251, 146, 60, 1)",
+            "underLineColor": "rgba(251, 146, 60, 0.1)",
+            "underLineBottomColor": "rgba(251, 146, 60, 0)",
             "isTransparent": true,
             "autosize": true,
             "largeChartUrl": "",
-            "noTimeScale": false,
-            "chartOnly": false,
-            "hideVolume": true
+            "noTimeScale": true,
+            "chartOnly": true
         });
 
-        wrapper.appendChild(script);
+        chartDiv.appendChild(script);
+        wrapper.appendChild(chartDiv);
         container.appendChild(wrapper);
     }
 
@@ -172,6 +212,44 @@ class BitcoinGame {
         } catch (error) {
             console.error(`Failed to fetch 5Y performance for ${symbol}:`, error);
             return null;
+        }
+    }
+
+    async fetchAndDisplay5YearPerformance(displaySymbol, containerId) {
+        try {
+            // Map display symbols to API symbols
+            const apiSymbol = {
+                'GOLD': 'XAU',
+                'SPY': 'SPY',
+                'AAPL': 'AAPL',
+                'TSLA': 'TSLA',
+                'VNQ': 'VNQ',
+                'OIL': 'WTI',
+                'USOIL': 'WTI'
+            }[displaySymbol.toUpperCase()] || displaySymbol;
+
+            const response = await fetch(`/api/assets/performance/${apiSymbol}/5y`);
+            const data = await response.json();
+
+            const perfElement = document.getElementById(`${containerId}-5y-perf`);
+            if (perfElement && data.performance !== null) {
+                const perf = data.performance.toFixed(1);
+                const isPositive = data.performance >= 0;
+                // Display with large percentage
+                perfElement.textContent = `${isPositive ? '+' : ''}${perf}%`;
+                perfElement.style.color = isPositive ? '#10b981' : '#ef4444';
+            } else if (perfElement) {
+                // If no data available, show a dash
+                perfElement.textContent = '—';
+                perfElement.style.color = '#6b7280';
+            }
+        } catch (error) {
+            console.error('Error fetching 5Y performance:', error);
+            const perfElement = document.getElementById(`${containerId}-5y-perf`);
+            if (perfElement) {
+                perfElement.textContent = '—';
+                perfElement.style.color = '#6b7280';
+            }
         }
     }
 
