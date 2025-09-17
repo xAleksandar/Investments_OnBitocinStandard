@@ -997,7 +997,10 @@ class BitcoinGame {
         });
 
         // After displaying holdings, update the From Asset dropdown to reflect what user owns
-        this.updateFromAssetDropdown();
+        // Only do this if we're on the portfolio page (elements exist)
+        if (document.getElementById('fromAsset') && document.getElementById('toAsset')) {
+            this.updateFromAssetDropdown();
+        }
     }
 
     displayTradeHistory(trades) {
