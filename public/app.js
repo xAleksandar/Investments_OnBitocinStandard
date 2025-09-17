@@ -646,37 +646,7 @@ class BitcoinGame {
             });
         }
 
-        // Setup modal close handlers with robust event delegation
-        if (!this.modalHandlersSetup) {
-            // Use event delegation on document for all modal interactions
-            document.addEventListener('click', (e) => {
-                // Check if clicked element is the close button or its child
-                const closeBtn = e.target.closest('#closeModal');
-                if (closeBtn) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.hideAssetModal();
-                    return;
-                }
-
-                // Check if clicked on modal backdrop (outside modal content)
-                if (e.target.id === 'assetModal') {
-                    this.hideAssetModal();
-                }
-            });
-
-            // Add keyboard support - ESC key closes modal
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    const modal = document.getElementById('assetModal');
-                    if (modal && !modal.classList.contains('hidden')) {
-                        this.hideAssetModal();
-                    }
-                }
-            });
-
-            this.modalHandlersSetup = true;
-        }
+        // Don't set up modal handlers here - do it when showing the modal instead
 
         // Setup custom dropdowns for mobile
         this.setupCustomDropdowns();
@@ -1773,6 +1743,9 @@ class BitcoinGame {
             }
 
             document.getElementById('assetModal').classList.remove('hidden');
+
+            // Setup modal close handlers after modal is shown
+            this.setupModalCloseHandlers();
         } catch (error) {
             console.error('Failed to load asset details:', error);
             this.showNotification('Failed to load asset details', 'error');
@@ -1780,7 +1753,54 @@ class BitcoinGame {
     }
 
     hideAssetModal() {
-        document.getElementById('assetModal').classList.add('hidden');
+        const modal = document.getElementById('assetModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    setupModalCloseHandlers() {
+        // Direct event listener on close button
+        const closeBtn = document.getElementById('closeModal');
+        if (closeBtn) {
+            // Remove any existing listeners by cloning
+            const newCloseBtn = closeBtn.cloneNode(true);
+            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+
+            // Add fresh click listener
+            newCloseBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.hideAssetModal();
+            });
+        }
+
+        // Click outside to close - use a one-time listener
+        const modalBackdrop = document.getElementById('assetModal');
+        if (modalBackdrop) {
+            const backdropHandler = (e) => {
+                // Check if clicked on the backdrop itself, not the modal content
+                if (e.target === modalBackdrop) {
+                    this.hideAssetModal();
+                }
+            };
+
+            // Remove old listener if exists and add new one
+            modalBackdrop.removeEventListener('click', backdropHandler);
+            modalBackdrop.addEventListener('click', backdropHandler);
+        }
+
+        // ESC key to close - use a one-time document listener
+        if (!this.escHandlerAdded) {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('assetModal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        this.hideAssetModal();
+                    }
+                }
+            });
+            this.escHandlerAdded = true;
+        }
     }
 
     logout() {
