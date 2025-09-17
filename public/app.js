@@ -136,6 +136,17 @@ class BitcoinGame {
         container.appendChild(script);
     }
 
+    async fetch5YearPerformance(symbol) {
+        try {
+            const response = await fetch(`/api/assets/performance/${symbol}/5y`);
+            const data = await response.json();
+            return data.performance;
+        } catch (error) {
+            console.error(`Failed to fetch 5Y performance for ${symbol}:`, error);
+            return null;
+        }
+    }
+
     async loadHomePageMetrics() {
         try {
             // Fetch current prices
@@ -170,20 +181,17 @@ class BitcoinGame {
                 }
 
                 if (changeElement) {
-                    // More realistic 5-year performance vs Bitcoin
-                    // Most assets lose value against Bitcoin over 5 years
-                    const performance5Y = {
-                        'XAU': -55,   // Gold typically loses ~50-60% vs BTC
-                        'SPY': -75,   // S&P 500 loses ~70-80% vs BTC
-                        'AAPL': -65,  // Apple loses ~60-70% vs BTC
-                        'TSLA': -45,  // Tesla volatile but still loses ~40-50% vs BTC
-                        'VNQ': -80,   // Real Estate loses ~75-85% vs BTC
-                        'WTI': -85    // Oil loses ~80-90% vs BTC
-                    };
-
-                    const change = performance5Y[asset.symbol] || -50;
-                    changeElement.textContent = `${change}%`;
-                    changeElement.className = 'font-semibold text-red-600';
+                    // Fetch real 5-year performance from server
+                    this.fetch5YearPerformance(asset.symbol).then(performance => {
+                        if (performance !== null) {
+                            const sign = performance > 0 ? '+' : '';
+                            changeElement.textContent = `${sign}${performance.toFixed(2)}%`;
+                            changeElement.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
+                        } else {
+                            changeElement.textContent = 'N/A';
+                            changeElement.className = 'font-semibold text-gray-500';
+                        }
+                    });
                 }
             });
 

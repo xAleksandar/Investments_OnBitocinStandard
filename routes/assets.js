@@ -192,6 +192,89 @@ router.get('/prices', async (req, res) => {
 });
 
 // Get all available assets
+// Get 5-year performance for an asset vs Bitcoin
+router.get('/performance/:symbol/5y', async (req, res) => {
+    try {
+        const symbol = req.params.symbol;
+        const now = new Date();
+        const fiveYearsAgo = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+
+        // Map symbols to Yahoo Finance tickers
+        const yahooSymbols = {
+            'XAU': 'GC=F',    // Gold futures
+            'XAG': 'SI=F',    // Silver futures
+            'SPY': 'SPY',
+            'AAPL': 'AAPL',
+            'TSLA': 'TSLA',
+            'MSFT': 'MSFT',
+            'GOOGL': 'GOOGL',
+            'AMZN': 'AMZN',
+            'NVDA': 'NVDA',
+            'VNQ': 'VNQ',
+            'WTI': 'CL=F'     // Crude oil futures
+        };
+
+        const yahooSymbol = yahooSymbols[symbol];
+        if (!yahooSymbol) {
+            return res.json({ performance: null });
+        }
+
+        // Fetch historical data for the asset (5 years ago)
+        const assetHistoricalUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?period1=${Math.floor(fiveYearsAgo.getTime() / 1000)}&period2=${Math.floor(fiveYearsAgo.getTime() / 1000 + 86400)}&interval=1d`;
+        const btcHistoricalUrl = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?period1=${Math.floor(fiveYearsAgo.getTime() / 1000)}&period2=${Math.floor(fiveYearsAgo.getTime() / 1000 + 86400)}&interval=1d`;
+
+        // Get current prices
+        const assetCurrentUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`;
+        const btcCurrentUrl = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD`;
+
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        };
+
+        // Fetch all data in parallel
+        const [assetHistRes, btcHistRes, assetCurrRes, btcCurrRes] = await Promise.all([
+            axios.get(assetHistoricalUrl, { headers }),
+            axios.get(btcHistoricalUrl, { headers }),
+            axios.get(assetCurrentUrl, { headers }),
+            axios.get(btcCurrentUrl, { headers })
+        ]);
+
+        // Extract prices (handle various response structures)
+        let assetPriceOld = null;
+        if (assetHistRes.data.chart.result[0].indicators?.quote?.[0]?.close?.[0]) {
+            assetPriceOld = assetHistRes.data.chart.result[0].indicators.quote[0].close[0];
+        } else if (assetHistRes.data.chart.result[0].meta?.previousClose) {
+            assetPriceOld = assetHistRes.data.chart.result[0].meta.previousClose;
+        }
+
+        let btcPriceOld = null;
+        if (btcHistRes.data.chart.result[0].indicators?.quote?.[0]?.close?.[0]) {
+            btcPriceOld = btcHistRes.data.chart.result[0].indicators.quote[0].close[0];
+        } else if (btcHistRes.data.chart.result[0].meta?.previousClose) {
+            btcPriceOld = btcHistRes.data.chart.result[0].meta.previousClose;
+        }
+
+        const assetPriceCurrent = assetCurrRes.data.chart.result[0].meta.regularMarketPrice;
+        const btcPriceCurrent = btcCurrRes.data.chart.result[0].meta.regularMarketPrice;
+
+        // If we couldn't get historical data, return null
+        if (!assetPriceOld || !btcPriceOld) {
+            return res.json({ performance: null });
+        }
+
+        // Calculate 5-year performance vs Bitcoin
+        const assetRatio5YAgo = assetPriceOld / btcPriceOld;
+        const assetRatioNow = assetPriceCurrent / btcPriceCurrent;
+        const performance = ((assetRatioNow - assetRatio5YAgo) / assetRatio5YAgo) * 100;
+
+        res.json({ performance });
+
+    } catch (error) {
+        console.error('Error fetching 5Y performance:', error.message);
+        res.json({ performance: null });
+    }
+});
+
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM assets ORDER BY asset_type, symbol');
