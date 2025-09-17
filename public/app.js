@@ -75,6 +75,10 @@ class BitcoinGame {
                 this.currentPage = 'portfolio';
                 if (this.token) {
                     document.getElementById('mainApp').classList.remove('hidden');
+
+                    // Set up event listeners for the portfolio page
+                    this.setupMainAppEventListeners();
+
                     if (!this.assets || this.assets.length === 0) {
                         this.loadData();
                         this.startPriceAutoRefresh();
