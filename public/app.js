@@ -1452,7 +1452,7 @@ class BitcoinGame {
         const createWidget = () => {
             new window.TradingView.widget({
                 "width": "100%",
-                "height": 500,
+                "height": 600,
                 "symbol": tvSymbol,
                 "interval": "D",
                 "timezone": "Etc/UTC",
@@ -1462,6 +1462,7 @@ class BitcoinGame {
                 "toolbar_bg": "#f1f3f6",
                 "enable_publishing": false,
                 "allow_symbol_change": false,
+                "range": "60M",  // 5 years (60 months)
                 "container_id": widgetId,
                 "hide_side_toolbar": false,
                 "studies": [],
