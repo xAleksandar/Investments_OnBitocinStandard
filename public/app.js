@@ -871,6 +871,9 @@ class BitcoinGame {
     }
 
     displayPortfolio(data) {
+        // Store holdings for use in dropdown updates
+        this.holdings = data.holdings || [];
+
         const holdingsDiv = document.getElementById('holdings');
         const totalValueDiv = document.getElementById('totalValue');
         const performanceDiv = document.getElementById('performance');
@@ -992,6 +995,9 @@ class BitcoinGame {
 
             holdingsDiv.appendChild(holdingDiv);
         });
+
+        // After displaying holdings, update the From Asset dropdown to reflect what user owns
+        this.updateFromAssetDropdown();
     }
 
     displayTradeHistory(trades) {
@@ -1531,14 +1537,29 @@ class BitcoinGame {
             }
         });
 
-        // If no assets owned yet (new user), only show Bitcoin
-        if (sortedAssets.length === 0) {
-            const btcAsset = this.assets.find(a => a.symbol === 'BTC');
-            if (btcAsset) {
-                const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
-                option.selected = true;
-                fromSelect.appendChild(option);
+        // If no assets owned yet (new user or holdings not loaded), show Bitcoin as default
+        if (sortedAssets.length === 0 || !this.holdings || this.holdings.length === 0) {
+            // Check if user actually owns BTC from holdings
+            const btcHolding = this.holdings?.find(h => h.asset_symbol === 'BTC');
+
+            if (btcHolding && btcHolding.amount > 0) {
+                // User owns BTC, show it
+                const btcAsset = this.assets.find(a => a.symbol === 'BTC');
+                if (btcAsset) {
+                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
+                    option.selected = true;
+                    fromSelect.appendChild(option);
+                }
+            } else if (!this.holdings || this.holdings.length === 0) {
+                // New user or holdings not loaded yet - show BTC as default
+                const btcAsset = this.assets.find(a => a.symbol === 'BTC');
+                if (btcAsset) {
+                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
+                    option.selected = true;
+                    fromSelect.appendChild(option);
+                }
             }
+            // If user has no BTC and no other holdings, From dropdown stays empty (can't trade)
         }
 
         // If the current From Asset was removed, select the first available option
