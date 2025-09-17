@@ -116,62 +116,51 @@ class BitcoinGame {
         const container = document.getElementById(containerId);
         if (!container || container.innerHTML !== '') return;
 
-        // Create a wrapper with position relative
+        // Create wrapper with relative positioning for overlay
         const wrapper = document.createElement('div');
         wrapper.style.position = 'relative';
         wrapper.style.height = '100%';
         wrapper.style.width = '100%';
 
-        // Add symbol and 5Y change overlay at the top
+        // Add 5-year performance overlay
         const overlay = document.createElement('div');
         overlay.style.position = 'absolute';
         overlay.style.top = '8px';
-        overlay.style.left = '8px';
         overlay.style.right = '8px';
         overlay.style.zIndex = '10';
-        overlay.style.display = 'flex';
-        overlay.style.justifyContent = 'space-between';
-        overlay.style.alignItems = 'center';
-        overlay.style.fontSize = '11px';
-        overlay.style.fontWeight = '500';
+        overlay.style.padding = '4px 8px';
+        overlay.style.background = 'rgba(255, 255, 255, 0.9)';
+        overlay.style.borderRadius = '4px';
+        overlay.style.fontSize = '12px';
+        overlay.style.fontWeight = '600';
+        overlay.id = `${containerId}-5y-overlay`;
+        overlay.textContent = '5Y: Loading...';
 
-        // Symbol text
-        const symbolText = document.createElement('span');
-        symbolText.style.color = '#666';
-        symbolText.textContent = symbol.split('/')[0].replace('TVC:', '').replace('NASDAQ:', '').replace('AMEX:', '');
-
-        // 5Y change will be updated dynamically
-        const changeText = document.createElement('span');
-        changeText.id = `${containerId}-5y-change`;
-        changeText.style.fontWeight = '600';
-        changeText.textContent = 'Loading...';
-
-        overlay.appendChild(symbolText);
-        overlay.appendChild(changeText);
         wrapper.appendChild(overlay);
 
-        // Use simplified sparkline chart
-        const chartScript = document.createElement('script');
-        chartScript.type = 'text/javascript';
-        chartScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-sparkline-chart.js';
-        chartScript.innerHTML = JSON.stringify({
-            "symbols": [
-                {
-                    "symbol": symbol,
-                    "name": ""
-                }
-            ],
+        // Create the TradingView widget
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+        script.innerHTML = JSON.stringify({
+            "symbol": symbol,
             "width": "100%",
             "height": "100%",
             "locale": "en",
-            "dateRange": "60M",
+            "dateRange": "60M",  // 5 years
             "colorTheme": "light",
+            "trendLineColor": "rgba(255, 152, 0, 1)",
+            "underLineColor": "rgba(255, 152, 0, 0.1)",
+            "underLineBottomColor": "rgba(255, 152, 0, 0)",
             "isTransparent": true,
+            "autosize": true,
             "largeChartUrl": "",
-            "backgroundColor": "rgba(255, 255, 255, 0)"
+            "noTimeScale": false,
+            "chartOnly": false,
+            "hideVolume": true
         });
 
-        wrapper.appendChild(chartScript);
+        wrapper.appendChild(script);
         container.appendChild(wrapper);
     }
 
@@ -228,10 +217,12 @@ class BitcoinGame {
                             changeElement.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
 
                             // Also update the chart overlay if it exists
-                            const chartOverlay = document.getElementById(`chart${asset.name.replace(' ', '')}-5y-change`);
+                            const overlayId = `chart${asset.elementId.charAt(0).toUpperCase() + asset.elementId.slice(1)}-5y-overlay`;
+                            const chartOverlay = document.getElementById(overlayId);
                             if (chartOverlay) {
                                 chartOverlay.textContent = `5Y: ${sign}${performance.toFixed(1)}%`;
-                                chartOverlay.style.color = performance > 0 ? '#10b981' : '#ef4444';
+                                chartOverlay.style.color = 'white';
+                                chartOverlay.style.background = performance > 0 ? '#10b981' : '#ef4444';
                             }
                         } else {
                             changeElement.textContent = 'N/A';
