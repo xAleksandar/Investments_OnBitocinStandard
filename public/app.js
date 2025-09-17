@@ -1591,22 +1591,10 @@ class BitcoinGame {
         // Clear To Asset dropdown
         toSelect.innerHTML = '';
 
-        let assetsToShow = [];
+        // Show all assets except the one selected in From Asset
+        const assetsToShow = [...this.assets].filter(asset => asset.symbol !== selectedFromAsset);
 
-        // If From Asset is Bitcoin, show all other assets
-        // If From Asset is NOT Bitcoin, only show Bitcoin (can only sell back to Bitcoin)
-        if (selectedFromAsset === 'BTC') {
-            // When selling Bitcoin, can buy any other asset
-            assetsToShow = [...this.assets].filter(asset => asset.symbol !== 'BTC');
-        } else {
-            // When selling any other asset, can only sell back to Bitcoin
-            const btcAsset = this.assets.find(asset => asset.symbol === 'BTC');
-            if (btcAsset) {
-                assetsToShow = [btcAsset];
-            }
-        }
-
-        // Sort assets to put Bitcoin first (though it might be the only one)
+        // Sort assets to put Bitcoin first
         const sortedAssets = [...assetsToShow].sort((a, b) => {
             if (a.symbol === 'BTC') return -1;
             if (b.symbol === 'BTC') return 1;
