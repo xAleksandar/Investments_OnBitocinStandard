@@ -200,7 +200,7 @@
                                     <span id="goldPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="goldChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -214,7 +214,7 @@
                                     <span id="spyPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="spyChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -228,7 +228,7 @@
                                     <span id="aaplPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="aaplChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -242,7 +242,7 @@
                                     <span id="tslaPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="tslaChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -256,7 +256,7 @@
                                     <span id="vnqPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="vnqChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -270,7 +270,7 @@
                                     <span id="oilPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">24h Change:</span>
+                                    <span class="text-gray-600">5 Year:</span>
                                     <span id="oilChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -303,36 +303,50 @@
                         </select>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div>
-                            <h3 class="text-lg font-semibold mb-4">Price Chart (in Bitcoin)</h3>
-                            <div id="assetChart" class="h-96 bg-gray-100 rounded"></div>
+                    <!-- Denomination Toggle -->
+                    <div class="mb-4 flex items-center justify-end">
+                        <span class="mr-3 text-sm font-medium">View in:</span>
+                        <div class="flex bg-gray-100 rounded-lg p-1">
+                            <button id="btcDenomination" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-500 text-white">Bitcoin</button>
+                            <button id="usdDenomination" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-200">USD</button>
                         </div>
-                        <div>
-                            <h3 class="text-lg font-semibold mb-4">Performance Metrics</h3>
-                            <div class="space-y-3">
-                                <div class="flex justify-between p-3 bg-gray-50 rounded">
-                                    <span>Current Price (BTC)</span>
-                                    <span id="assetPriceBTC" class="font-mono">0.00000000</span>
-                                </div>
-                                <div class="flex justify-between p-3 bg-gray-50 rounded">
-                                    <span>24h Change</span>
-                                    <span id="asset24h" class="font-semibold">-</span>
-                                </div>
-                                <div class="flex justify-between p-3 bg-gray-50 rounded">
-                                    <span>1 Year</span>
-                                    <span id="asset1y" class="font-semibold">-</span>
-                                </div>
-                                <div class="flex justify-between p-3 bg-gray-50 rounded">
-                                    <span>5 Years</span>
-                                    <span id="asset5y" class="font-semibold">-</span>
-                                </div>
-                                <div class="flex justify-between p-3 bg-gray-50 rounded">
-                                    <span>All Time</span>
-                                    <span id="assetAllTime" class="font-semibold">-</span>
-                                </div>
+                    </div>
+
+                    <!-- Horizontal Performance Metrics -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">Performance Metrics</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">Current (BTC)</div>
+                                <div id="assetPriceBTC" class="font-mono text-sm font-semibold">0.00000000</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">Current (USD)</div>
+                                <div id="assetPriceUSD" class="font-mono text-sm font-semibold">$0.00</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">24h</div>
+                                <div id="asset24h" class="text-sm font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">1 Year</div>
+                                <div id="asset1y" class="text-sm font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">5 Years</div>
+                                <div id="asset5y" class="text-sm font-semibold">-</div>
+                            </div>
+                            <div class="bg-gray-50 rounded p-3">
+                                <div class="text-xs text-gray-600 mb-1">All Time</div>
+                                <div id="assetAllTime" class="text-sm font-semibold">-</div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Full Width Chart -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">Price Chart (<span id="chartDenomination">in Bitcoin</span>)</h3>
+                        <div id="assetChart" class="bg-gray-100 rounded" style="height: 600px;"></div>
                     </div>
                 </div>
             </div>
@@ -381,24 +395,9 @@
                     </div>
                 </div>
 
-                <!-- TradingView Chart -->
-                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                    <h2 class="text-xl font-bold mb-4">Price Chart</h2>
-                    <div id="tradingview-widget-container" style="height: 500px;">
-                        <!-- TradingView Widget - Shows ratio based on Trade Assets dropdowns -->
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Holdings -->
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <h2 class="text-xl font-bold mb-4">Your Holdings</h2>
-                        <div id="holdings" class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                            <!-- Holdings will be populated here -->
-                        </div>
-                    </div>
-
-                    <!-- Trading -->
+                <!-- Top Row: Trade Assets (left) + Chart (right) -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Trading Module -->
                     <div class="bg-white rounded-lg shadow-md p-6 trade-form-container">
                         <h2 class="text-xl font-bold mb-4">Trade Assets</h2>
                         <form id="tradeForm">
@@ -470,13 +469,32 @@
                             </button>
                         </form>
                     </div>
+
+                    <!-- TradingView Chart -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-bold mb-4">Price Chart</h2>
+                        <div id="tradingview-widget-container" style="height: 600px;">
+                            <!-- TradingView Widget - Updates based on Trade Assets dropdowns -->
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Recent Trades -->
-                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <h2 class="text-xl font-bold mb-4">Recent Trades</h2>
-                    <div id="tradeHistory" class="overflow-x-auto max-h-64 overflow-y-auto">
-                        <!-- Trade history will be populated here -->
+                <!-- Bottom Row: Holdings (left) + Recent Trades (right) -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Holdings -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-bold mb-4">Your Holdings</h2>
+                        <div id="holdings" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                            <!-- Holdings will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Recent Trades -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-bold mb-4">Recent Trades</h2>
+                        <div id="tradeHistory" class="overflow-x-auto max-h-96 overflow-y-auto">
+                            <!-- Trade history will be populated here -->
+                        </div>
                     </div>
                 </div>
             </div>
