@@ -490,16 +490,14 @@ class BitcoinGame {
         const widgetId = 'tv-widget-' + Date.now();
         const widgetContainer = document.createElement('div');
         widgetContainer.id = widgetId;
-        // Get the actual height of the container
-        const containerHeight = container.offsetHeight || 1200;
-        widgetContainer.style.height = containerHeight + 'px';
+        widgetContainer.style.height = '1200px';
         widgetContainer.style.width = '100%';
         container.appendChild(widgetContainer);
 
         const createWidget = () => {
             new window.TradingView.widget({
                 "width": "100%",
-                "height": "100%",
+                "height": 1200,
                 "symbol": symbol,
                 "interval": "D",
                 "timezone": "Etc/UTC",
