@@ -124,7 +124,7 @@ class BitcoinGame {
             "width": "100%",
             "height": "100%",
             "locale": "en",
-            "dateRange": "12M",
+            "dateRange": "60M",  // Changed from 12M to 60M (5 years)
             "colorTheme": "light",
             "trendLineColor": "rgba(255, 152, 0, 1)",
             "underLineColor": "rgba(255, 152, 0, 0.1)",
@@ -195,6 +195,37 @@ class BitcoinGame {
         const newSelector = selector.cloneNode(true);
         selector.parentNode.replaceChild(newSelector, selector);
 
+        // Initialize denomination state
+        this.currentDenomination = 'BTC'; // Default to Bitcoin
+
+        // Setup denomination toggle buttons
+        const btcBtn = document.getElementById('btcDenomination');
+        const usdBtn = document.getElementById('usdDenomination');
+
+        if (btcBtn && usdBtn) {
+            btcBtn.addEventListener('click', () => {
+                this.currentDenomination = 'BTC';
+                btcBtn.classList.add('bg-blue-500', 'text-white');
+                btcBtn.classList.remove('text-gray-700', 'hover:bg-gray-200');
+                usdBtn.classList.remove('bg-blue-500', 'text-white');
+                usdBtn.classList.add('text-gray-700', 'hover:bg-gray-200');
+                document.getElementById('chartDenomination').textContent = 'in Bitcoin';
+                this.updateAssetChart();
+                this.loadAssetPageMetrics();
+            });
+
+            usdBtn.addEventListener('click', () => {
+                this.currentDenomination = 'USD';
+                usdBtn.classList.add('bg-blue-500', 'text-white');
+                usdBtn.classList.remove('text-gray-700', 'hover:bg-gray-200');
+                btcBtn.classList.remove('bg-blue-500', 'text-white');
+                btcBtn.classList.add('text-gray-700', 'hover:bg-gray-200');
+                document.getElementById('chartDenomination').textContent = 'in USD';
+                this.updateAssetChart();
+                this.loadAssetPageMetrics();
+            });
+        }
+
         // Initialize chart for selected asset
         this.updateAssetChart();
 
@@ -221,12 +252,21 @@ class BitcoinGame {
             if (!data || !data.pricesInSats) return;
 
             const pricesInSats = data.pricesInSats;
+            const pricesUsd = data.pricesUsd;
+            const btcPrice = data.btcPrice || 100000;
 
-            // Update price display
-            const priceElement = document.getElementById('assetPriceBTC');
-            if (priceElement && pricesInSats[selectedAsset]) {
+            // Update BTC price display
+            const priceBTCElement = document.getElementById('assetPriceBTC');
+            if (priceBTCElement && pricesInSats[selectedAsset]) {
                 const priceInBTC = pricesInSats[selectedAsset] / 100000000;
-                priceElement.textContent = priceInBTC.toFixed(8);
+                priceBTCElement.textContent = priceInBTC.toFixed(8);
+            }
+
+            // Update USD price display
+            const priceUSDElement = document.getElementById('assetPriceUSD');
+            if (priceUSDElement && pricesUsd && pricesUsd[selectedAsset]) {
+                const priceUSD = pricesUsd[selectedAsset];
+                priceUSDElement.textContent = `$${priceUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             }
 
             // Update performance metrics (mock data for now)
@@ -280,7 +320,10 @@ class BitcoinGame {
         if (!selector || !container) return;
 
         const asset = selector.value;
-        const symbolMap = {
+        const denomination = this.currentDenomination || 'BTC';
+
+        // Different symbol mapping based on denomination
+        const symbolMapBTC = {
             'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',
             'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',
             'SPY': 'AMEX:SPY/BITSTAMP:BTCUSD',
@@ -294,7 +337,22 @@ class BitcoinGame {
             'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'
         };
 
-        const symbol = symbolMap[asset] || 'BITSTAMP:BTCUSD';
+        const symbolMapUSD = {
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER',
+            'SPY': 'AMEX:SPY',
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'NVDA': 'NASDAQ:NVDA',
+            'VNQ': 'AMEX:VNQ',
+            'WTI': 'TVC:USOIL'
+        };
+
+        const symbolMap = denomination === 'USD' ? symbolMapUSD : symbolMapBTC;
+        const symbol = symbolMap[asset] || (denomination === 'USD' ? 'TVC:DJI' : 'BITSTAMP:BTCUSD');
 
         container.innerHTML = '';
         const widgetId = 'tv-widget-' + Date.now();
@@ -456,22 +514,26 @@ class BitcoinGame {
             });
         }
 
-        // Close modal
+        // Close modal - remove existing listeners first to avoid duplicates
         const closeModal = document.getElementById('closeModal');
         if (closeModal) {
-            closeModal.addEventListener('click', () => {
+            // Clone node to remove all existing listeners
+            const newCloseModal = closeModal.cloneNode(true);
+            closeModal.parentNode.replaceChild(newCloseModal, closeModal);
+            // Add single listener
+            newCloseModal.addEventListener('click', () => {
                 this.hideAssetModal();
             });
         }
 
-        // Close modal on backdrop click
-        const assetModal = document.getElementById('assetModal');
-        if (assetModal) {
-            assetModal.addEventListener('click', (e) => {
+        // Close modal on backdrop click - use event delegation on body
+        if (!this.modalBackdropListenerAdded) {
+            document.body.addEventListener('click', (e) => {
                 if (e.target.id === 'assetModal') {
                     this.hideAssetModal();
                 }
             });
+            this.modalBackdropListenerAdded = true;
         }
 
         // Setup custom dropdowns for mobile
@@ -1074,10 +1136,23 @@ class BitcoinGame {
 
         // Check if it's below minimum (only for BTC trades)
         const MIN_TRADE_SATS = 100000;
+        const executeBtn = document.querySelector('#tradeForm button[type="submit"]');
+
         if (fromAsset === 'BTC' && sats < MIN_TRADE_SATS) {
             helper.textContent = `⚠️ Minimum trade: 100 kSats (${MIN_TRADE_SATS.toLocaleString()} sats)`;
             helper.className = 'text-red-600 font-medium';
+            // Disable execute button when below minimum
+            if (executeBtn) {
+                executeBtn.disabled = true;
+                executeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
             return;
+        }
+
+        // Re-enable execute button when above minimum
+        if (executeBtn) {
+            executeBtn.disabled = false;
+            executeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
 
         // Show full conversion
@@ -1312,15 +1387,23 @@ class BitcoinGame {
         // Clear From Asset dropdown
         fromSelect.innerHTML = '';
 
+        // Get user holdings - only show assets user owns
+        const userHoldings = this.holdings || [];
+        const ownedAssetSymbols = new Set(userHoldings.map(h => h.asset_symbol));
+
+        // Filter assets to only those the user owns
+        const ownedAssets = this.assets.filter(asset => ownedAssetSymbols.has(asset.symbol));
+
         // Sort assets to put Bitcoin first
-        const sortedAssets = [...this.assets].sort((a, b) => {
+        const sortedAssets = [...ownedAssets].sort((a, b) => {
             if (a.symbol === 'BTC') return -1;
             if (b.symbol === 'BTC') return 1;
             return a.name.localeCompare(b.name);
         });
 
-        // Populate From Asset dropdown, excluding whatever is selected in To Asset
+        // Populate From Asset dropdown with only owned assets
         sortedAssets.forEach(asset => {
+            // Also exclude whatever is selected in To Asset (can't trade same to same)
             if (asset.symbol !== selectedToAsset) {
                 const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
 
@@ -1333,8 +1416,18 @@ class BitcoinGame {
             }
         });
 
+        // If no assets owned yet (new user), only show Bitcoin
+        if (sortedAssets.length === 0) {
+            const btcAsset = this.assets.find(a => a.symbol === 'BTC');
+            if (btcAsset) {
+                const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
+                option.selected = true;
+                fromSelect.appendChild(option);
+            }
+        }
+
         // If the current From Asset was removed, select the first available option
-        if (currentFromAsset === selectedToAsset) {
+        if (currentFromAsset === selectedToAsset || !ownedAssetSymbols.has(currentFromAsset)) {
             fromSelect.selectedIndex = 0;
         }
 
@@ -1355,29 +1448,43 @@ class BitcoinGame {
         // Clear To Asset dropdown
         toSelect.innerHTML = '';
 
-        // Sort assets to put Bitcoin first
-        const sortedAssets = [...this.assets].sort((a, b) => {
+        let assetsToShow = [];
+
+        // If From Asset is Bitcoin, show all other assets
+        // If From Asset is NOT Bitcoin, only show Bitcoin (can only sell back to Bitcoin)
+        if (selectedFromAsset === 'BTC') {
+            // When selling Bitcoin, can buy any other asset
+            assetsToShow = [...this.assets].filter(asset => asset.symbol !== 'BTC');
+        } else {
+            // When selling any other asset, can only sell back to Bitcoin
+            const btcAsset = this.assets.find(asset => asset.symbol === 'BTC');
+            if (btcAsset) {
+                assetsToShow = [btcAsset];
+            }
+        }
+
+        // Sort assets to put Bitcoin first (though it might be the only one)
+        const sortedAssets = [...assetsToShow].sort((a, b) => {
             if (a.symbol === 'BTC') return -1;
             if (b.symbol === 'BTC') return 1;
             return a.name.localeCompare(b.name);
         });
 
-        // Populate To Asset dropdown, excluding whatever is selected in From Asset
+        // Populate To Asset dropdown
         sortedAssets.forEach(asset => {
-            if (asset.symbol !== selectedFromAsset) {
-                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
+            const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
 
-                // Keep the current selection if it's still valid
-                if (asset.symbol === currentToAsset) {
-                    option.selected = true;
-                }
-
-                toSelect.appendChild(option);
+            // Keep the current selection if it's still valid
+            if (asset.symbol === currentToAsset) {
+                option.selected = true;
             }
+
+            toSelect.appendChild(option);
         });
 
-        // If the current To Asset was removed, select the first available option
-        if (currentToAsset === selectedFromAsset) {
+        // If the current To Asset was removed or invalid, select the first available option
+        const validSelection = sortedAssets.some(asset => asset.symbol === currentToAsset);
+        if (!validSelection && sortedAssets.length > 0) {
             toSelect.selectedIndex = 0;
         }
     }
