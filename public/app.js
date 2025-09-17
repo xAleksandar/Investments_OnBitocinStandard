@@ -116,24 +116,63 @@ class BitcoinGame {
         const container = document.getElementById(containerId);
         if (!container || container.innerHTML !== '') return;
 
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
-        script.innerHTML = JSON.stringify({
-            "symbol": symbol,
+        // Create a wrapper with position relative
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        wrapper.style.height = '100%';
+        wrapper.style.width = '100%';
+
+        // Add symbol and 5Y change overlay at the top
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '8px';
+        overlay.style.left = '8px';
+        overlay.style.right = '8px';
+        overlay.style.zIndex = '10';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'space-between';
+        overlay.style.alignItems = 'center';
+        overlay.style.fontSize = '11px';
+        overlay.style.fontWeight = '500';
+
+        // Symbol text
+        const symbolText = document.createElement('span');
+        symbolText.style.color = '#666';
+        symbolText.textContent = symbol.split('/')[0].replace('TVC:', '').replace('NASDAQ:', '').replace('AMEX:', '');
+
+        // 5Y change will be updated dynamically
+        const changeText = document.createElement('span');
+        changeText.id = `${containerId}-5y-change`;
+        changeText.style.fontWeight = '600';
+        changeText.textContent = 'Loading...';
+
+        overlay.appendChild(symbolText);
+        overlay.appendChild(changeText);
+        wrapper.appendChild(overlay);
+
+        // Use simplified sparkline chart
+        const chartScript = document.createElement('script');
+        chartScript.type = 'text/javascript';
+        chartScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-sparkline-chart.js';
+        chartScript.innerHTML = JSON.stringify({
+            "symbols": [
+                {
+                    "symbol": symbol,
+                    "name": ""
+                }
+            ],
             "width": "100%",
             "height": "100%",
             "locale": "en",
-            "dateRange": "60M",  // Changed from 12M to 60M (5 years)
+            "dateRange": "60M",
             "colorTheme": "light",
-            "trendLineColor": "rgba(255, 152, 0, 1)",
-            "underLineColor": "rgba(255, 152, 0, 0.1)",
-            "underLineBottomColor": "rgba(255, 152, 0, 0)",
             "isTransparent": true,
-            "autosize": true,
-            "largeChartUrl": ""
+            "largeChartUrl": "",
+            "backgroundColor": "rgba(255, 255, 255, 0)"
         });
-        container.appendChild(script);
+
+        wrapper.appendChild(chartScript);
+        container.appendChild(wrapper);
     }
 
     async fetch5YearPerformance(symbol) {
@@ -187,6 +226,13 @@ class BitcoinGame {
                             const sign = performance > 0 ? '+' : '';
                             changeElement.textContent = `${sign}${performance.toFixed(2)}%`;
                             changeElement.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                            // Also update the chart overlay if it exists
+                            const chartOverlay = document.getElementById(`chart${asset.name.replace(' ', '')}-5y-change`);
+                            if (chartOverlay) {
+                                chartOverlay.textContent = `5Y: ${sign}${performance.toFixed(1)}%`;
+                                chartOverlay.style.color = performance > 0 ? '#10b981' : '#ef4444';
+                            }
                         } else {
                             changeElement.textContent = 'N/A';
                             changeElement.className = 'font-semibold text-gray-500';
