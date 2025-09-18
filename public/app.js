@@ -1961,14 +1961,24 @@ class BitcoinGame {
         const modal = document.getElementById('suggestionsModal');
         modal.classList.remove('show');
 
-        // Reset form
-        document.getElementById('suggestionsForm').reset();
-        document.getElementById('typeSuggestion').checked = true;
+        // Delay form reset until after modal animation completes (prevent flickering)
+        setTimeout(() => {
+            // Reset form
+            const form = document.getElementById('suggestionsForm');
+            form.reset();
+            form.style.display = 'block'; // Show form again
+            document.getElementById('typeSuggestion').checked = true;
 
-        // Hide rate limit warning
-        document.getElementById('rateLimitWarning').classList.add('hidden');
+            // Hide rate limit warning
+            document.getElementById('rateLimitWarning').classList.add('hidden');
 
-        // Clear any countdown interval
+            // Hide and reset success message
+            const successMessage = document.getElementById('suggestionSuccessMessage');
+            successMessage.classList.add('hidden');
+            successMessage.classList.remove('fade-out');
+        }, 400); // Wait for modal animation to complete
+
+        // Clear any countdown interval immediately
         if (this.rateLimitInterval) {
             clearInterval(this.rateLimitInterval);
             this.rateLimitInterval = null;
@@ -1986,6 +1996,9 @@ class BitcoinGame {
             mySuggestionsTab.classList.remove('active');
             submitContent.classList.remove('hidden');
             mySuggestionsContent.classList.add('hidden');
+
+            // Refresh rate limit status when switching to submit tab
+            this.checkRateLimit();
         } else {
             submitTab.classList.remove('active');
             mySuggestionsTab.classList.add('active');
@@ -2008,7 +2021,18 @@ class BitcoinGame {
             if (!data.canSubmit) {
                 this.showRateLimitWarning(data.remainingMs);
             } else {
-                document.getElementById('rateLimitWarning').classList.add('hidden');
+                // Rate limit cleared - re-enable submission
+                const warning = document.getElementById('rateLimitWarning');
+                const submitBtn = document.getElementById('submitSuggestionBtn');
+
+                warning.classList.add('hidden');
+                submitBtn.disabled = false;
+
+                // Clear any existing countdown interval
+                if (this.rateLimitInterval) {
+                    clearInterval(this.rateLimitInterval);
+                    this.rateLimitInterval = null;
+                }
             }
         } catch (error) {
             console.error('Error checking rate limit:', error);
@@ -2050,6 +2074,28 @@ class BitcoinGame {
         countdown.textContent = `${minutes}m ${seconds}s`;
     }
 
+    showSuccessInModal(type) {
+        const successMessage = document.getElementById('suggestionSuccessMessage');
+        const successType = document.getElementById('successType');
+        const form = document.getElementById('suggestionsForm');
+
+        // Check if all required elements exist
+        if (!successMessage || !successType || !form) {
+            console.error('Missing DOM elements for success modal:', { successMessage, successType, form });
+            throw new Error('Required DOM elements not found for success modal');
+        }
+
+        // Hide the form and show success message
+        form.style.display = 'none';
+        successType.textContent = type;
+        successMessage.classList.remove('hidden');
+
+        // Add fade-out animation before closing
+        setTimeout(() => {
+            successMessage.classList.add('fade-out');
+        }, 1000);
+    }
+
     async submitSuggestion() {
         const type = document.querySelector('input[name="type"]:checked').value;
         const title = document.getElementById('suggestionTitle').value.trim();
@@ -2078,7 +2124,19 @@ class BitcoinGame {
 
             if (response.ok) {
                 this.showNotification(data.message, 'success');
-                this.closeSuggestionsModal();
+
+                try {
+                    this.showSuccessInModal(type);
+
+                    // Auto-close modal after 1.5 seconds
+                    setTimeout(() => {
+                        this.closeSuggestionsModal();
+                    }, 1500);
+                } catch (modalError) {
+                    console.error('Error showing success in modal:', modalError);
+                    // Fallback: just close the modal normally
+                    this.closeSuggestionsModal();
+                }
             } else {
                 if (response.status === 429) {
                     // Rate limit exceeded
@@ -2110,6 +2168,10 @@ class BitcoinGame {
 
             if (response.ok) {
                 this.displayMySuggestions(data.suggestions);
+
+                // Check if rate limit status should be updated (in case admin closed suggestions)
+                // This helps sync the submit tab with current state
+                this.checkRateLimit();
             } else {
                 container.innerHTML = '<div class="text-center text-red-500">Failed to load suggestions</div>';
             }
@@ -2138,11 +2200,9 @@ class BitcoinGame {
 
             let replyHtml = '';
             if (suggestion.admin_reply) {
-                const replyDate = new Date(suggestion.replied_at).toLocaleDateString();
                 replyHtml = `
                     <div class="suggestion-reply">
-                        <div class="suggestion-reply-label">💬 Admin Reply (${replyDate}):</div>
-                        <div class="suggestion-reply-text">${this.escapeHtml(suggestion.admin_reply)}</div>
+                        ${this.formatAdminReply(suggestion.admin_reply)}
                     </div>
                 `;
             }
@@ -2181,6 +2241,35 @@ class BitcoinGame {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    formatAdminReply(adminReply) {
+        if (!adminReply) return '';
+
+        // Check if this is the new format with timestamps
+        const timestampRegex = /\[(\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2})\]/g;
+
+        if (timestampRegex.test(adminReply)) {
+            // New format with conversation history
+            const replies = adminReply.split(/\n\n(?=\[)/).filter(reply => reply.trim());
+
+            return replies.map(reply => {
+                const match = reply.match(/^\[([^\]]+)\]\s*(.*)$/s);
+                if (match) {
+                    const [, timestamp, content] = match;
+                    return `
+                        <div class="admin-reply-item">
+                            <div class="admin-reply-timestamp">💬 Admin Reply (${timestamp}):</div>
+                            <div class="admin-reply-content">${this.escapeHtml(content.trim())}</div>
+                        </div>
+                    `;
+                }
+                return `<div class="admin-reply-content">${this.escapeHtml(reply)}</div>`;
+            }).join('');
+        } else {
+            // Legacy format - single reply without timestamp
+            return `<div class="admin-reply-content">${this.escapeHtml(adminReply)}</div>`;
+        }
     }
 
     // ===== ADMIN DASHBOARD SYSTEM =====
@@ -2362,11 +2451,9 @@ class BitcoinGame {
 
             let existingReplyHtml = '';
             if (suggestion.admin_reply) {
-                const replyDate = new Date(suggestion.replied_at).toLocaleDateString();
                 existingReplyHtml = `
                     <div class="admin-existing-reply">
-                        <div class="admin-existing-reply-label">💬 Admin Reply (${replyDate}):</div>
-                        <div class="admin-existing-reply-text">${this.escapeHtml(suggestion.admin_reply)}</div>
+                        ${this.formatAdminReply(suggestion.admin_reply)}
                     </div>
                 `;
             }

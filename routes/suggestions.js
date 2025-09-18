@@ -5,15 +5,24 @@ const requireAdmin = require('../middleware/requireAdmin');
 const router = express.Router();
 
 // Rate limiting helper - check if user can submit (1 hour cooldown)
+// Exception: If the most recent submission is closed, user can submit immediately
 const checkRateLimit = async (userId) => {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const recentSubmission = await pool.query(
-    'SELECT created_at FROM suggestions WHERE user_id = $1 AND created_at > $2 ORDER BY created_at DESC LIMIT 1',
+    'SELECT created_at, status FROM suggestions WHERE user_id = $1 AND created_at > $2 ORDER BY created_at DESC LIMIT 1',
     [userId, oneHourAgo]
   );
 
   if (recentSubmission.rows.length > 0) {
-    const lastSubmission = new Date(recentSubmission.rows[0].created_at);
+    const submission = recentSubmission.rows[0];
+
+    // If the most recent submission is closed, allow immediate submission
+    if (submission.status === 'closed') {
+      return { canSubmit: true };
+    }
+
+    // Otherwise, apply rate limiting for open submissions
+    const lastSubmission = new Date(submission.created_at);
     const nextAllowedTime = new Date(lastSubmission.getTime() + 60 * 60 * 1000);
     const remainingMs = nextAllowedTime.getTime() - Date.now();
 
@@ -271,12 +280,34 @@ router.put('/admin/suggestions/:id/reply', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Admin reply must be 2000 characters or less' });
     }
 
-    // Update suggestion with reply and optionally close
+    // Get existing reply to append to it (preserve conversation history)
+    const existingReply = await pool.query('SELECT admin_reply FROM suggestions WHERE id = $1', [id]);
+
+    if (existingReply.rows.length === 0) {
+      return res.status(404).json({ error: 'Suggestion not found' });
+    }
+
+    const currentReply = existingReply.rows[0].admin_reply;
+    const timestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // Append new reply to existing replies (preserve conversation history)
+    const newReplyContent = currentReply
+      ? `${currentReply}\n\n[${timestamp}] ${adminReply.trim()}`
+      : `[${timestamp}] ${adminReply.trim()}`;
+
+    // Update suggestion with appended reply and optionally close
     let updateQuery = `
       UPDATE suggestions
       SET admin_reply = $1, replied_at = CURRENT_TIMESTAMP
     `;
-    let params = [adminReply.trim()];
+    let params = [newReplyContent];
 
     if (closeAfterReply) {
       updateQuery += `, status = 'closed'`;

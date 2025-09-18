@@ -374,6 +374,33 @@
             font-size: 0.875rem;
         }
 
+        /* Admin reply conversation history styles */
+        .admin-reply-item {
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .admin-reply-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .admin-reply-timestamp {
+            color: #059669;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-reply-content {
+            color: #92400e;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
         .rate-limit-warning {
             background: #fef2f2;
             border: 1px solid #fecaca;
@@ -381,6 +408,55 @@
             padding: 1rem;
             border-radius: 0.5rem;
             margin-bottom: 1rem;
+        }
+
+        .suggestion-success-message {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideInSuccess 0.3s ease-out;
+        }
+
+        .suggestion-success-message .success-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .suggestion-success-message .success-text {
+            flex: 1;
+        }
+
+        @keyframes slideInSuccess {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .suggestion-success-message.fade-out {
+            animation: fadeOutSuccess 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeOutSuccess {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
         }
 
         /* Mobile responsiveness */
@@ -1099,6 +1175,14 @@
                     <div id="rateLimitWarning" class="rate-limit-warning hidden">
                         <strong>Rate limit exceeded!</strong><br>
                         You can submit another suggestion in <span id="rateLimitCountdown"></span>.
+                    </div>
+
+                    <div id="suggestionSuccessMessage" class="suggestion-success-message hidden">
+                        <div class="success-icon">✅</div>
+                        <div class="success-text">
+                            <strong>Success!</strong><br>
+                            Your <span id="successType">suggestion</span> has been submitted successfully!
+                        </div>
                     </div>
 
                     <form id="suggestionsForm">
