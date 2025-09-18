@@ -66,6 +66,7 @@ class BitcoinGame {
         document.getElementById('assetsPage').classList.add('hidden');
         document.getElementById('mainApp').classList.add('hidden');
         document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('adminPage').classList.add('hidden');
 
         // Route to appropriate page
         switch(hash) {
@@ -92,6 +93,19 @@ class BitcoinGame {
                     }, 100);
                 } else {
                     this.showNotification('Please login to access your portfolio', 'error');
+                    this.showLoginForm();
+                }
+                break;
+            case '#admin':
+                this.currentPage = 'admin';
+                if (this.token && this.user?.isAdmin) {
+                    document.getElementById('adminPage').classList.remove('hidden');
+                    this.initAdminDashboard();
+                } else if (this.token) {
+                    this.showNotification('Admin access required', 'error');
+                    this.navigate('#home');
+                } else {
+                    this.showNotification('Please login to access admin panel', 'error');
                     this.showLoginForm();
                 }
                 break;
@@ -535,6 +549,12 @@ class BitcoinGame {
         document.getElementById('navUserInfo').classList.remove('hidden');
         if (this.user && this.user.username) {
             document.getElementById('navUsername').textContent = this.user.username;
+        }
+
+        // Show admin link if user is admin
+        const navAdminLink = document.getElementById('navAdminLink');
+        if (this.user?.isAdmin && navAdminLink) {
+            navAdminLink.classList.remove('hidden');
         }
     }
 
@@ -2162,7 +2182,343 @@ class BitcoinGame {
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // ===== ADMIN DASHBOARD SYSTEM =====
+
+    initAdminDashboard() {
+        // Initialize admin dashboard
+        this.adminCurrentPage = 1;
+        this.adminCurrentFilter = 'all';
+        this.adminCurrentSearch = '';
+
+        this.setupAdminEventListeners();
+        this.loadAdminStats();
+        this.loadAdminSuggestions();
+
+        // Auto-refresh every 30 seconds
+        if (this.adminRefreshInterval) {
+            clearInterval(this.adminRefreshInterval);
+        }
+        this.adminRefreshInterval = setInterval(() => {
+            this.loadAdminStats();
+            this.loadAdminSuggestions();
+        }, 30000);
+    }
+
+    setupAdminEventListeners() {
+        // Filter buttons
+        const filterButtons = {
+            'filterAll': 'all',
+            'filterOpen': 'open',
+            'filterClosed': 'closed',
+            'filterBugs': 'bug',
+            'filterSuggestions': 'suggestion'
+        };
+
+        Object.entries(filterButtons).forEach(([id, filter]) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    this.setAdminFilter(filter);
+                });
+            }
+        });
+
+        // Search input
+        const searchInput = document.getElementById('adminSearch');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.adminCurrentSearch = e.target.value;
+                    this.adminCurrentPage = 1;
+                    this.loadAdminSuggestions();
+                }, 500);
+            });
+        }
+
+        // Pagination
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (this.adminCurrentPage > 1) {
+                    this.adminCurrentPage--;
+                    this.loadAdminSuggestions();
+                }
+            });
+        }
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (this.adminCurrentPage < this.adminTotalPages) {
+                    this.adminCurrentPage++;
+                    this.loadAdminSuggestions();
+                }
+            });
+        }
+    }
+
+    setAdminFilter(filter) {
+        this.adminCurrentFilter = filter;
+        this.adminCurrentPage = 1;
+
+        // Update active filter button
+        document.querySelectorAll('#adminPage button[id^="filter"]').forEach(btn => {
+            btn.classList.remove('active-filter');
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+            btn.classList.remove('bg-blue-500', 'text-white');
+        });
+
+        const activeBtn = document.getElementById(
+            filter === 'all' ? 'filterAll' :
+            filter === 'open' ? 'filterOpen' :
+            filter === 'closed' ? 'filterClosed' :
+            filter === 'bug' ? 'filterBugs' :
+            'filterSuggestions'
+        );
+
+        if (activeBtn) {
+            activeBtn.classList.add('active-filter');
+            activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            activeBtn.classList.add('bg-blue-500', 'text-white');
+        }
+
+        this.loadAdminSuggestions();
+    }
+
+    async loadAdminStats() {
+        try {
+            const response = await fetch('/api/suggestions/admin/stats', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const stats = await response.json();
+
+            if (response.ok) {
+                document.getElementById('statsOpen').textContent = stats.status.open || 0;
+                document.getElementById('statsClosed').textContent = stats.status.closed || 0;
+                document.getElementById('statsBugs').textContent = stats.type.bug || 0;
+                document.getElementById('statsSuggestions').textContent = stats.type.suggestion || 0;
+            }
+        } catch (error) {
+            console.error('Error loading admin stats:', error);
+        }
+    }
+
+    async loadAdminSuggestions() {
+        const container = document.getElementById('adminSuggestionsList');
+        container.innerHTML = '<div class="text-center text-gray-500 py-8">Loading suggestions...</div>';
+
+        try {
+            let url = `/api/suggestions/admin/suggestions?page=${this.adminCurrentPage}&limit=10`;
+
+            if (this.adminCurrentFilter !== 'all') {
+                if (['open', 'closed'].includes(this.adminCurrentFilter)) {
+                    url += `&status=${this.adminCurrentFilter}`;
+                } else {
+                    url += `&type=${this.adminCurrentFilter}`;
+                }
+            }
+
+            if (this.adminCurrentSearch) {
+                url += `&search=${encodeURIComponent(this.adminCurrentSearch)}`;
+            }
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.displayAdminSuggestions(data.suggestions);
+                this.updateAdminPagination(data.pagination);
+            } else {
+                container.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load suggestions</div>';
+            }
+        } catch (error) {
+            console.error('Error loading admin suggestions:', error);
+            container.innerHTML = '<div class="text-center text-red-500 py-8">Failed to load suggestions</div>';
+        }
+    }
+
+    displayAdminSuggestions(suggestions) {
+        const container = document.getElementById('adminSuggestionsList');
+
+        if (suggestions.length === 0) {
+            container.innerHTML = '<div class="text-center text-gray-500 py-8">No suggestions found</div>';
+            return;
+        }
+
+        container.innerHTML = suggestions.map(suggestion => {
+            const typeClass = suggestion.type === 'bug' ? 'bug' : 'suggestion';
+            const statusClass = suggestion.status === 'open' ? 'open' : 'closed';
+            const typeIcon = suggestion.type === 'bug' ? '🐛' : '💡';
+            const statusIcon = suggestion.status === 'open' ? '🟢' : '⚫';
+
+            const date = new Date(suggestion.created_at).toLocaleDateString();
+            const timeAgo = this.getTimeAgo(new Date(suggestion.created_at));
+
+            let existingReplyHtml = '';
+            if (suggestion.admin_reply) {
+                const replyDate = new Date(suggestion.replied_at).toLocaleDateString();
+                existingReplyHtml = `
+                    <div class="admin-existing-reply">
+                        <div class="admin-existing-reply-label">💬 Admin Reply (${replyDate}):</div>
+                        <div class="admin-existing-reply-text">${this.escapeHtml(suggestion.admin_reply)}</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="admin-suggestion-item" id="suggestion-${suggestion.id}">
+                    <div class="admin-suggestion-header">
+                        <div class="flex items-center gap-2">
+                            <span class="admin-type-badge ${typeClass}">${typeIcon} ${suggestion.type}</span>
+                            <span class="admin-status-badge ${statusClass}">${statusIcon} ${suggestion.status}</span>
+                        </div>
+                        <div class="admin-user-info">
+                            <strong>${this.escapeHtml(suggestion.username)}</strong> (${this.escapeHtml(suggestion.email)}) • ${timeAgo}
+                        </div>
+                    </div>
+
+                    <div class="admin-suggestion-title">${this.escapeHtml(suggestion.title)}</div>
+                    <div class="admin-suggestion-description">${this.escapeHtml(suggestion.description)}</div>
+
+                    ${existingReplyHtml}
+
+                    <div class="admin-reply-form">
+                        <textarea
+                            id="reply-${suggestion.id}"
+                            class="admin-reply-textarea"
+                            placeholder="Write admin reply..."
+                            maxlength="2000"
+                        ></textarea>
+                        <div class="flex gap-2 mt-3">
+                            <button
+                                class="admin-action-btn primary"
+                                onclick="window.app.addAdminReply(${suggestion.id}, false)"
+                            >Send Reply</button>
+                            <button
+                                class="admin-action-btn secondary"
+                                onclick="window.app.addAdminReply(${suggestion.id}, true)"
+                            >Send & Close</button>
+                            ${suggestion.status === 'open' ? `
+                                <button
+                                    class="admin-action-btn danger"
+                                    onclick="window.app.changeStatus(${suggestion.id}, 'closed')"
+                                >Mark Closed</button>
+                            ` : `
+                                <button
+                                    class="admin-action-btn primary"
+                                    onclick="window.app.changeStatus(${suggestion.id}, 'open')"
+                                >Reopen</button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    updateAdminPagination(pagination) {
+        this.adminTotalPages = pagination.totalPages;
+
+        const pageInfo = document.getElementById('pageInfo');
+        const prevBtn = document.getElementById('prevPage');
+        const nextBtn = document.getElementById('nextPage');
+        const paginationDiv = document.getElementById('adminPagination');
+
+        if (pageInfo) {
+            pageInfo.textContent = `Page ${pagination.page} of ${pagination.totalPages}`;
+        }
+
+        if (prevBtn) {
+            prevBtn.disabled = pagination.page <= 1;
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled = pagination.page >= pagination.totalPages;
+        }
+
+        if (paginationDiv) {
+            paginationDiv.classList.toggle('hidden', pagination.totalPages <= 1);
+        }
+    }
+
+    async addAdminReply(suggestionId, closeAfterReply) {
+        const textarea = document.getElementById(`reply-${suggestionId}`);
+        const adminReply = textarea.value.trim();
+
+        if (!adminReply) {
+            this.showNotification('Please enter a reply', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/suggestions/admin/suggestions/${suggestionId}/reply`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    adminReply,
+                    closeAfterReply
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification(data.message, 'success');
+                textarea.value = '';
+                this.loadAdminSuggestions(); // Refresh the list
+                this.loadAdminStats(); // Update stats
+            } else {
+                this.showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error adding admin reply:', error);
+            this.showNotification('Failed to add reply', 'error');
+        }
+    }
+
+    async changeStatus(suggestionId, newStatus) {
+        try {
+            const response = await fetch(`/api/suggestions/admin/suggestions/${suggestionId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification(data.message, 'success');
+                this.loadAdminSuggestions(); // Refresh the list
+                this.loadAdminStats(); // Update stats
+            } else {
+                this.showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error changing status:', error);
+            this.showNotification('Failed to change status', 'error');
+        }
+    }
+
+    // Clean up admin intervals when leaving admin page
+    stopAdminRefresh() {
+        if (this.adminRefreshInterval) {
+            clearInterval(this.adminRefreshInterval);
+            this.adminRefreshInterval = null;
+        }
+    }
 }
 
 // Initialize the app
-new BitcoinGame();
+window.app = new BitcoinGame();

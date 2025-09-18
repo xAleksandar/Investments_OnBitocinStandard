@@ -88,15 +88,31 @@ router.get('/verify', async (req, res) => {
     
     // Get user
     const user = await pool.query('SELECT * FROM users WHERE email = $1', [link.rows[0].email]);
-    
-    // Generate JWT
+
+    // Check admin status for JWT token (dual verification)
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(email => email.trim()).filter(email => email);
+    const isAdminByEmail = adminEmails.includes(user.rows[0].email);
+    const isAdminByDB = user.rows[0].is_admin === true;
+    const isAdmin = isAdminByEmail || isAdminByDB;
+
+    // Generate JWT with admin status
     const jwtToken = jwt.sign(
-      { userId: user.rows[0].id, email: user.rows[0].email },
+      {
+        userId: user.rows[0].id,
+        email: user.rows[0].email,
+        isAdmin: isAdmin
+      },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    
-    res.json({ token: jwtToken, user: user.rows[0] });
+
+    // Include admin status in user object for frontend
+    const userWithAdmin = {
+      ...user.rows[0],
+      isAdmin: isAdmin
+    };
+
+    res.json({ token: jwtToken, user: userWithAdmin });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

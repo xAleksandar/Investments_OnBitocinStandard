@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../config/database');
 const authenticateToken = require('../middleware/auth');
+const requireAdmin = require('../middleware/requireAdmin');
 const router = express.Router();
 
 // Rate limiting helper - check if user can submit (1 hour cooldown)
@@ -183,6 +184,228 @@ router.get('/rate-limit', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error checking rate limit:', error);
     res.status(500).json({ error: 'Failed to check rate limit' });
+  }
+});
+
+// ===== ADMIN ENDPOINTS =====
+
+// Get all suggestions for admin dashboard (with pagination and filters)
+router.get('/admin/suggestions', requireAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status, type, search } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Build dynamic query
+    let whereClause = '1=1';
+    let params = [];
+    let paramCount = 1;
+
+    if (status && ['open', 'closed'].includes(status)) {
+      whereClause += ` AND s.status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    if (type && ['suggestion', 'bug'].includes(type)) {
+      whereClause += ` AND s.type = $${paramCount}`;
+      params.push(type);
+      paramCount++;
+    }
+
+    if (search) {
+      whereClause += ` AND (s.title ILIKE $${paramCount} OR s.description ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+      params.push(`%${search}%`);
+      paramCount++;
+    }
+
+    // Get suggestions with user info
+    const query = `
+      SELECT s.id, s.type, s.title, s.description, s.status, s.admin_reply, s.replied_at, s.created_at,
+             u.id as user_id, u.username, u.email
+      FROM suggestions s
+      JOIN users u ON s.user_id = u.id
+      WHERE ${whereClause}
+      ORDER BY s.created_at DESC
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}
+    `;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM suggestions s
+      JOIN users u ON s.user_id = u.id
+      WHERE ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params.slice(0, -2)); // Remove limit and offset
+
+    res.json({
+      suggestions: result.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: parseInt(countResult.rows[0].total),
+        totalPages: Math.ceil(countResult.rows[0].total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching admin suggestions:', error);
+    res.status(500).json({ error: 'Failed to fetch suggestions' });
+  }
+});
+
+// Add admin reply to suggestion
+router.put('/admin/suggestions/:id/reply', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminReply, closeAfterReply = false } = req.body;
+
+    if (!adminReply || adminReply.trim().length === 0) {
+      return res.status(400).json({ error: 'Admin reply is required' });
+    }
+
+    if (adminReply.length > 2000) {
+      return res.status(400).json({ error: 'Admin reply must be 2000 characters or less' });
+    }
+
+    // Update suggestion with reply and optionally close
+    let updateQuery = `
+      UPDATE suggestions
+      SET admin_reply = $1, replied_at = CURRENT_TIMESTAMP
+    `;
+    let params = [adminReply.trim()];
+
+    if (closeAfterReply) {
+      updateQuery += `, status = 'closed'`;
+    }
+
+    updateQuery += ` WHERE id = $2 RETURNING *`;
+    params.push(id);
+
+    const result = await pool.query(updateQuery, params);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Suggestion not found' });
+    }
+
+    res.json({
+      message: closeAfterReply ? 'Reply added and suggestion closed' : 'Reply added successfully',
+      suggestion: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error adding admin reply:', error);
+    res.status(500).json({ error: 'Failed to add reply' });
+  }
+});
+
+// Update suggestion status
+router.put('/admin/suggestions/:id/status', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['open', 'closed'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be either "open" or "closed"' });
+    }
+
+    const result = await pool.query(
+      'UPDATE suggestions SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Suggestion not found' });
+    }
+
+    res.json({
+      message: `Suggestion marked as ${status}`,
+      suggestion: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error updating suggestion status:', error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// Get admin dashboard statistics
+router.get('/admin/stats', requireAdmin, async (req, res) => {
+  try {
+    // Get counts by status
+    const statusStats = await pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM suggestions
+      GROUP BY status
+    `);
+
+    // Get counts by type
+    const typeStats = await pool.query(`
+      SELECT type, COUNT(*) as count
+      FROM suggestions
+      GROUP BY type
+    `);
+
+    // Get recent activity (last 7 days)
+    const recentActivity = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM suggestions
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+    `);
+
+    // Get average response time for closed suggestions with replies
+    const avgResponseTime = await pool.query(`
+      SELECT AVG(EXTRACT(EPOCH FROM (replied_at - created_at))/3600) as avg_hours
+      FROM suggestions
+      WHERE status = 'closed' AND admin_reply IS NOT NULL AND replied_at IS NOT NULL
+    `);
+
+    const stats = {
+      status: statusStats.rows.reduce((acc, row) => {
+        acc[row.status] = parseInt(row.count);
+        return acc;
+      }, { open: 0, closed: 0 }),
+      type: typeStats.rows.reduce((acc, row) => {
+        acc[row.type] = parseInt(row.count);
+        return acc;
+      }, { suggestion: 0, bug: 0 }),
+      recentActivity: parseInt(recentActivity.rows[0].count),
+      avgResponseTimeHours: avgResponseTime.rows[0].avg_hours ? parseFloat(avgResponseTime.rows[0].avg_hours).toFixed(1) : null
+    };
+
+    res.json(stats);
+
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Promote user to admin via database flag
+router.post('/admin/users/:id/promote', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'UPDATE users SET is_admin = true WHERE id = $1 RETURNING id, username, email, is_admin',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'User promoted to admin successfully',
+      user: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error promoting user to admin:', error);
+    res.status(500).json({ error: 'Failed to promote user' });
   }
 });
 

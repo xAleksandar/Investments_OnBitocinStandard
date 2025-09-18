@@ -57,6 +57,32 @@ async function addSuggestionsTable() {
 
     console.log('✅ Indexes created successfully');
 
+    // Add admin column to users table
+    console.log('Checking if admin column exists in users table...');
+
+    const adminColumnExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'is_admin'
+      );
+    `);
+
+    if (!adminColumnExists.rows[0].exists) {
+      console.log('Adding is_admin column to users table...');
+
+      await pool.query(`
+        ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT false;
+      `);
+
+      await pool.query(`
+        CREATE INDEX idx_users_is_admin ON users(is_admin);
+      `);
+
+      console.log('✅ Admin column and index added successfully');
+    } else {
+      console.log('✅ Admin column already exists, skipping creation');
+    }
+
     // Verify table structure
     const tableInfo = await pool.query(`
       SELECT column_name, data_type, is_nullable, column_default
@@ -65,8 +91,21 @@ async function addSuggestionsTable() {
       ORDER BY ordinal_position;
     `);
 
-    console.log('\n📋 Table structure:');
+    console.log('\n📋 Suggestions table structure:');
     tableInfo.rows.forEach(row => {
+      console.log(`  ${row.column_name}: ${row.data_type} ${row.is_nullable === 'NO' ? 'NOT NULL' : ''} ${row.column_default ? `DEFAULT ${row.column_default}` : ''}`);
+    });
+
+    // Verify users table structure
+    const usersTableInfo = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_name = 'users'
+      ORDER BY ordinal_position;
+    `);
+
+    console.log('\n👤 Users table structure:');
+    usersTableInfo.rows.forEach(row => {
       console.log(`  ${row.column_name}: ${row.data_type} ${row.is_nullable === 'NO' ? 'NOT NULL' : ''} ${row.column_default ? `DEFAULT ${row.column_default}` : ''}`);
     });
 

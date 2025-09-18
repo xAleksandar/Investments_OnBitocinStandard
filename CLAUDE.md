@@ -32,6 +32,10 @@ sudo systemctl restart postgresql
 # Install dependencies
 npm install
 
+# Set up environment file (first time only)
+cp .env.example .env
+# Edit .env with your settings
+
 # Initialize database (run once after PostgreSQL setup)
 npm run setup-db
 
@@ -180,6 +184,18 @@ Implemented comprehensive user feedback system
 ```bash
 git pull
 npm run update-db  # Creates suggestions table and indexes
+```
+
+#### Admin Setup:
+To grant admin access to users, add their emails to the `ADMIN_EMAILS` environment variable in your local `.env` file:
+```bash
+# In your .env file (local only, not committed)
+ADMIN_EMAILS=your@email.com,colleague@email.com
+```
+
+Alternatively, promote users via database:
+```sql
+UPDATE users SET is_admin = true WHERE email = 'user@email.com';
 ```
 
 #### API Endpoints:
