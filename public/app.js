@@ -7,7 +7,73 @@ class BitcoinGame {
         this.currentPage = 'home';
         this.priceRefreshInterval = null;
 
+        this.initTooltips();
         this.init();
+    }
+
+    initTooltips() {
+        // Initialize custom tooltip system
+        this.tooltip = document.getElementById('customTooltip');
+    }
+
+    showTooltip(element, content, event) {
+        if (!this.tooltip) return;
+
+        this.tooltip.textContent = content;
+        this.tooltip.classList.add('show');
+
+        // Position tooltip relative to mouse
+        const rect = element.getBoundingClientRect();
+        const tooltipRect = this.tooltip.getBoundingClientRect();
+
+        let left = event.clientX - tooltipRect.width / 2;
+        let top = rect.top - tooltipRect.height - 10;
+
+        // Prevent tooltip from going off screen
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+        if (top < 10) {
+            top = rect.bottom + 10;
+        }
+
+        this.tooltip.style.left = left + 'px';
+        this.tooltip.style.top = top + 'px';
+    }
+
+    hideTooltip() {
+        if (this.tooltip) {
+            this.tooltip.classList.remove('show');
+        }
+    }
+
+    setupPerformanceTooltip(element, content) {
+        // Remove existing title attribute
+        element.removeAttribute('title');
+
+        // Add performance-metric class for cursor styling
+        element.classList.add('performance-metric');
+
+        // Remove existing event listeners to prevent duplicates
+        element.onmouseenter = null;
+        element.onmouseleave = null;
+        element.onmousemove = null;
+
+        // Add hover event listeners
+        element.addEventListener('mouseenter', (e) => {
+            this.showTooltip(element, content, e);
+        });
+
+        element.addEventListener('mouseleave', () => {
+            this.hideTooltip();
+        });
+
+        element.addEventListener('mousemove', (e) => {
+            if (this.tooltip && this.tooltip.classList.contains('show')) {
+                this.showTooltip(element, content, e);
+            }
+        });
     }
 
     init() {
@@ -465,31 +531,83 @@ class BitcoinGame {
                 try {
                     const response = await fetch(`/api/assets/performance/${selectedAsset}/${period}`);
                     const data = await response.json();
-                    return { period, performance: data.performance };
+                    return {
+                        period,
+                        performance: data.performance,
+                        startDate: data.startDate,
+                        details: data.details || null
+                    };
                 } catch (error) {
                     console.error(`Failed to fetch ${period} performance for ${selectedAsset}:`, error);
-                    return { period, performance: null };
+                    return { period, performance: null, details: null };
                 }
             });
 
             // Wait for all performance data and update the UI
             const performanceResults = await Promise.all(performancePromises);
 
-            performanceResults.forEach(({ period, performance }) => {
+            performanceResults.forEach(({ period, performance, details }) => {
                 const element = metrics[period];
+
                 if (element) {
-                    if (performance !== null && !isNaN(performance)) {
+                    // Find the parent container div (.bg-gray-50.rounded.p-3)
+                    const container = element.closest('.bg-gray-50');
+
+                    if (performance !== null && !isNaN(performance) && details) {
                         const value = performance.toFixed(2);
                         element.textContent = `${performance > 0 ? '+' : ''}${value}%`;
                         element.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
-                        element.title = `Performance vs Bitcoin over ${period}`;
+
+                        // Create detailed tooltip with price breakdown
+                        const assetMultiplier = (details.assetPriceCurrent / details.assetPriceOld).toFixed(1);
+                        const btcMultiplier = (details.btcPriceCurrent / details.btcPriceOld).toFixed(1);
+
+                        const periodLabel = period === '24h' ? '24 hours ago' :
+                                          period === '1y' ? '1 year ago' :
+                                          period === '5y' ? '5 years ago' :
+                                          period === '10y' ? '10 years ago' : period;
+
+                        const tooltip = `${selectedAsset} vs Bitcoin Performance (${period})\n\n` +
+                                      `${periodLabel}:\n` +
+                                      `${selectedAsset}: $${details.assetPriceOld.toLocaleString()} → $${details.assetPriceCurrent.toLocaleString()} (${assetMultiplier}x)\n` +
+                                      `Bitcoin: $${details.btcPriceOld.toLocaleString()} → $${details.btcPriceCurrent.toLocaleString()} (${btcMultiplier}x)\n\n` +
+                                      `Bitcoin grew ${btcMultiplier}x vs ${selectedAsset}'s ${assetMultiplier}x\n` +
+                                      `Net performance: ${value}%`;
+
+                        // Apply tooltip to the container div instead of just the text
+                        this.setupPerformanceTooltip(container || element, tooltip);
+                    } else if (performance !== null && !isNaN(performance)) {
+                        const value = performance.toFixed(2);
+                        element.textContent = `${performance > 0 ? '+' : ''}${value}%`;
+                        element.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
+                        this.setupPerformanceTooltip(container || element, `Performance vs Bitcoin over ${period}`);
                     } else {
                         element.textContent = 'N/A';
                         element.className = 'font-semibold text-gray-500';
-                        element.title = `Data not available for ${period} period`;
+                        this.setupPerformanceTooltip(container || element, `Data not available for ${period} period`);
                     }
                 }
             });
+
+            // Add Bitcoin price tooltip for Current (BTC) section
+            const btcPriceElement = document.getElementById('assetPriceBTC');
+            if (btcPriceElement && data && data.pricesInSats && data.pricesUsd && data.btcPrice) {
+                const btcContainer = btcPriceElement.closest('.bg-gray-50');
+                const btcPrice = data.btcPrice;
+                const assetPriceInBTC = data.pricesInSats[selectedAsset];
+                const assetPriceInUSD = data.pricesUsd[selectedAsset];
+
+                if (assetPriceInBTC && btcPrice && assetPriceInUSD) {
+                    // Convert satoshis to BTC (divide by 100,000,000)
+                    const assetPriceInBTCConverted = assetPriceInBTC / 100000000;
+                    const btcTooltip = `Current Bitcoin Price: $${btcPrice.toLocaleString()}\n` +
+                                      `Current ${selectedAsset} Price: $${assetPriceInUSD.toLocaleString()}\n\n` +
+                                      `1 ${selectedAsset} = ${assetPriceInBTCConverted.toFixed(8)} BTC\n` +
+                                      `1 BTC = ${(1/assetPriceInBTCConverted).toFixed(2)} ${selectedAsset}`;
+
+                    this.setupPerformanceTooltip(btcContainer || btcPriceElement, btcTooltip);
+                }
+            }
 
         } catch (error) {
             console.error('Failed to load asset page metrics:', error);

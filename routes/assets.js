@@ -192,126 +192,6 @@ router.get('/prices', async (req, res) => {
 });
 
 // Get all available assets
-// Get 5-year performance for an asset vs Bitcoin
-router.get('/performance/:symbol/5y', async (req, res) => {
-    try {
-        const symbol = req.params.symbol;
-        const now = new Date();
-        const fiveYearsAgo = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-
-        // Map symbols to Yahoo Finance tickers
-        const yahooSymbols = {
-            'XAU': 'GC=F',    // Gold futures
-            'XAG': 'SI=F',    // Silver futures
-            'SPY': 'SPY',
-            'AAPL': 'AAPL',
-            'TSLA': 'TSLA',
-            'MSFT': 'MSFT',
-            'GOOGL': 'GOOGL',
-            'AMZN': 'AMZN',
-            'NVDA': 'NVDA',
-            'VNQ': 'VNQ',
-            'WTI': 'CL=F'     // Crude oil futures
-        };
-
-        const yahooSymbol = yahooSymbols[symbol];
-        if (!yahooSymbol) {
-            return res.json({ performance: null });
-        }
-
-        // Fetch historical data for the asset (5 years ago, with a 7-day range to ensure we get data)
-        const startRange = Math.floor((fiveYearsAgo.getTime() - 7 * 24 * 60 * 60 * 1000) / 1000); // 7 days before
-        const endRange = Math.floor((fiveYearsAgo.getTime() + 7 * 24 * 60 * 60 * 1000) / 1000); // 7 days after
-
-        const assetHistoricalUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?period1=${startRange}&period2=${endRange}&interval=1d`;
-        const btcHistoricalUrl = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?period1=${startRange}&period2=${endRange}&interval=1d`;
-
-        // Get current prices
-        const assetCurrentUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}`;
-        const btcCurrentUrl = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD`;
-
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        };
-
-        // Fetch all data in parallel
-        const [assetHistRes, btcHistRes, assetCurrRes, btcCurrRes] = await Promise.all([
-            axios.get(assetHistoricalUrl, { headers }),
-            axios.get(btcHistoricalUrl, { headers }),
-            axios.get(assetCurrentUrl, { headers }),
-            axios.get(btcCurrentUrl, { headers })
-        ]);
-
-        // Extract historical prices (get the middle/closest date from the range)
-        let assetPriceOld = null;
-        const assetData = assetHistRes.data.chart.result[0];
-        if (assetData.indicators?.quote?.[0]?.close) {
-            const closePrices = assetData.indicators.quote[0].close.filter(price => price !== null);
-            if (closePrices.length > 0) {
-                // Use the middle price from available data, or the last one
-                const middleIndex = Math.floor(closePrices.length / 2);
-                assetPriceOld = closePrices[middleIndex] || closePrices[closePrices.length - 1];
-            }
-        }
-
-        let btcPriceOld = null;
-        const btcData = btcHistRes.data.chart.result[0];
-        if (btcData.indicators?.quote?.[0]?.close) {
-            const closePrices = btcData.indicators.quote[0].close.filter(price => price !== null);
-            if (closePrices.length > 0) {
-                // Use the middle price from available data, or the last one
-                const middleIndex = Math.floor(closePrices.length / 2);
-                btcPriceOld = closePrices[middleIndex] || closePrices[closePrices.length - 1];
-            }
-        }
-
-        const assetPriceCurrent = assetCurrRes.data.chart.result[0].meta.regularMarketPrice;
-        const btcPriceCurrent = btcCurrRes.data.chart.result[0].meta.regularMarketPrice;
-
-        // Validate that we have all required data
-        if (!assetPriceOld || !btcPriceOld || !assetPriceCurrent || !btcPriceCurrent) {
-            console.log(`Missing price data for ${symbol}:`, {
-                assetPriceOld,
-                btcPriceOld,
-                assetPriceCurrent,
-                btcPriceCurrent
-            });
-            return res.json({ performance: null });
-        }
-
-        // Validate that prices are reasonable (positive numbers)
-        if (assetPriceOld <= 0 || btcPriceOld <= 0 || assetPriceCurrent <= 0 || btcPriceCurrent <= 0) {
-            console.log(`Invalid price data for ${symbol}:`, {
-                assetPriceOld,
-                btcPriceOld,
-                assetPriceCurrent,
-                btcPriceCurrent
-            });
-            return res.json({ performance: null });
-        }
-
-        // Calculate 5-year performance vs Bitcoin
-        const assetRatio5YAgo = assetPriceOld / btcPriceOld;
-        const assetRatioNow = assetPriceCurrent / btcPriceCurrent;
-        const performance = ((assetRatioNow - assetRatio5YAgo) / assetRatio5YAgo) * 100;
-
-        console.log(`5Y Performance for ${symbol}:`, {
-            assetPriceOld,
-            btcPriceOld,
-            assetPriceCurrent,
-            btcPriceCurrent,
-            assetRatio5YAgo,
-            assetRatioNow,
-            performance: performance.toFixed(2) + '%'
-        });
-
-        res.json({ performance });
-
-    } catch (error) {
-        console.error('Error fetching 5Y performance:', error.message);
-        res.json({ performance: null });
-    }
-});
 
 // Get performance for an asset vs Bitcoin over different time periods
 router.get('/performance/:symbol/:period', async (req, res) => {
@@ -437,7 +317,17 @@ router.get('/performance/:symbol/:period', async (req, res) => {
             performance: performance.toFixed(2) + '%'
         });
 
-        res.json({ performance, period, startDate: startDate.toISOString() });
+        res.json({
+            performance,
+            period,
+            startDate: startDate.toISOString(),
+            details: {
+                assetPriceOld,
+                btcPriceOld,
+                assetPriceCurrent,
+                btcPriceCurrent
+            }
+        });
 
     } catch (error) {
         console.error(`Error fetching ${req.params.period} performance:`, error.message);
