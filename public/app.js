@@ -32,6 +32,9 @@ class BitcoinGame {
 
         this.setupEventListeners();
 
+        // Initialize suggestions system
+        this.initSuggestionsSystem();
+
         // Navigate to current hash or default to home
         this.navigate(window.location.hash || '#home');
     }
@@ -1853,6 +1856,311 @@ class BitcoinGame {
             clearInterval(this.priceRefreshInterval);
             this.priceRefreshInterval = null;
         }
+    }
+
+    // ===== SUGGESTIONS SYSTEM =====
+
+    initSuggestionsSystem() {
+        // Initialize suggestions system event listeners
+        this.setupSuggestionsEventListeners();
+    }
+
+    setupSuggestionsEventListeners() {
+        const fab = document.getElementById('suggestionsFab');
+        const modal = document.getElementById('suggestionsModal');
+        const closeBtn = document.getElementById('closeSuggestionsModal');
+        const cancelBtn = document.getElementById('cancelSuggestionBtn');
+        const submitTab = document.getElementById('submitTab');
+        const mySuggestionsTab = document.getElementById('mySuggestionsTab');
+        const form = document.getElementById('suggestionsForm');
+
+        // Open modal
+        fab.addEventListener('click', () => {
+            this.openSuggestionsModal();
+        });
+
+        // Close modal
+        closeBtn.addEventListener('click', () => {
+            this.closeSuggestionsModal();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            this.closeSuggestionsModal();
+        });
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeSuggestionsModal();
+            }
+        });
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                this.closeSuggestionsModal();
+            }
+        });
+
+        // Tab switching
+        submitTab.addEventListener('click', () => {
+            this.switchSuggestionsTab('submit');
+        });
+
+        mySuggestionsTab.addEventListener('click', () => {
+            this.switchSuggestionsTab('mySuggestions');
+        });
+
+        // Form submission
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.submitSuggestion();
+        });
+    }
+
+    openSuggestionsModal() {
+        const modal = document.getElementById('suggestionsModal');
+
+        // Check if user is authenticated
+        if (!this.token) {
+            this.showNotification('Please login to submit suggestions or report bugs', 'error');
+            this.showLoginForm();
+            return;
+        }
+
+        // Check rate limit before opening
+        this.checkRateLimit();
+
+        modal.classList.add('show');
+
+        // Reset to submit tab
+        this.switchSuggestionsTab('submit');
+    }
+
+    closeSuggestionsModal() {
+        const modal = document.getElementById('suggestionsModal');
+        modal.classList.remove('show');
+
+        // Reset form
+        document.getElementById('suggestionsForm').reset();
+        document.getElementById('typeSuggestion').checked = true;
+
+        // Hide rate limit warning
+        document.getElementById('rateLimitWarning').classList.add('hidden');
+
+        // Clear any countdown interval
+        if (this.rateLimitInterval) {
+            clearInterval(this.rateLimitInterval);
+            this.rateLimitInterval = null;
+        }
+    }
+
+    switchSuggestionsTab(tab) {
+        const submitTab = document.getElementById('submitTab');
+        const mySuggestionsTab = document.getElementById('mySuggestionsTab');
+        const submitContent = document.getElementById('submitTabContent');
+        const mySuggestionsContent = document.getElementById('mySuggestionsTabContent');
+
+        if (tab === 'submit') {
+            submitTab.classList.add('active');
+            mySuggestionsTab.classList.remove('active');
+            submitContent.classList.remove('hidden');
+            mySuggestionsContent.classList.add('hidden');
+        } else {
+            submitTab.classList.remove('active');
+            mySuggestionsTab.classList.add('active');
+            submitContent.classList.add('hidden');
+            mySuggestionsContent.classList.remove('hidden');
+
+            // Load user's suggestions
+            this.loadMySuggestions();
+        }
+    }
+
+    async checkRateLimit() {
+        try {
+            const response = await fetch('/api/suggestions/rate-limit', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const data = await response.json();
+
+            if (!data.canSubmit) {
+                this.showRateLimitWarning(data.remainingMs);
+            } else {
+                document.getElementById('rateLimitWarning').classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Error checking rate limit:', error);
+        }
+    }
+
+    showRateLimitWarning(remainingMs) {
+        const warning = document.getElementById('rateLimitWarning');
+        const countdown = document.getElementById('rateLimitCountdown');
+        const submitBtn = document.getElementById('submitSuggestionBtn');
+
+        warning.classList.remove('hidden');
+        submitBtn.disabled = true;
+
+        // Update countdown every second
+        this.updateRateLimitCountdown(remainingMs);
+
+        if (this.rateLimitInterval) {
+            clearInterval(this.rateLimitInterval);
+        }
+
+        this.rateLimitInterval = setInterval(() => {
+            remainingMs -= 1000;
+            if (remainingMs <= 0) {
+                clearInterval(this.rateLimitInterval);
+                warning.classList.add('hidden');
+                submitBtn.disabled = false;
+                this.rateLimitInterval = null;
+            } else {
+                this.updateRateLimitCountdown(remainingMs);
+            }
+        }, 1000);
+    }
+
+    updateRateLimitCountdown(remainingMs) {
+        const countdown = document.getElementById('rateLimitCountdown');
+        const minutes = Math.floor(remainingMs / 60000);
+        const seconds = Math.floor((remainingMs % 60000) / 1000);
+        countdown.textContent = `${minutes}m ${seconds}s`;
+    }
+
+    async submitSuggestion() {
+        const type = document.querySelector('input[name="type"]:checked').value;
+        const title = document.getElementById('suggestionTitle').value.trim();
+        const description = document.getElementById('suggestionDescription').value.trim();
+        const submitBtn = document.getElementById('submitSuggestionBtn');
+
+        if (!title || !description) {
+            this.showNotification('Please fill in all fields', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+            const response = await fetch('/api/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ type, title, description })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification(data.message, 'success');
+                this.closeSuggestionsModal();
+            } else {
+                if (response.status === 429) {
+                    // Rate limit exceeded
+                    this.showRateLimitWarning(data.remainingMs);
+                    this.showNotification(data.error, 'error');
+                } else {
+                    this.showNotification(data.error, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error submitting suggestion:', error);
+            this.showNotification('Failed to submit suggestion', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit';
+        }
+    }
+
+    async loadMySuggestions() {
+        const container = document.getElementById('mySuggestionsList');
+        container.innerHTML = '<div class="text-center text-gray-500">Loading...</div>';
+
+        try {
+            const response = await fetch('/api/suggestions', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.displayMySuggestions(data.suggestions);
+            } else {
+                container.innerHTML = '<div class="text-center text-red-500">Failed to load suggestions</div>';
+            }
+        } catch (error) {
+            console.error('Error loading suggestions:', error);
+            container.innerHTML = '<div class="text-center text-red-500">Failed to load suggestions</div>';
+        }
+    }
+
+    displayMySuggestions(suggestions) {
+        const container = document.getElementById('mySuggestionsList');
+
+        if (suggestions.length === 0) {
+            container.innerHTML = '<div class="text-center text-gray-500">No suggestions submitted yet</div>';
+            return;
+        }
+
+        container.innerHTML = suggestions.map(suggestion => {
+            const typeClass = suggestion.type === 'bug' ? 'bug' : 'suggestion';
+            const statusClass = suggestion.status === 'open' ? 'open' : 'closed';
+            const statusIcon = suggestion.status === 'open' ? '🟢' : '⚫';
+            const typeIcon = suggestion.type === 'bug' ? '🐛' : '💡';
+
+            const date = new Date(suggestion.created_at).toLocaleDateString();
+            const timeAgo = this.getTimeAgo(new Date(suggestion.created_at));
+
+            let replyHtml = '';
+            if (suggestion.admin_reply) {
+                const replyDate = new Date(suggestion.replied_at).toLocaleDateString();
+                replyHtml = `
+                    <div class="suggestion-reply">
+                        <div class="suggestion-reply-label">💬 Admin Reply (${replyDate}):</div>
+                        <div class="suggestion-reply-text">${this.escapeHtml(suggestion.admin_reply)}</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="suggestion-item">
+                    <div class="suggestion-header">
+                        <span class="suggestion-type ${typeClass}">${typeIcon} ${suggestion.type.toUpperCase()}</span>
+                        <span class="suggestion-status ${statusClass}">${statusIcon} ${suggestion.status.toUpperCase()}</span>
+                    </div>
+                    <div class="suggestion-meta">Submitted ${timeAgo} (${date})</div>
+                    <div class="suggestion-title">${this.escapeHtml(suggestion.title)}</div>
+                    <div class="suggestion-description">${this.escapeHtml(suggestion.description)}</div>
+                    ${replyHtml}
+                </div>
+            `;
+        }).join('');
+    }
+
+    getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        return date.toLocaleDateString();
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

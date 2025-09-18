@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolio');
 const tradeRoutes = require('./routes/trades');
 const assetRoutes = require('./routes/assets');
+const suggestionsRoutes = require('./routes/suggestions');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,6 +68,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/assets', assetRoutes);
+app.use('/api/suggestions', suggestionsRoutes);
 
 // Magic link redirect (for user-friendly URLs)
 app.get('/auth/verify', (req, res) => {

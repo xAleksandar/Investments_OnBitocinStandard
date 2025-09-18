@@ -101,6 +101,307 @@
                 display: none;
             }
         }
+
+        /* Suggestions Floating Button Styles */
+        .suggestions-float-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+            z-index: 1000;
+            transition: all 0.3s ease;
+            animation: float-glow 3s ease-in-out infinite;
+        }
+
+        .suggestions-float-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6);
+        }
+
+        @keyframes float-glow {
+            0%, 100% {
+                box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(249, 115, 22, 0.7), 0 0 30px rgba(249, 115, 22, 0.3);
+            }
+        }
+
+        /* Suggestions Modal Styles */
+        .suggestions-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .suggestions-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .suggestions-modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+
+        .suggestions-modal.show .suggestions-modal-content {
+            transform: translateY(0);
+        }
+
+        .suggestions-tab-header {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .suggestions-tab {
+            flex: 1;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .suggestions-tab.active {
+            color: #f97316;
+            border-bottom: 2px solid #f97316;
+            background: #fff7ed;
+        }
+
+        .suggestions-tab-content {
+            padding: 1.5rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .suggestions-form-group {
+            margin-bottom: 1rem;
+        }
+
+        .suggestions-form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .suggestions-radio-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .suggestions-radio-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .suggestions-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .suggestions-input:focus {
+            outline: none;
+            border-color: #f97316;
+            ring: 2px;
+            ring-color: rgba(249, 115, 22, 0.2);
+        }
+
+        .suggestions-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .suggestions-btn {
+            background: #f97316;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .suggestions-btn:hover {
+            background: #ea580c;
+        }
+
+        .suggestions-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .suggestions-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #6b7280;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .suggestions-close:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .suggestion-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .suggestion-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .suggestion-type {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .suggestion-type.bug {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .suggestion-type.suggestion {
+            background: #f0f9ff;
+            color: #2563eb;
+        }
+
+        .suggestion-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .suggestion-status.open {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .suggestion-status.closed {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .suggestion-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+
+        .suggestion-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .suggestion-description {
+            color: #4b5563;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .suggestion-reply {
+            background: #fffbeb;
+            border-left: 3px solid #f59e0b;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            border-radius: 0 0.25rem 0.25rem 0;
+        }
+
+        .suggestion-reply-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #92400e;
+            margin-bottom: 0.25rem;
+        }
+
+        .suggestion-reply-text {
+            color: #92400e;
+            font-size: 0.875rem;
+        }
+
+        .rate-limit-warning {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 640px) {
+            .suggestions-float-btn {
+                bottom: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .suggestions-modal-content {
+                width: 95%;
+                margin: 1rem;
+            }
+
+            .suggestions-tab-content {
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -537,6 +838,70 @@
                         <div id="modalContent">
                             <!-- Content will be populated by JavaScript -->
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suggestions Floating Button -->
+        <button id="suggestionsFab" class="suggestions-float-btn" title="Make a suggestion or report a bug">
+            💡
+        </button>
+
+        <!-- Suggestions Modal -->
+        <div id="suggestionsModal" class="suggestions-modal">
+            <div class="suggestions-modal-content relative">
+                <button id="closeSuggestionsModal" class="suggestions-close">&times;</button>
+
+                <!-- Tab Header -->
+                <div class="suggestions-tab-header">
+                    <button id="submitTab" class="suggestions-tab active">Submit New</button>
+                    <button id="mySuggestionsTab" class="suggestions-tab">My Suggestions</button>
+                </div>
+
+                <!-- Submit Tab Content -->
+                <div id="submitTabContent" class="suggestions-tab-content">
+                    <div id="rateLimitWarning" class="rate-limit-warning hidden">
+                        <strong>Rate limit exceeded!</strong><br>
+                        You can submit another suggestion in <span id="rateLimitCountdown"></span>.
+                    </div>
+
+                    <form id="suggestionsForm">
+                        <div class="suggestions-form-group">
+                            <label>Type:</label>
+                            <div class="suggestions-radio-group">
+                                <div class="suggestions-radio-item">
+                                    <input type="radio" name="type" value="suggestion" id="typeSuggestion" checked>
+                                    <label for="typeSuggestion">💡 Suggestion</label>
+                                </div>
+                                <div class="suggestions-radio-item">
+                                    <input type="radio" name="type" value="bug" id="typeBug">
+                                    <label for="typeBug">🐛 Bug Report</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="suggestions-form-group">
+                            <label for="suggestionTitle">Title:</label>
+                            <input type="text" id="suggestionTitle" class="suggestions-input" maxlength="255" required>
+                        </div>
+
+                        <div class="suggestions-form-group">
+                            <label for="suggestionDescription">Description:</label>
+                            <textarea id="suggestionDescription" class="suggestions-input suggestions-textarea" maxlength="5000" required></textarea>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button type="submit" id="submitSuggestionBtn" class="suggestions-btn flex-1">Submit</button>
+                            <button type="button" id="cancelSuggestionBtn" class="suggestions-btn" style="background: #6b7280;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- My Suggestions Tab Content -->
+                <div id="mySuggestionsTabContent" class="suggestions-tab-content hidden">
+                    <div id="mySuggestionsList">
+                        <!-- Content will be populated by JavaScript -->
                     </div>
                 </div>
             </div>

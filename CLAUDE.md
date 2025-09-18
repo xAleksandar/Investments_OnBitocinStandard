@@ -35,6 +35,9 @@ npm install
 # Initialize database (run once after PostgreSQL setup)
 npm run setup-db
 
+# Update database with new features (run after git pull when prompted)
+npm run update-db
+
 # Run development server with auto-reload (port 3000)
 npm run dev
 
@@ -161,25 +164,48 @@ Check PostgreSQL is running and `.env` credentials are correct
 - Implement fallback to last known prices
 - Consider caching strategy for resilience
 
-## Recent Fixes (Sep 2025)
+## Recent Features (Sep 2025)
 
-### 1. Performance Calculation Bug
+### 1. Suggestions & Bug Report System
+Implemented comprehensive user feedback system
+- **Floating action button** with glow animations (bottom-right corner)
+- **Two-tab modal**: "Submit New" and "My Suggestions"
+- **Rate limiting**: 1-hour cooldown between submissions
+- **Authentication required**: Login check with redirect
+- **Real-time countdown**: Shows remaining time for rate limit
+- **Admin replies**: Support for admin responses to suggestions
+- **Database**: New `suggestions` table with status tracking
+
+#### Team Migration Instructions:
+```bash
+git pull
+npm run update-db  # Creates suggestions table and indexes
+```
+
+#### API Endpoints:
+- `POST /api/suggestions` - Submit suggestion/bug report (auth required)
+- `GET /api/suggestions` - Get user's suggestions (auth required)
+- `GET /api/suggestions/all` - Get all suggestions (public for now)
+- `PUT /api/suggestions/:id` - Update status/reply (public for now)
+- `GET /api/suggestions/rate-limit` - Check rate limit status (auth required)
+
+### 2. Performance Calculation Bug
 Fixed missing performance calculation in frontend (`public/app.js` lines 234-252)
 - Calculates: `(current_value - initial_1BTC) / initial_1BTC * 100`
 - Updates color based on positive/negative performance
 
-### 2. 30-Second Auto-Refresh
+### 3. 30-Second Auto-Refresh
 Implemented automatic price updates every 30 seconds
 - Added `startPriceAutoRefresh()` and `stopPriceAutoRefresh()` methods
 - Auto-starts on login, stops on logout
 - Refreshes both prices and portfolio values
 
-### 3. API Rate Limiting & Error Handling
+### 4. API Rate Limiting & Error Handling
 Added fallback handling for CoinGecko API rate limits
 - Falls back to last known database price when API fails
 - Default fallback price of $115,000 for BTC
 
-### 4. Gold Price Unit Conversion
+### 5. Gold Price Unit Conversion
 Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
 - CoinGecko returns gold price per gram
 - Multiply by 31.1035 to convert to troy ounces
