@@ -745,7 +745,7 @@
                 <div class="bg-white rounded-lg shadow-md p-8">
                     <h2 class="text-2xl font-bold mb-6">Popular Assets vs Bitcoin</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="XAU" onclick="window.app.navigateToAsset('XAU')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">Gold / Bitcoin</h3>
                             <div id="chartGold" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -759,7 +759,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="SPY" onclick="window.app.navigateToAsset('SPY')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">S&P 500 / Bitcoin</h3>
                             <div id="chartSPY" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -773,7 +773,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="AAPL" onclick="window.app.navigateToAsset('AAPL')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">Apple / Bitcoin</h3>
                             <div id="chartAAPL" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -787,7 +787,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="TSLA" onclick="window.app.navigateToAsset('TSLA')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">Tesla / Bitcoin</h3>
                             <div id="chartTSLA" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -801,7 +801,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="VNQ" onclick="window.app.navigateToAsset('VNQ')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">Real Estate / Bitcoin</h3>
                             <div id="chartVNQ" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -815,7 +815,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="border rounded-lg p-4">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="WTI" onclick="window.app.navigateToAsset('WTI')" style="z-index: 10;">
                             <h3 class="font-semibold mb-2">Oil / Bitcoin</h3>
                             <div id="chartOil" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
@@ -949,7 +949,7 @@
                                 <div id="asset5y" class="text-sm font-semibold">-</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">All Time</div>
+                                <div class="text-xs text-gray-600 mb-1">10 Years</div>
                                 <div id="assetAllTime" class="text-sm font-semibold">-</div>
                             </div>
                         </div>

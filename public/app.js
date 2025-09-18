@@ -69,11 +69,19 @@ class BitcoinGame {
         document.getElementById('adminPage').classList.add('hidden');
 
         // Route to appropriate page
-        switch(hash) {
+        const baseHash = hash.split('?')[0]; // Remove query parameters for switch statement
+        switch(baseHash) {
             case '#assets':
                 this.currentPage = 'assets';
                 document.getElementById('assetsPage').classList.remove('hidden');
-                this.initAssetsPage();
+                // Parse asset parameter from URL
+                const hashParts = window.location.hash.split('?');
+                let preselectedAsset = null;
+                if (hashParts.length > 1) {
+                    const urlParams = new URLSearchParams(hashParts[1]);
+                    preselectedAsset = urlParams.get('asset');
+                }
+                this.initAssetsPage(preselectedAsset);
                 break;
             case '#portfolio':
                 this.currentPage = 'portfolio';
@@ -116,6 +124,11 @@ class BitcoinGame {
                 this.initHomePage();
                 break;
         }
+    }
+
+    navigateToAsset(assetSymbol) {
+        // Navigate to assets page with preselected asset
+        window.location.hash = `#assets?asset=${assetSymbol}`;
     }
 
     initHomePage() {
@@ -199,6 +212,7 @@ class BitcoinGame {
         chartDiv.style.position = 'absolute';
         chartDiv.style.top = '0';
         chartDiv.style.left = '0';
+        chartDiv.style.pointerEvents = 'none'; // Disable clicks on chart
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
@@ -217,7 +231,10 @@ class BitcoinGame {
             "autosize": true,
             "largeChartUrl": "",
             "noTimeScale": true,
-            "chartOnly": true
+            "chartOnly": true,
+            "hide_top_toolbar": true,
+            "hide_legend": true,
+            "allow_symbol_change": false
         });
 
         chartDiv.appendChild(script);
@@ -340,13 +357,18 @@ class BitcoinGame {
         }
     }
 
-    initAssetsPage() {
+    initAssetsPage(preselectedAsset = null) {
         const selector = document.getElementById('assetSelector');
         if (!selector) return;
 
         // Remove any existing listeners
         const newSelector = selector.cloneNode(true);
         selector.parentNode.replaceChild(newSelector, selector);
+
+        // Preselect asset if specified
+        if (preselectedAsset && newSelector.querySelector(`option[value="${preselectedAsset}"]`)) {
+            newSelector.value = preselectedAsset;
+        }
 
         // Initialize denomination state
         this.currentDenomination = 'BTC'; // Default to Bitcoin
@@ -422,29 +444,50 @@ class BitcoinGame {
                 priceUSDElement.textContent = `$${priceUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             }
 
-            // Update performance metrics (mock data for now)
+            // Update performance metrics with real API data
             const metrics = {
                 '24h': document.getElementById('asset24h'),
                 '1y': document.getElementById('asset1y'),
                 '5y': document.getElementById('asset5y'),
-                'all': document.getElementById('assetAllTime')
+                '10y': document.getElementById('assetAllTime')
             };
 
-            // Mock performance data (in real app, would come from API)
-            const mockPerformance = {
-                '24h': (Math.random() * 10 - 5).toFixed(2),
-                '1y': (Math.random() * -50 - 10).toFixed(2),
-                '5y': (Math.random() * -80 - 20).toFixed(2),
-                'all': (Math.random() * -95 - 5).toFixed(2)
-            };
+            // Show loading state initially
+            Object.values(metrics).forEach(element => {
+                if (element) {
+                    element.textContent = 'Loading...';
+                    element.className = 'font-semibold text-gray-500';
+                }
+            });
 
-            // Update each metric
-            Object.keys(metrics).forEach(period => {
+            // Fetch real performance data for each time period
+            const performancePromises = Object.keys(metrics).map(async period => {
+                try {
+                    const response = await fetch(`/api/assets/performance/${selectedAsset}/${period}`);
+                    const data = await response.json();
+                    return { period, performance: data.performance };
+                } catch (error) {
+                    console.error(`Failed to fetch ${period} performance for ${selectedAsset}:`, error);
+                    return { period, performance: null };
+                }
+            });
+
+            // Wait for all performance data and update the UI
+            const performanceResults = await Promise.all(performancePromises);
+
+            performanceResults.forEach(({ period, performance }) => {
                 const element = metrics[period];
                 if (element) {
-                    const value = mockPerformance[period];
-                    element.textContent = `${value > 0 ? '+' : ''}${value}%`;
-                    element.className = `font-semibold ${value > 0 ? 'text-green-600' : 'text-red-600'}`;
+                    if (performance !== null && !isNaN(performance)) {
+                        const value = performance.toFixed(2);
+                        element.textContent = `${performance > 0 ? '+' : ''}${value}%`;
+                        element.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
+                        element.title = `Performance vs Bitcoin over ${period}`;
+                    } else {
+                        element.textContent = 'N/A';
+                        element.className = 'font-semibold text-gray-500';
+                        element.title = `Data not available for ${period} period`;
+                    }
                 }
             });
 
