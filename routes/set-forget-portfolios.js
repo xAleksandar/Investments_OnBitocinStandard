@@ -2,7 +2,11 @@ const express = require('express');
 const pool = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const crypto = require('crypto');
+const PortfolioImageGenerator = require('../services/PortfolioImageGenerator');
 const router = express.Router();
+
+// Initialize image generator
+const imageGenerator = new PortfolioImageGenerator();
 
 // Set & Forget Portfolio Model Class
 class SetForgetPortfolio {
@@ -441,6 +445,63 @@ router.get('/public/:shareToken', async (req, res) => {
   } catch (error) {
     console.error('Get shared portfolio error:', error);
     res.status(500).json({ error: 'Failed to fetch shared portfolio' });
+  }
+});
+
+// Generate portfolio image for sharing (public endpoint)
+router.get('/public/:shareToken/image', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+
+    if (!shareToken || shareToken.length !== 64) {
+      return res.status(400).json({ error: 'Invalid share token' });
+    }
+
+    const portfolio = await SetForgetPortfolio.findByShareToken(shareToken);
+
+    if (!portfolio) {
+      return res.status(404).json({ error: 'Shared portfolio not found' });
+    }
+
+    // Check if we need to regenerate the image (daily limit)
+    const portfolioRecord = await pool.query(
+      'SELECT last_image_generated FROM set_forget_portfolios WHERE share_token = $1',
+      [shareToken]
+    );
+
+    const lastGenerated = portfolioRecord.rows[0]?.last_image_generated;
+    const shouldRegenerate = imageGenerator.shouldRegenerateImage(lastGenerated);
+
+    if (!shouldRegenerate) {
+      // For now, we'll regenerate every time since we don't have image storage
+      // In production, you'd want to store images and serve cached versions
+    }
+
+    // Get portfolio performance data
+    const performance = await portfolio.calculateCurrentPerformance();
+
+    // Generate the image
+    const imageBuffer = await imageGenerator.generatePortfolioImage(performance);
+
+    // Update last generation timestamp
+    await pool.query(
+      'UPDATE set_forget_portfolios SET last_image_generated = NOW() WHERE share_token = $1',
+      [shareToken]
+    );
+
+    // Set appropriate headers for image response
+    res.set({
+      'Content-Type': 'image/png',
+      'Content-Length': imageBuffer.length,
+      'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+      'Content-Disposition': `inline; filename="portfolio-${portfolio.name.replace(/[^a-zA-Z0-9]/g, '-')}.png"`
+    });
+
+    res.send(imageBuffer);
+
+  } catch (error) {
+    console.error('Generate portfolio image error:', error);
+    res.status(500).json({ error: 'Failed to generate portfolio image' });
   }
 });
 
