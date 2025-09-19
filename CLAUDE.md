@@ -42,6 +42,9 @@ npm run setup-db
 # Update database with new features (run after git pull when prompted)
 npm run update-db
 
+# Update database for portfolio sharing enhancements (if needed)
+npm run update-db:portfolio-sharing
+
 # Run development server with auto-reload (port 3000)
 npm run dev
 
@@ -237,10 +240,16 @@ Other developers are developing this project, so when we do database updates we 
 Keep It Simple Stupid - dont overcomplicate the code and architecture
 Dont Repeat Yourself - use templates, modules, reuse CSS, reuse the html and classes, etc, reuse function and more - we want small code base, not bloated with lots of repetitions
 
-# Don't introduce unexpected things
+# Don't introduce unexpected changes when asked to fix something
 When asked to fix something specific dont introduce new unexpected results.
 Be proactive only when developing or when asked, but not when asked to fix one specific issue that we want to commit after that, we dont want to have other changes that are unplanned, as we are working on a fix.
 
 # Meaningfull commits
 When asked to commit also commit with meaningful messages and useful descriptions, and if there's a need for the other devs to do something on git pull stay so on the description and if tis crucial a keyword in the git commit meain message. When creating commits we must separate files in different commits if they are not related to the same task. Claude.md updates or else changes need to be in different commits as they are instruction for AI, not project amendments visible to the users. Also we dont mention bugfixes that we introduced while working on a feature, we just mention the features.
 additionally when committin we can check if task was completed so we cross it off the Kiro task list.
+
+#Don;'t assume - check
+Don't assume function names, database names, etc - always check.
+Check that database name, check that function name, if you assume even if it makes sense you could make a mistake.
+Maybe its called in a weird way, that API endpoint or that function name.
+Don't assume you need a new list or variable or whatever, check if it exists first so you use it if possible.
