@@ -8,6 +8,7 @@ const portfolioRoutes = require('./routes/portfolio');
 const tradeRoutes = require('./routes/trades');
 const assetRoutes = require('./routes/assets');
 const suggestionsRoutes = require('./routes/suggestions');
+const setForgetPortfoliosRoutes = require('./routes/set-forget-portfolios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
+app.use('/api/set-forget-portfolios', setForgetPortfoliosRoutes);
 
 // Magic link redirect (for user-friendly URLs)
 app.get('/auth/verify', (req, res) => {
@@ -76,9 +78,15 @@ app.get('/auth/verify', (req, res) => {
   res.redirect(`/?token=${token}`);
 });
 
-// Serve frontend
+// Serve frontend - catch-all for non-API, non-static routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  // Only serve index.html for non-static file requests
+  if (!req.path.includes('.')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    // Let static middleware handle file requests (should have been caught already)
+    res.status(404).send('File not found');
+  }
 });
 
 app.listen(PORT, () => {
