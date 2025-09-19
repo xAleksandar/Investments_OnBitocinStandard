@@ -4512,8 +4512,8 @@ class BitcoinGame {
             this.currentShareUrl = shareUrl;
             this.currentImageUrl = imageUrl;
 
-            // Load image preview
-            await this.loadImagePreview(imageUrl);
+            // Check metadata and handle generation/display appropriately
+            await this.handleImageGenerationAndDisplay(shareToken, imageUrl);
 
         } catch (error) {
             console.error('Error preparing share modal:', error);
@@ -4542,12 +4542,20 @@ class BitcoinGame {
         const loader = document.getElementById('imageLoader');
         const preview = document.getElementById('portfolioImagePreview');
         const error = document.getElementById('imageError');
+        const infoContainer = document.getElementById('imageGenerationInfo');
         const shareUrlInput = document.getElementById('shareUrlInput');
         const imageUrlInput = document.getElementById('imageUrlInput');
 
-        if (loader) loader.classList.remove('hidden');
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating image...
+            `;
+            loader.classList.remove('hidden');
+        }
         if (preview) preview.classList.add('hidden');
         if (error) error.classList.add('hidden');
+        if (infoContainer) infoContainer.classList.add('hidden');
         if (shareUrlInput) shareUrlInput.value = 'Generating link...';
         if (imageUrlInput) imageUrlInput.value = 'Generating image...';
     }
@@ -4589,6 +4597,162 @@ class BitcoinGame {
         }
     }
 
+    async loadImageMetadata(shareToken) {
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}/image-info`);
+            if (!response.ok) {
+                console.error('Failed to fetch image metadata');
+                return null;
+            }
+
+            const metadata = await response.json();
+            this.updateImageMetadataDisplay(metadata);
+            return metadata;
+
+        } catch (error) {
+            console.error('Error loading image metadata:', error);
+            return null;
+        }
+    }
+
+    updateImageMetadataDisplay(metadata) {
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (infoContainer && timestampText && metadata) {
+            timestampText.textContent = metadata.message;
+            infoContainer.classList.remove('hidden');
+
+            // Update styling based on refresh status
+            if (metadata.canRefresh || !metadata.hasGeneratedImage) {
+                infoContainer.className = 'mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700';
+            } else {
+                infoContainer.className = 'mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700';
+            }
+        }
+    }
+
+    async handleImageGenerationAndDisplay(shareToken, baseImageUrl) {
+        // Prevent multiple simultaneous executions
+        if (this.isGeneratingImage) {
+            console.log('DEBUG: Already generating image, skipping duplicate call');
+            return;
+        }
+        this.isGeneratingImage = true;
+
+        try {
+            // First, get metadata without displaying it to check if regeneration is needed
+            const metadata = await this.loadImageMetadataQuiet(shareToken);
+            console.log('DEBUG: Metadata received:', metadata);
+
+            const needsRegeneration = !metadata || !metadata.hasGeneratedImage || (metadata.canRefresh && metadata.hoursAgo >= 24);
+            console.log('DEBUG: Needs regeneration:', needsRegeneration);
+
+            if (needsRegeneration) {
+                console.log('DEBUG: Showing generating message');
+                // Show generating message immediately - don't show old timestamp
+                this.showImageGenerating();
+
+                // Trigger image generation
+                try {
+                    const response = await fetch(baseImageUrl, {
+                        method: 'GET',
+                        cache: 'no-cache',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
+
+                    if (response.ok) {
+                        console.log('DEBUG: Image generated successfully');
+                        // Image was generated successfully, now load it with cache busting
+                        const cacheBustUrl = `${baseImageUrl}?t=${Date.now()}`;
+                        await this.loadImagePreview(cacheBustUrl);
+
+                        // Show "just generated" message instead of fetching from backend
+                        this.showJustGeneratedMessage();
+                    } else {
+                        throw new Error('Failed to generate image');
+                    }
+                } catch (error) {
+                    console.error('Error generating image:', error);
+                    this.showImageError();
+                }
+            } else {
+                console.log('DEBUG: Using existing image, showing metadata');
+                // Image is recent, show metadata and load existing image
+                this.updateImageMetadataDisplay(metadata);
+                const cacheBustUrl = `${baseImageUrl}?t=${Date.now()}`;
+                await this.loadImagePreview(cacheBustUrl);
+            }
+        } finally {
+            this.isGeneratingImage = false;
+        }
+    }
+
+    showJustGeneratedMessage() {
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (infoContainer && timestampText) {
+            timestampText.textContent = 'Image was just generated';
+            infoContainer.classList.remove('hidden');
+            infoContainer.className = 'mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700';
+        }
+    }
+
+    async loadImageMetadataQuiet(shareToken) {
+        // Load metadata without displaying it
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}/image-info`);
+            if (!response.ok) {
+                console.error('Failed to fetch image metadata');
+                return null;
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error loading image metadata:', error);
+            return null;
+        }
+    }
+
+    showImageGenerating() {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating fresh image...
+            `;
+            loader.classList.remove('hidden');
+        }
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.add('hidden');
+
+        // Update info to show generating status
+        if (infoContainer && timestampText) {
+            timestampText.textContent = 'Generating fresh image...';
+            infoContainer.classList.remove('hidden');
+            infoContainer.className = 'mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700';
+        }
+    }
+
+    showImageError() {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+
+        if (loader) loader.classList.add('hidden');
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.remove('hidden');
+    }
+
     async copyShareUrl() {
         if (!this.currentShareUrl) return;
 
@@ -4615,9 +4779,12 @@ class BitcoinGame {
         if (!this.currentImageUrl) return;
 
         try {
+            // Use cache busting for download to ensure fresh image
+            const downloadUrl = `${this.currentImageUrl}?t=${Date.now()}`;
+
             // Create a temporary link to download the image
             const link = document.createElement('a');
-            link.href = this.currentImageUrl;
+            link.href = downloadUrl;
             link.download = `portfolio-${this.currentSetForgetPortfolio.portfolio_name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
             document.body.appendChild(link);
             link.click();
