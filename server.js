@@ -32,11 +32,7 @@ app.get('/api/refresh-pools', async (req, res) => {
 app.get('/api/debug', async (req, res) => {
   const { Client } = require('pg');
   const client = new Client({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_NAME,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
+    connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
   });
   
   try {
@@ -50,10 +46,7 @@ app.get('/api/debug', async (req, res) => {
       trade_count: result.rows[0].trade_count,
       connection_type: 'fresh_client',
       env: {
-        DB_HOST: process.env.DB_HOST,
-        DB_PORT: process.env.DB_PORT,
-        DB_NAME: process.env.DB_NAME,
-        DB_USER: process.env.DB_USER
+        connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
       }
     });
   } catch (error) {

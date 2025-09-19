@@ -3,11 +3,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
 });
 
 async function fixPortfolio() {
