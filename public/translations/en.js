@@ -104,16 +104,6 @@ export const translations = {
             realEstate: 'Real Estate',
             commodities: 'Commodities'
         },
-        commodityNames: {
-            gold: 'Gold',
-            silver: 'Silver',
-            crudeOil: 'Crude Oil',
-            copper: 'Copper',
-            wheat: 'Wheat',
-            naturalGas: 'Natural Gas',
-            uranium: 'Uranium',
-            agriculture: 'Agriculture'
-        },
         assetDescriptions: {
             CPER: {
                 title: 'United States Copper Index Fund (CPER)',
@@ -344,11 +334,28 @@ export const translations = {
             'Commodity ETF': 'Commodity ETF'
         },
 
-        dropdownOptions: {
-            'Germany ETF': 'Germany ETF',
-            'International Stocks': 'International Stocks',
-            'Developed Markets': 'Developed Markets',
-            'UK Market': 'UK Market'
+        assetNames: {
+            // Commodities (with ticker symbols)
+            'goldXAU': 'Gold (XAU)',
+            'silverXAG': 'Silver (XAG)',
+            'crudeOilWTI': 'Crude Oil (WTI)',
+            'copperCPER': 'Copper (CPER)',
+            'wheatWEAT': 'Wheat (WEAT)',
+            'naturalGasUNG': 'Natural Gas (UNG)',
+            'uraniumURA': 'Uranium (URA)',
+            'agricultureDBA': 'Agriculture (DBA)',
+
+            // Bonds & Financial Instruments (with ticker symbols)
+            'twentyYearTreasuryTLT': '20+ Year Treasury (TLT)',
+            'highYieldCorporateHYG': 'High Yield Corporate (HYG)',
+            'vanguardREITVNQ': 'Vanguard REIT (VNQ)',
+
+            // International Markets (with ticker symbols)
+            'germanyETFEWG': 'Germany ETF (EWG)',
+            'internationalStocksVXUS': 'International Stocks (VXUS)',
+            'developedMarketsEFA': 'Developed Markets (EFA)',
+            'ukMarketEWU': 'UK Market (EWU)',
+            'japanETFEWJ': 'Japan ETF (EWJ)'
         },
 
         currentBTC: 'Current (BTC)',

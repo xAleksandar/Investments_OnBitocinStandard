@@ -104,16 +104,6 @@ export const translations = {
             realEstate: 'Недвижими имоти',
             commodities: 'Суровини'
         },
-        commodityNames: {
-            gold: 'Злато',
-            silver: 'Сребро',
-            crudeOil: 'Суров петрол',
-            copper: 'Мед',
-            wheat: 'Пшеница',
-            naturalGas: 'Природен газ',
-            uranium: 'Уран',
-            agriculture: 'Селско стопанство'
-        },
         assetDescriptions: {
             CPER: {
                 title: 'Индексен фонд за мед (CPER)',
@@ -329,11 +319,28 @@ export const translations = {
             'Commodity ETF': 'ETF за суровини'
         },
 
-        dropdownOptions: {
-            'Germany ETF': 'Германски ETF',
-            'International Stocks': 'Международни акции',
-            'Developed Markets': 'Развити пазари',
-            'UK Market': 'Британски пазар'
+        assetNames: {
+            // Commodities (with ticker symbols)
+            'goldXAU': 'Злато (XAU)',
+            'silverXAG': 'Сребро (XAG)',
+            'crudeOilWTI': 'Суров петрол (WTI)',
+            'copperCPER': 'Мед (CPER)',
+            'wheatWEAT': 'Пшеница (WEAT)',
+            'naturalGasUNG': 'Природен газ (UNG)',
+            'uraniumURA': 'Уран (URA)',
+            'agricultureDBA': 'Селско стопанство (DBA)',
+
+            // Bonds & Financial Instruments (with ticker symbols)
+            'twentyYearTreasuryTLT': '20+ Годишни Държавни Облигации (TLT)',
+            'highYieldCorporateHYG': 'Високодоходни Корпоративни (HYG)',
+            'vanguardREITVNQ': 'Vanguard REIT (VNQ)',
+
+            // International Markets (with ticker symbols)
+            'germanyETFEWG': 'Германски ETF (EWG)',
+            'internationalStocksVXUS': 'Международни акции (VXUS)',
+            'developedMarketsEFA': 'Развити пазари (EFA)',
+            'ukMarketEWU': 'Британски пазар (EWU)',
+            'japanETFEWJ': 'Японски ETF (EWJ)'
         },
 
         currentBTC: 'Текуща цена (BTC)',
