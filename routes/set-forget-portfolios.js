@@ -486,8 +486,59 @@ router.get('/public/:shareToken/image', async (req, res) => {
       isRegenerated: shouldRegenerate
     };
 
+    // Get user language preference (default to English)
+    const userLanguage = req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'en';
+    const language = ['en', 'bg'].includes(userLanguage) ? userLanguage : 'en';
+
+    // Load translations for image generation
+    let translations = null;
+    try {
+      // Define translations directly since ES6 modules can't be required easily
+      const portfolioTranslations = {
+        en: {
+          imageTitle: 'Bitcoin Standard Platform',
+          imagePortfolioLabel: 'Portfolio',
+          imagePerformanceLabel: 'Performance vs Bitcoin',
+          imageCurrentValueLabel: 'Current Value',
+          imageTrackedDaysLabel: 'Tracked for {days} days',
+          imageCreatedLabel: 'Portfolio Created',
+          // Category translations
+          'Crypto': 'Crypto',
+          'Precious Metals': 'Precious Metals',
+          'Stock Indices': 'Stock Indices',
+          'International Stocks': 'International Stocks',
+          'Individual Stocks': 'Individual Stocks',
+          'Real Estate': 'Real Estate',
+          'Bonds': 'Bonds',
+          'Commodities': 'Commodities',
+          'Other': 'Other'
+        },
+        bg: {
+          imageTitle: 'Биткойн стандарт платформа',
+          imagePortfolioLabel: 'Портфолио',
+          imagePerformanceLabel: 'Представяне спрямо Биткойн',
+          imageCurrentValueLabel: 'Текуща стойност',
+          imageTrackedDaysLabel: 'Проследено {days} дни',
+          imageCreatedLabel: 'Портфолио създадено',
+          // Category translations
+          'Crypto': 'Крипто',
+          'Precious Metals': 'Благородни метали',
+          'Stock Indices': 'Фондови индекси',
+          'International Stocks': 'Международни акции',
+          'Individual Stocks': 'Индивидуални акции',
+          'Real Estate': 'Недвижими имоти',
+          'Bonds': 'Облигации',
+          'Commodities': 'Суровини',
+          'Other': 'Други'
+        }
+      };
+      translations = portfolioTranslations[language] || portfolioTranslations.en;
+    } catch (error) {
+      console.warn(`Could not load translations for language: ${language}, using English fallback`);
+    }
+
     // Generate the image
-    const imageBuffer = await imageGenerator.generatePortfolioImage(performance, imageMetadata);
+    const imageBuffer = await imageGenerator.generatePortfolioImage(performance, imageMetadata, translations);
 
     // Update last generation timestamp
     await pool.query(
@@ -516,6 +567,29 @@ router.get('/public/:shareToken/image-info', async (req, res) => {
   try {
     const { shareToken } = req.params;
 
+    // Get user language preference (default to English)
+    const userLanguage = req.headers['accept-language']?.split(',')[0]?.split('-')[0] || 'en';
+    const language = ['en', 'bg'].includes(userLanguage) ? userLanguage : 'en';
+
+    // Load translations for messages
+    const messageTranslations = {
+      en: {
+        imageWillBeGenerated: 'Image will be generated fresh',
+        imageJustGenerated: 'Image was just generated',
+        imageLessThanHour: 'Image was generated less than 1 hour ago',
+        imageGeneratedCanRefresh: 'Image was generated {hours} hour{hourPlural} ago, can be refreshed in {refreshHours} hour{refreshPlural}',
+        imageGeneratedReadyRefresh: 'Image was generated {hours} hour{hourPlural} ago, ready for refresh'
+      },
+      bg: {
+        imageWillBeGenerated: 'Изображението ще бъде генерирано ново',
+        imageJustGenerated: 'Изображението беше току-що генерирано',
+        imageLessThanHour: 'Изображението беше генерирано преди по-малко от 1 час',
+        imageGeneratedCanRefresh: 'Изображението беше генерирано преди {hours} час{hourPlural}, може да бъде обновено след {refreshHours} час{refreshPlural}',
+        imageGeneratedReadyRefresh: 'Изображението беше генерирано преди {hours} час{hourPlural}, готово за обновяване'
+      }
+    };
+    const t = messageTranslations[language] || messageTranslations.en;
+
     // Get portfolio and last image generation time
     const portfolioRecord = await pool.query(
       'SELECT last_image_generated FROM set_forget_portfolios WHERE share_token = $1',
@@ -531,7 +605,7 @@ router.get('/public/:shareToken/image-info', async (req, res) => {
     if (!lastGenerated) {
       return res.json({
         hasGeneratedImage: false,
-        message: 'Image will be generated fresh'
+        message: t.imageWillBeGenerated
       });
     }
 
@@ -543,13 +617,22 @@ router.get('/public/:shareToken/image-info', async (req, res) => {
 
     let message;
     if (minutesAgo < 2) {
-      message = 'Image was just generated';
+      message = t.imageJustGenerated;
     } else if (hoursAgo < 1) {
-      message = 'Image was generated less than 1 hour ago';
+      message = t.imageLessThanHour;
     } else if (hoursUntilRefresh > 0) {
-      message = `Image was generated ${hoursAgo} hour${hoursAgo === 1 ? '' : 's'} ago, can be refreshed in ${hoursUntilRefresh} hour${hoursUntilRefresh === 1 ? '' : 's'}`;
+      const hourPlural = language === 'bg' ? (hoursAgo === 1 ? '' : 'а') : (hoursAgo === 1 ? '' : 's');
+      const refreshPlural = language === 'bg' ? (hoursUntilRefresh === 1 ? '' : 'а') : (hoursUntilRefresh === 1 ? '' : 's');
+      message = t.imageGeneratedCanRefresh
+        .replace('{hours}', hoursAgo)
+        .replace('{hourPlural}', hourPlural)
+        .replace('{refreshHours}', hoursUntilRefresh)
+        .replace('{refreshPlural}', refreshPlural);
     } else {
-      message = `Image was generated ${hoursAgo} hour${hoursAgo === 1 ? '' : 's'} ago, ready for refresh`;
+      const hourPlural = language === 'bg' ? (hoursAgo === 1 ? '' : 'а') : (hoursAgo === 1 ? '' : 's');
+      message = t.imageGeneratedReadyRefresh
+        .replace('{hours}', hoursAgo)
+        .replace('{hourPlural}', hourPlural);
     }
 
     res.json({

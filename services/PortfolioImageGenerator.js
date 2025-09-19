@@ -19,11 +19,28 @@ class PortfolioImageGenerator {
    * Generate a shareable portfolio image
    * @param {Object} portfolioData - Portfolio performance data
    * @param {Object} imageMetadata - Image generation metadata (optional)
+   * @param {Object} translations - Text translations for the image (optional)
    * @returns {Buffer} PNG image buffer
    */
-  async generatePortfolioImage(portfolioData, imageMetadata = null) {
+  async generatePortfolioImage(portfolioData, imageMetadata = null, translations = null) {
     const width = 1200;
     const height = 630;
+
+    // Helper function to get translated text
+    const t = (key, fallback, replacements = {}) => {
+      if (!translations || !translations[key]) {
+        let text = fallback;
+        Object.keys(replacements).forEach(replaceKey => {
+          text = text.replace(`{${replaceKey}}`, replacements[replaceKey]);
+        });
+        return text;
+      }
+      let text = translations[key];
+      Object.keys(replacements).forEach(replaceKey => {
+        text = text.replace(`{${replaceKey}}`, replacements[replaceKey]);
+      });
+      return text;
+    };
 
     // Create main canvas
     const canvas = createCanvas(width, height);
@@ -39,12 +56,12 @@ class PortfolioImageGenerator {
     // Bitcoin Standard Platform branding
     ctx.fillStyle = '#f7931a';
     ctx.font = 'bold 46px Arial';
-    ctx.fillText('Bitcoin Standard Platform', 60, 80);
+    ctx.fillText(t('imageTitle', 'Bitcoin Standard Platform'), 60, 80);
 
     // Portfolio title
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 36px Arial';
-    ctx.fillText(`Portfolio: ${portfolioData.portfolio_name}`, 60, 130);
+    ctx.fillText(`${t('imagePortfolioLabel', 'Portfolio')}: ${portfolioData.portfolio_name}`, 60, 130);
 
     // Performance metrics
     const performance = portfolioData.total_performance_percent;
@@ -52,7 +69,7 @@ class PortfolioImageGenerator {
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '26px Arial';
-    ctx.fillText('Performance vs Bitcoin:', 60, 180);
+    ctx.fillText(`${t('imagePerformanceLabel', 'Performance vs Bitcoin')}:`, 60, 180);
 
     ctx.fillStyle = performanceColor;
     ctx.font = 'bold 31px Arial';
@@ -63,11 +80,11 @@ class PortfolioImageGenerator {
     ctx.fillStyle = '#ffffff';
     ctx.font = '23px Arial';
     const btcValue = (portfolioData.current_value_sats / 100000000).toFixed(4);
-    ctx.fillText(`Current Value: ${btcValue} BTC`, 400, 180);
+    ctx.fillText(`${t('imageCurrentValueLabel', 'Current Value')}: ${btcValue} BTC`, 400, 180);
 
     ctx.fillStyle = '#9ca3af';
     ctx.font = '21px Arial';
-    ctx.fillText(`Tracked for ${portfolioData.days_tracked} days`, 400, 210);
+    ctx.fillText(t('imageTrackedDaysLabel', 'Tracked for {days} days', { days: portfolioData.days_tracked }), 400, 210);
 
     // Generate pie chart for allocations
     const pieChart = await this.generateAllocationChart(portfolioData.allocations);
@@ -116,7 +133,8 @@ class PortfolioImageGenerator {
       // Category header
       ctx.fillStyle = '#ffb366';
       ctx.font = 'bold 30px Arial';
-      ctx.fillText(category, 60, legendY);
+      const translatedCategory = t(category, category);
+      ctx.fillText(translatedCategory, 60, legendY);
       legendY += 35;
 
       // Assets in category
@@ -154,7 +172,7 @@ class PortfolioImageGenerator {
     ctx.fillStyle = '#6b7280';
     ctx.font = '12px Arial';
     const createdDate = new Date(portfolioData.created_at).toLocaleDateString();
-    ctx.fillText(`Portfolio Created: ${createdDate}`, 60, height - 40);
+    ctx.fillText(`${t('imageCreatedLabel', 'Portfolio Created')}: ${createdDate}`, 60, height - 40);
 
 
     const shareUrl = 'bitcoinstandardplatform.com';
