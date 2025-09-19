@@ -182,6 +182,8 @@ class BitcoinGame {
             await window.translationService.updatePageTranslations();
             // Update any dynamically generated content
             this.updateHoldingsDisplay();
+            // Update asset dropdowns in portfolio creation modal
+            this.updateAssetDropdowns();
         }
     }
 
@@ -3927,7 +3929,7 @@ class BitcoinGame {
         const isAdmin = this.isCurrentUserAdmin();
         const isDonator = this.user.isDonator || false; // TODO: Implement donator status
 
-        if (!isDonator && currentPortfolioCount >= 1) {
+        if (!isDonator && !isAdmin && currentPortfolioCount >= 1) {
             this.showDonatorAchievementModal();
             return;
         }
@@ -3982,6 +3984,31 @@ class BitcoinGame {
         this.clearAllocationChart();
     }
 
+    getTranslatedText(key, fallback) {
+        if (!window.translationService) {
+            return fallback;
+        }
+        const translated = window.translationService.translate(key);
+        return translated && translated !== key ? translated : fallback;
+    }
+
+    getTranslatedAssetName(asset) {
+        if (!window.translationService) {
+            return `${asset.name} (${asset.symbol})`;
+        }
+
+        // Create translation key based on symbol
+        const translationKey = `assets.assetNames.${asset.symbol.toLowerCase()}${asset.symbol}`;
+        const translated = window.translationService.translate(translationKey);
+
+        // If translation exists, use it, otherwise fallback to original
+        if (translated && translated !== translationKey) {
+            return translated;
+        }
+
+        return `${asset.name} (${asset.symbol})`;
+    }
+
     addAllocationInput() {
         const container = document.getElementById('allocationInputs');
         if (!container) return;
@@ -4003,11 +4030,11 @@ class BitcoinGame {
         const availableAssets = this.getAvailableAssets();
 
         div.innerHTML = `
-            <select class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
-                <option value="">Select Asset</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${asset.name} (${asset.symbol})</option>`).join('')}
+            <select class="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
+                <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
             </select>
-            <div class="relative w-24">
+            <div class="relative w-20">
                 <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 percentage-input"
                        placeholder="0" min="5" max="100" step="0.01">
                 <span class="absolute right-2 top-2 text-gray-500 text-sm">%</span>
@@ -4110,12 +4137,13 @@ class BitcoinGame {
 
         document.querySelectorAll('.asset-select').forEach(select => {
             const currentValue = select.value;
+            const currentAsset = this.assets.find(asset => asset.symbol === currentValue);
 
             // Rebuild options
             select.innerHTML = `
-                <option value="">Select Asset</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${asset.name} (${asset.symbol})</option>`).join('')}
-                ${currentValue ? `<option value="${currentValue}" selected style="display:none;">${currentValue}</option>` : ''}
+                <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${currentValue && currentAsset ? `<option value="${currentValue}" selected style="display:none;">${this.getTranslatedAssetName(currentAsset)}</option>` : ''}
             `;
 
             // Restore selected value if it was previously selected
@@ -4396,40 +4424,40 @@ class BitcoinGame {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div class="space-y-4">
                     <div class="bg-gray-50 p-4 rounded-lg">
-                        <h4 class="font-semibold mb-2">Portfolio Overview</h4>
+                        <h4 class="font-semibold mb-2">${this.getTranslatedText('portfolio.portfolioOverview', 'Portfolio Overview')}</h4>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
-                                <span>Status:</span>
-                                <span>📊 Performance Tracking</span>
+                                <span>${this.getTranslatedText('portfolio.status', 'Status')}:</span>
+                                <span>📊 ${this.getTranslatedText('portfolio.performanceTracking', 'Performance Tracking')}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Days Tracked:</span>
+                                <span>${this.getTranslatedText('portfolio.daysTracked', 'Days Tracked')}:</span>
                                 <span class="font-medium">${daysRunning}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Created:</span>
+                                <span>${this.getTranslatedText('portfolio.created', 'Created')}:</span>
                                 <span>${new Date(portfolio.created_at).toLocaleDateString()}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>BTC Price at Creation:</span>
+                                <span>${this.getTranslatedText('portfolio.btcPriceAtCreation', 'BTC Price at Creation')}:</span>
                                 <span>$${portfolio.current_btc_price.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="bg-gray-50 p-4 rounded-lg">
-                        <h4 class="font-semibold mb-2">Performance</h4>
+                        <h4 class="font-semibold mb-2">${this.getTranslatedText('portfolio.performance', 'Performance')}</h4>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
-                                <span>Initial Value:</span>
+                                <span>${this.getTranslatedText('portfolio.initialValue', 'Initial Value')}:</span>
                                 <span class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Current Value:</span>
+                                <span>${this.getTranslatedText('portfolio.currentValue', 'Current Value')}:</span>
                                 <span class="font-medium">${this.formatSatoshis(portfolio.current_value_sats)} BTC</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Total Performance:</span>
+                                <span>${this.getTranslatedText('portfolio.totalPerformance', 'Total Performance')}:</span>
                                 <span class="font-bold ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</span>
                             </div>
                         </div>
@@ -4449,16 +4477,16 @@ class BitcoinGame {
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
                                         <div>
-                                            <div>Initial: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
-                                            <div>Current: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                                            <div>${this.getTranslatedText('portfolio.current', 'Current')}: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
                                         </div>
                                         <div>
-                                            <div>Initial: $${alloc.initial_price_usd.toLocaleString()}</div>
-                                            <div>Current: $${alloc.current_price_usd.toLocaleString()}</div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: $${alloc.initial_price_usd.toLocaleString()}</div>
+                                            <div>${this.getTranslatedText('portfolio.current', 'Current')}: $${alloc.current_price_usd.toLocaleString()}</div>
                                         </div>
                                     </div>
                                     <div class="mt-2 text-xs">
-                                        <span class="text-gray-600">Performance vs BTC: </span>
+                                        <span class="text-gray-600">${this.getTranslatedText('portfolio.performanceVsBTC', 'Performance vs BTC')}: </span>
                                         <span class="${assetPerformanceColor} font-medium">
                                             ${alloc.asset_performance_percent >= 0 ? '+' : ''}${alloc.asset_performance_percent.toFixed(2)}%
                                         </span>
@@ -4697,7 +4725,7 @@ class BitcoinGame {
         const timestampText = document.getElementById('imageTimestampText');
 
         if (infoContainer && timestampText) {
-            timestampText.textContent = 'Image was just generated';
+            timestampText.textContent = this.getTranslatedText('portfolio.imageJustGenerated', 'Image was just generated');
             infoContainer.classList.remove('hidden');
             infoContainer.className = 'mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700';
         }
