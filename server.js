@@ -69,6 +69,12 @@ app.get('/auth/verify', (req, res) => {
   res.redirect(`/?token=${token}`);
 });
 
+// Alternative API route for magic link verification (backup)
+app.get('/api/auth/verify-redirect', (req, res) => {
+  const token = req.query.token;
+  res.redirect(`/?token=${token}`);
+});
+
 // Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

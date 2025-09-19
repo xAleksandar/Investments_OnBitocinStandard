@@ -57,8 +57,11 @@ router.post('/request-link', async (req, res) => {
 
     // Generate magic link URL based on environment
     const baseUrl = process.env.APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    // Try /auth/verify first, fallback to API route if needed
     const magicLinkUrl = `${baseUrl}/auth/verify?token=${token}`;
+    const fallbackUrl = `${baseUrl}/api/auth/verify-redirect?token=${token}`;
     console.log(`Magic link for ${email}: ${magicLinkUrl}`);
+    console.log(`Fallback URL: ${fallbackUrl}`);
 
     res.json({
       message: 'Magic link sent! Check console for now.',
