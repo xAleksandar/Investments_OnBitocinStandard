@@ -77,7 +77,19 @@ class BitcoinGame {
     }
 
     init() {
-        // Set up routing first
+        console.log('App init started, pathname:', window.location.pathname);
+        console.log('Full URL:', window.location.href);
+
+        // Check for share URLs FIRST before any other initialization
+        const isShareUrl = this.handleShareRouting();
+        console.log('handleShareRouting() returned:', isShareUrl);
+        if (isShareUrl) {
+            console.log('Share URL detected, skipping normal app initialization');
+            return;
+        }
+        console.log('Not a share URL, continuing with normal initialization');
+
+        // Set up routing for normal pages
         this.setupRouting();
 
         // Check if we have a token from URL (magic link)
@@ -172,7 +184,7 @@ class BitcoinGame {
                 break;
             case '#admin':
                 this.currentPage = 'admin';
-                if (this.token && this.user?.isAdmin) {
+                if (this.token && this.isCurrentUserAdmin()) {
                     document.getElementById('adminPage').classList.remove('hidden');
                     this.initAdminDashboard();
                 } else if (this.token) {
@@ -714,7 +726,7 @@ class BitcoinGame {
 
         // Show admin link if user is admin
         const navAdminLink = document.getElementById('navAdminLink');
-        if (this.user?.isAdmin && navAdminLink) {
+        if (this.isCurrentUserAdmin() && navAdminLink) {
             navAdminLink.classList.remove('hidden');
         }
     }
@@ -902,6 +914,9 @@ class BitcoinGame {
                 selectElement.classList.remove('open');
             });
         });
+
+        // Set & Forget Portfolio Event Listeners
+        this.setupSetForgetEventListeners();
     }
 
     async requestMagicLink() {
@@ -994,7 +1009,8 @@ class BitcoinGame {
             this.loadAssets(),
             this.loadPrices(),
             this.loadPortfolio(),
-            this.loadTradeHistory()
+            this.loadTradeHistory(),
+            this.loadSetForgetPortfolios()
         ]);
 
         // Initialize the amount helper after data is loaded
@@ -2765,6 +2781,1118 @@ class BitcoinGame {
             clearInterval(this.adminRefreshInterval);
             this.adminRefreshInterval = null;
         }
+    }
+
+    // Set & Forget Portfolio Methods
+    setupSetForgetEventListeners() {
+        // Create Portfolio button
+        const createBtn = document.getElementById('createSetForgetBtn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                this.showSetForgetModal();
+            });
+        }
+
+        // Close modals
+        const closeModal = document.getElementById('closeSetForgetModal');
+        const cancelBtn = document.getElementById('cancelSetForget');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => {
+                this.hideSetForgetModal();
+            });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.hideSetForgetModal();
+            });
+        }
+
+        // Close details modal
+        const closeDetailsModal = document.getElementById('closeSetForgetDetailsModal');
+        if (closeDetailsModal) {
+            closeDetailsModal.addEventListener('click', () => {
+                this.hideSetForgetDetailsModal();
+            });
+        }
+
+        // Form submission
+        const form = document.getElementById('setForgetForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.createSetForgetPortfolio();
+            });
+        }
+
+
+        // Share portfolio button
+        const shareBtn = document.getElementById('sharePortfolioBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                this.sharePortfolio();
+            });
+        }
+
+        // Delete portfolio button (admin only)
+        const deleteBtn = document.getElementById('deletePortfolioBtn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                this.showDeleteConfirmation();
+            });
+        }
+
+        // Delete confirmation modal
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', () => {
+                this.hideDeleteConfirmation();
+            });
+        }
+
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', () => {
+                this.confirmDeletePortfolio();
+            });
+        }
+
+        // Donator achievement modal (new)
+        const cancelDonationBtn = document.getElementById('cancelDonationBtn');
+        const donateBtn = document.getElementById('donateBtn');
+
+        if (cancelDonationBtn) {
+            cancelDonationBtn.addEventListener('click', () => {
+                this.hideDonatorAchievementModal();
+            });
+        }
+
+        if (donateBtn) {
+            donateBtn.addEventListener('click', () => {
+                this.handleDonatorAchievement();
+            });
+        }
+
+        // Legacy premium upgrade modal (backwards compatibility)
+        const cancelUpgradeBtn = document.getElementById('cancelUpgradeBtn');
+        const upgradeBtn = document.getElementById('upgradeBtn');
+
+        if (cancelUpgradeBtn) {
+            cancelUpgradeBtn.addEventListener('click', () => {
+                this.hidePremiumUpgradeModal();
+            });
+        }
+
+        if (upgradeBtn) {
+            upgradeBtn.addEventListener('click', () => {
+                this.handlePremiumUpgrade();
+            });
+        }
+
+        // Initialize allocation chart canvas
+        this.initAllocationChart();
+    }
+
+    async loadSetForgetPortfolios() {
+        try {
+            const response = await fetch('/api/set-forget-portfolios', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.setForgetPortfolios = data.portfolios; // Store portfolios for limit checking
+                this.displaySetForgetPortfolios(data.portfolios);
+            } else {
+                console.error('Failed to load Set & Forget portfolios');
+            }
+        } catch (error) {
+            console.error('Error loading Set & Forget portfolios:', error);
+        }
+    }
+
+    displaySetForgetPortfolios(portfolios) {
+        const listContainer = document.getElementById('setForgetPortfoliosList');
+        const noPortfoliosMsg = document.getElementById('noSetForgetPortfolios');
+
+        if (!listContainer) return;
+
+        if (portfolios.length === 0) {
+            listContainer.innerHTML = '';
+            noPortfoliosMsg.classList.remove('hidden');
+            return;
+        }
+
+        noPortfoliosMsg.classList.add('hidden');
+
+        listContainer.innerHTML = portfolios.map(portfolio => {
+            const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+            const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer transition-shadow" onclick="window.app.showPortfolioDetails(${portfolio.portfolio_id})">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-semibold text-lg">${portfolio.portfolio_name}</h3>
+                        <span class="text-sm text-gray-500">📊 ${daysRunning} days tracked</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-600">Initial:</span>
+                            <div class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Current:</span>
+                            <div class="font-medium">${this.formatSatoshis(portfolio.current_value_sats)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Performance:</span>
+                            <div class="font-medium ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Created:</span>
+                            <div class="font-medium">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        ${portfolio.allocations.slice(0, 3).map(alloc =>
+                            `<span class="px-2 py-1 bg-gray-100 rounded text-xs">${alloc.asset_symbol} ${alloc.allocation_percentage}%</span>`
+                        ).join('')}
+                        ${portfolio.allocations.length > 3 ? `<span class="px-2 py-1 bg-gray-100 rounded text-xs">+${portfolio.allocations.length - 3} more</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    showSetForgetModal() {
+        // Check portfolio limit for free users FIRST
+        const currentPortfolioCount = this.setForgetPortfolios ? this.setForgetPortfolios.length : 0;
+        const isAdmin = this.isCurrentUserAdmin();
+        const isDonator = this.user.isDonator || false; // TODO: Implement donator status
+
+        if (!isDonator && currentPortfolioCount >= 1) {
+            this.showDonatorAchievementModal();
+            return;
+        }
+
+        // Store the BTC balance for validation (but we always use 1 BTC equivalent)
+        const btcHolding = this.currentPortfolio?.holdings?.find(h => h.asset_symbol === 'BTC');
+        this.availableBTC = btcHolding ? btcHolding.amount : 0;
+
+        // We always invest the equivalent of 1 BTC (100M sats)
+        this.investmentAmount = 100000000;
+
+        // Clear form
+        this.resetSetForgetForm();
+
+        // Add initial allocation input
+        this.addAllocationInput();
+
+        // Show modal
+        const modal = document.getElementById('setForgetModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideSetForgetModal() {
+        const modal = document.getElementById('setForgetModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+        this.resetSetForgetForm();
+    }
+
+    hideSetForgetDetailsModal() {
+        const modal = document.getElementById('setForgetDetailsModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    resetSetForgetForm() {
+        const form = document.getElementById('setForgetForm');
+        if (form) {
+            form.reset();
+        }
+
+        const allocationsContainer = document.getElementById('allocationInputs');
+        if (allocationsContainer) {
+            allocationsContainer.innerHTML = '';
+        }
+
+        this.updateAllocationTotal();
+        this.clearAllocationChart();
+    }
+
+    addAllocationInput() {
+        const container = document.getElementById('allocationInputs');
+        if (!container) return;
+
+        // Check if we already have an empty allocation input
+        const existingEmpty = Array.from(container.querySelectorAll('.allocation-input')).find(div => {
+            const select = div.querySelector('.asset-select');
+            return !select.value;
+        });
+
+        if (existingEmpty) {
+            return; // Don't add another empty input
+        }
+
+        const div = document.createElement('div');
+        div.className = 'flex gap-3 items-center allocation-input';
+
+        // Get available assets (exclude already selected ones)
+        const availableAssets = this.getAvailableAssets();
+
+        div.innerHTML = `
+            <select class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
+                <option value="">Select Asset</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${asset.name} (${asset.symbol})</option>`).join('')}
+            </select>
+            <div class="relative w-24">
+                <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 percentage-input"
+                       placeholder="0" min="5" max="100" step="0.01">
+                <span class="absolute right-2 top-2 text-gray-500 text-sm">%</span>
+            </div>
+            <button type="button" class="text-red-500 hover:text-red-700 remove-allocation" title="Remove">×</button>
+        `;
+
+        container.appendChild(div);
+
+        // Add event listeners
+        const assetSelect = div.querySelector('.asset-select');
+        const percentageInput = div.querySelector('.percentage-input');
+        const removeBtn = div.querySelector('.remove-allocation');
+
+        assetSelect.addEventListener('change', () => {
+            this.updateAssetDropdowns();
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+
+            // If an asset is selected and we don't have 100% allocation, ensure we have one empty row
+            if (assetSelect.value) {
+                this.ensureOneEmptyAllocation();
+            }
+        });
+
+        percentageInput.addEventListener('input', () => {
+            // Validate percentage range
+            const value = parseFloat(percentageInput.value);
+            if (value < 5 && value > 0) {
+                percentageInput.setCustomValidity('Minimum allocation is 5%');
+            } else if (value > 100) {
+                percentageInput.setCustomValidity('Maximum allocation is 100%');
+            } else {
+                percentageInput.setCustomValidity('');
+            }
+
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+            this.ensureOneEmptyAllocation();
+        });
+
+        removeBtn.addEventListener('click', () => {
+            div.remove();
+            this.updateAssetDropdowns();
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+            this.ensureOneEmptyAllocation();
+        });
+    }
+
+    ensureOneEmptyAllocation() {
+        const currentTotal = this.getCurrentAllocationTotal();
+
+        // If we're at 100%, don't add empty allocation
+        if (currentTotal >= 100) {
+            return;
+        }
+
+        // Check if we have exactly one empty allocation
+        const emptyAllocations = Array.from(document.querySelectorAll('.allocation-input')).filter(div => {
+            const select = div.querySelector('.asset-select');
+            return !select.value;
+        });
+
+        if (emptyAllocations.length === 0) {
+            this.addAllocationInput();
+        } else if (emptyAllocations.length > 1) {
+            // Remove extra empty allocations, keep only one
+            for (let i = 1; i < emptyAllocations.length; i++) {
+                emptyAllocations[i].remove();
+            }
+        }
+    }
+
+    getCurrentAllocationTotal() {
+        const percentageInputs = document.querySelectorAll('.percentage-input');
+        let total = 0;
+        percentageInputs.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+        return total;
+    }
+
+    getAvailableAssets() {
+        // Get all selected assets
+        const selectedAssets = new Set();
+        document.querySelectorAll('.asset-select').forEach(select => {
+            if (select.value) {
+                selectedAssets.add(select.value);
+            }
+        });
+
+        // Return assets not yet selected (including BTC)
+        return this.assets.filter(asset => !selectedAssets.has(asset.symbol));
+    }
+
+    updateAssetDropdowns() {
+        const availableAssets = this.getAvailableAssets();
+
+        document.querySelectorAll('.asset-select').forEach(select => {
+            const currentValue = select.value;
+
+            // Rebuild options
+            select.innerHTML = `
+                <option value="">Select Asset</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${asset.name} (${asset.symbol})</option>`).join('')}
+                ${currentValue ? `<option value="${currentValue}" selected style="display:none;">${currentValue}</option>` : ''}
+            `;
+
+            // Restore selected value if it was previously selected
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        });
+    }
+
+    updateAllocationTotal() {
+        const total = this.getCurrentAllocationTotal();
+
+        const totalElement = document.getElementById('totalAllocation');
+        if (totalElement) {
+            totalElement.textContent = `${total.toFixed(2)}%`;
+            totalElement.className = total === 100 ? 'font-medium text-green-600' :
+                                   total > 100 ? 'font-medium text-red-600' : 'font-medium text-gray-700';
+        }
+
+        // Enable/disable submit button - check for valid allocations
+        const submitBtn = document.getElementById('createSetForgetSubmit');
+        if (submitBtn) {
+            const validAllocations = this.getValidAllocations();
+            const hasUnselectedAssets = this.hasUnselectedAssets();
+
+            submitBtn.disabled = total !== 100 || validAllocations.length === 0 || hasUnselectedAssets;
+        }
+    }
+
+    getValidAllocations() {
+        const allocationInputs = document.querySelectorAll('.allocation-input');
+        const validAllocations = [];
+
+        allocationInputs.forEach(input => {
+            const assetSelect = input.querySelector('.asset-select');
+            const percentageInput = input.querySelector('.percentage-input');
+
+            const asset = assetSelect.value;
+            const percentage = parseFloat(percentageInput.value) || 0;
+
+            if (asset && percentage >= 5) {
+                validAllocations.push({ asset, percentage });
+            }
+        });
+
+        return validAllocations;
+    }
+
+    hasUnselectedAssets() {
+        const allocationInputs = document.querySelectorAll('.allocation-input');
+
+        for (let input of allocationInputs) {
+            const assetSelect = input.querySelector('.asset-select');
+            const percentageInput = input.querySelector('.percentage-input');
+
+            const asset = assetSelect.value;
+            const percentage = parseFloat(percentageInput.value) || 0;
+
+            // If there's a percentage but no asset selected
+            if (!asset && percentage > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    initAllocationChart() {
+        this.allocationChart = {
+            canvas: document.getElementById('allocationChart'),
+            colors: ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+        };
+    }
+
+    updateAllocationChart() {
+        if (!this.allocationChart || !this.allocationChart.canvas) return;
+
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = Math.min(centerX, centerY) - 20;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Get allocations
+        const allocations = this.getAllocationsFromForm();
+        const totalPercentage = allocations.reduce((sum, alloc) => sum + alloc.percentage, 0);
+
+        if (allocations.length === 0 || totalPercentage === 0) {
+            this.clearAllocationChart();
+            return;
+        }
+
+        // Draw pie chart
+        let currentAngle = -Math.PI / 2; // Start at top
+
+        allocations.forEach((allocation, index) => {
+            const sliceAngle = (allocation.percentage / 100) * 2 * Math.PI;
+            const color = this.allocationChart.colors[index % this.allocationChart.colors.length];
+
+            // Draw slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            currentAngle += sliceAngle;
+        });
+
+        // Update legend
+        this.updateChartLegend(allocations);
+    }
+
+    updateChartLegend(allocations) {
+        const legendContainer = document.getElementById('chartLegend');
+        if (!legendContainer) return;
+
+        legendContainer.innerHTML = allocations.map((allocation, index) => {
+            const color = this.allocationChart.colors[index % this.allocationChart.colors.length];
+            return `
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded" style="background-color: ${color}"></div>
+                    <span class="text-sm">${allocation.asset} (${allocation.percentage.toFixed(1)}%)</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    clearAllocationChart() {
+        if (!this.allocationChart || !this.allocationChart.canvas) return;
+
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw placeholder
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) / 2 - 20, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const legendContainer = document.getElementById('chartLegend');
+        if (legendContainer) {
+            legendContainer.innerHTML = '<p class="text-gray-500 text-sm">Add allocations to see preview</p>';
+        }
+    }
+
+    getAllocationsFromForm() {
+        return this.getValidAllocations();
+    }
+
+    async createSetForgetPortfolio() {
+        // Prevent double submission
+        if (this.isCreatingPortfolio) {
+            return;
+        }
+
+        // Portfolio limit already checked in showSetForgetModal() - no need to check again
+
+        const createBtn = document.getElementById('createSetForgetBtn');
+        const name = document.getElementById('setForgetName').value;
+        const amount = this.investmentAmount; // Always 1 BTC equivalent (100M sats)
+        const allocations = this.getAllocationsFromForm();
+
+        if (!name || allocations.length === 0) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        // This is a theoretical portfolio - no actual BTC movement required
+
+        const totalPercentage = allocations.reduce((sum, alloc) => sum + alloc.percentage, 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+            this.showNotification('Allocations must sum to exactly 100%', 'error');
+            return;
+        }
+
+        // Convert to API format
+        const apiAllocations = allocations.map(alloc => ({
+            asset_symbol: alloc.asset,
+            allocation_percentage: alloc.percentage
+        }));
+
+        // Set submission flag and disable button
+        this.isCreatingPortfolio = true;
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating...';
+        }
+
+        try {
+            const response = await fetch('/api/set-forget-portfolios', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    name,
+                    initial_btc_amount: amount,
+                    allocations: apiAllocations
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification('Set & Forget portfolio created successfully!', 'success');
+                this.hideSetForgetModal();
+                this.loadSetForgetPortfolios();
+                // No need to refresh main portfolio - this is theoretical
+            } else {
+                this.showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error creating portfolio:', error);
+            this.showNotification('Failed to create portfolio', 'error');
+        } finally {
+            // Always reset submission flag and button state
+            this.isCreatingPortfolio = false;
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Portfolio';
+            }
+        }
+    }
+
+    async showPortfolioDetails(portfolioId) {
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const portfolio = await response.json();
+                this.displayPortfolioDetails(portfolio);
+            } else {
+                this.showNotification('Failed to load portfolio details', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading portfolio details:', error);
+            this.showNotification('Failed to load portfolio details', 'error');
+        }
+    }
+
+    displayPortfolioDetails(portfolio) {
+        const titleElement = document.getElementById('portfolioDetailsTitle');
+        const contentElement = document.getElementById('portfolioDetailsContent');
+        const deleteBtn = document.getElementById('deletePortfolioBtn');
+
+        if (!titleElement || !contentElement) return;
+
+        titleElement.textContent = portfolio.portfolio_name;
+
+        // Show delete button only for admins
+        if (deleteBtn && this.isCurrentUserAdmin()) {
+            deleteBtn.classList.remove('hidden');
+        } else if (deleteBtn) {
+            deleteBtn.classList.add('hidden');
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+
+        contentElement.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Portfolio Overview</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Status:</span>
+                                <span>📊 Performance Tracking</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Days Tracked:</span>
+                                <span class="font-medium">${daysRunning}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Created:</span>
+                                <span>${new Date(portfolio.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>BTC Price at Creation:</span>
+                                <span>$${portfolio.current_btc_price.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Performance</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Initial Value:</span>
+                                <span class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Current Value:</span>
+                                <span class="font-medium">${this.formatSatoshis(portfolio.current_value_sats)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Total Performance:</span>
+                                <span class="font-bold ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Asset Allocations</h4>
+                    <div class="space-y-3">
+                        ${portfolio.allocations.map(alloc => {
+                            const assetPerformanceColor = alloc.asset_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+                            return `
+                                <div class="border border-gray-200 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium">${alloc.asset_symbol}</span>
+                                        <span class="text-sm text-gray-600">${alloc.allocation_percentage}%</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                        <div>
+                                            <div>Initial: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                                            <div>Current: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
+                                        </div>
+                                        <div>
+                                            <div>Initial: $${alloc.initial_price_usd.toLocaleString()}</div>
+                                            <div>Current: $${alloc.current_price_usd.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-xs">
+                                        <span class="text-gray-600">Performance vs BTC: </span>
+                                        <span class="${assetPerformanceColor} font-medium">
+                                            ${alloc.asset_performance_percent >= 0 ? '+' : ''}${alloc.asset_performance_percent.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Store current portfolio for sharing
+        this.currentSetForgetPortfolio = portfolio;
+
+        // Show modal
+        const modal = document.getElementById('setForgetDetailsModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    async sharePortfolio() {
+        if (!this.currentSetForgetPortfolio) return;
+
+        try {
+            // For now, just copy the URL to clipboard
+            const portfolioId = this.currentSetForgetPortfolio.portfolio_id;
+
+            // Get the share token from database
+            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const portfolio = await response.json();
+
+                // Use the share token from the portfolio data
+                const shareToken = portfolio.share_token || this.currentSetForgetPortfolio.share_token;
+
+                if (!shareToken) {
+                    this.showNotification('Share token not available', 'error');
+                    return;
+                }
+
+                const shareUrl = `${window.location.origin}/share/${shareToken}`;
+
+                if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(shareUrl);
+                    this.showNotification('Share URL copied to clipboard!', 'success');
+                } else {
+                    // Fallback for older browsers
+                    prompt('Copy this URL to share your portfolio:', shareUrl);
+                }
+            } else {
+                this.showNotification('Failed to generate share link', 'error');
+            }
+        } catch (error) {
+            console.error('Error sharing portfolio:', error);
+            this.showNotification('Failed to generate share link', 'error');
+        }
+    }
+
+    formatSatoshis(sats) {
+        const btc = sats / 100000000;
+        return btc < 0.001 ? btc.toFixed(8) : btc.toFixed(4);
+    }
+
+    showDeleteConfirmation() {
+        if (!this.currentSetForgetPortfolio || !this.isCurrentUserAdmin()) {
+            this.showNotification('Access denied', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('deleteConfirmModal');
+        const message = document.getElementById('deleteConfirmMessage');
+
+        if (modal && message) {
+            message.textContent = `Are you sure you want to delete the portfolio "${this.currentSetForgetPortfolio.portfolio_name}"? This action cannot be undone.`;
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideDeleteConfirmation() {
+        const modal = document.getElementById('deleteConfirmModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    showDonatorAchievementModal() {
+        const modal = document.getElementById('donatorAchievementModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideDonatorAchievementModal() {
+        const modal = document.getElementById('donatorAchievementModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    handleDonatorAchievement() {
+        this.hideDonatorAchievementModal();
+        this.showNotification('Thank you for your interest! Donation system coming soon. Contact support for early access.', 'info');
+    }
+
+    // Legacy methods for backwards compatibility
+    showPremiumUpgradeModal() {
+        this.showDonatorAchievementModal();
+    }
+
+    hidePremiumUpgradeModal() {
+        this.hideDonatorAchievementModal();
+    }
+
+    handlePremiumUpgrade() {
+        this.handleDonatorAchievement();
+    }
+
+    // Centralized admin check for frontend
+    isCurrentUserAdmin() {
+        return this.user && (this.user.isAdmin || this.user.is_admin);
+    }
+
+    fixNavigationOnSharePage() {
+        console.log('Fixing navigation links for share page');
+
+        // Find all navigation links and make them absolute
+        const navLinks = document.querySelectorAll('nav a[href^="#"]');
+        navLinks.forEach(link => {
+            const originalHref = link.getAttribute('href');
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Navigation click intercepted:', originalHref);
+                window.location.href = '/' + originalHref;
+            });
+        });
+    }
+
+    getBtcPriceAtCreation(portfolio) {
+        // Get BTC price from the first allocation (they all have the same btc_price_usd)
+        if (portfolio.allocations && portfolio.allocations.length > 0) {
+            return parseFloat(portfolio.allocations[0].initial_btc_price_usd || 0);
+        }
+        return 0;
+    }
+
+    handleShareRouting() {
+        const path = window.location.pathname;
+        console.log('Checking share routing for path:', path);
+        console.log('Path length:', path.length);
+        console.log('Expected pattern: /^\/share\/([a-f0-9]{64})$/');
+        const shareMatch = path.match(/^\/share\/([a-f0-9]{64})$/);
+        console.log('Share match result:', shareMatch);
+
+        if (shareMatch) {
+            const shareToken = shareMatch[1];
+            console.log('MATCH FOUND! Loading shared portfolio with token:', shareToken);
+            this.loadSharedPortfolio(shareToken);
+            return true;
+        }
+
+        console.log('NO MATCH - not a valid share URL');
+        return false;
+    }
+
+    async loadSharedPortfolio(shareToken) {
+        try {
+            console.log('Loading shared portfolio with token:', shareToken);
+
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}`);
+
+            if (response.ok) {
+                const portfolioData = await response.json();
+                console.log('Shared portfolio data loaded:', portfolioData);
+                this.displaySharedPortfolio(portfolioData);
+
+                // Fix navigation links to work from share URLs
+                this.fixNavigationOnSharePage();
+
+                // Check if user is logged in and update nav accordingly
+                if (this.token) {
+                    this.updateNavForLoggedInUser();
+                }
+            } else {
+                console.error('Failed to load shared portfolio, status:', response.status);
+                const errorData = await response.json().catch(() => ({error: 'Unknown error'}));
+                console.error('Error data:', errorData);
+
+                // For now, show an alert instead of notification system (which might require login)
+                alert('Shared portfolio not found');
+                window.location.href = '/';
+            }
+        } catch (error) {
+            console.error('Error loading shared portfolio:', error);
+            this.showNotification('Failed to load shared portfolio', 'error');
+            window.location.href = '/';
+        }
+    }
+
+    displaySharedPortfolio(portfolioData) {
+        // Hide all pages first
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('assetsPage').classList.add('hidden');
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('adminPage').classList.add('hidden');
+
+        // Create and show dedicated shared portfolio page
+        this.createSharedPortfolioPage(portfolioData);
+
+        // Update page title
+        document.title = `${portfolioData.portfolio_name} - Bitcoin Investment Portfolio`;
+    }
+
+    createSharedPortfolioPage(portfolio) {
+        // Remove existing shared page if it exists
+        const existing = document.getElementById('sharedPortfolioPage');
+        if (existing) {
+            existing.remove();
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const performanceSign = portfolio.total_performance_percent >= 0 ? '+' : '';
+
+        const sharedPageHTML = `
+            <div id="sharedPortfolioPage" class="min-h-screen bg-gray-50">
+                <!-- Simple Header -->
+                <header class="bg-white shadow-sm border-b">
+                    <div class="max-w-4xl mx-auto px-4 py-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-900">${portfolio.portfolio_name}</h1>
+                                <p class="text-gray-600">Shared Bitcoin-Denominated Portfolio</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-500">Total Performance</div>
+                                <div class="text-2xl font-bold ${performanceColor}">
+                                    ${performanceSign}${portfolio.total_performance_percent.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Portfolio Content -->
+                <main class="max-w-4xl mx-auto px-4 py-8">
+                    <!-- Portfolio Status -->
+                    <div class="bg-white rounded-lg p-6 shadow-sm mb-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Status</h3>
+                                <p class="text-gray-600">📊 Performance Tracking</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-500">Created</div>
+                                <div class="font-semibold">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                                <div class="text-xs text-gray-500 mt-1">Days Tracked: ${portfolio.days_tracked}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Portfolio Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Initial Investment</h3>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</p>
+                            <p class="text-sm text-gray-500 mt-1">BTC Price at Creation: $${this.getBtcPriceAtCreation(portfolio).toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Current Value</h3>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.current_value_sats)} BTC</p>
+                            <p class="text-sm text-gray-500 mt-1">Current BTC Price: $${portfolio.current_btc_price.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Performance</h3>
+                            <p class="text-2xl font-bold ${performanceColor}">${performanceSign}${portfolio.total_performance_percent.toFixed(2)}%</p>
+                            <p class="text-sm text-gray-500 mt-1">vs HODL Bitcoin</p>
+                        </div>
+                    </div>
+
+                    <!-- Asset Allocations -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-bold">Asset Allocations</h2>
+                            <p class="text-gray-600 mt-1">Performance measured against Bitcoin</p>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            ${this.generateAllocationHTML(portfolio.allocations)}
+                        </div>
+                    </div>
+
+                    <!-- Call to Action -->
+                    <div class="mt-8 bg-orange-50 border border-orange-200 rounded-lg p-6 text-center">
+                        <h3 class="text-lg font-semibold text-orange-900 mb-2">Create Your Own Bitcoin Portfolio</h3>
+                        <p class="text-orange-700 mb-4">Track your investments in Bitcoin terms and see how your assets perform against the ultimate store of value.</p>
+                        <a href="/" class="inline-block bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-6 rounded-lg transition-colors">
+                            Get Started
+                        </a>
+                    </div>
+                </main>
+            </div>
+        `;
+
+        // Insert the shared page into the body
+        const sharedDiv = document.createElement('div');
+        sharedDiv.innerHTML = sharedPageHTML;
+        document.body.appendChild(sharedDiv.firstElementChild);
+    }
+
+    generateAllocationHTML(allocations) {
+        return allocations.map(alloc => {
+            const isPositive = alloc.asset_performance_percent >= 0;
+            const performanceColor = isPositive ? 'text-green-600' : 'text-red-600';
+            const performanceSign = isPositive ? '+' : '';
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center">
+                            <h3 class="text-lg font-semibold">${alloc.asset_symbol}</h3>
+                            <span class="ml-2 px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                                ${Number(alloc.allocation_percentage).toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">vs BTC Performance</div>
+                            <div class="font-bold ${performanceColor}">
+                                ${performanceSign}${alloc.asset_performance_percent.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <div class="text-gray-600">Initial</div>
+                            <div class="font-medium">${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                            <div class="text-gray-500">$${Number(alloc.initial_price_usd).toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-600">Current</div>
+                            <div class="font-medium">${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
+                            <div class="text-gray-500">$${Number(alloc.current_price_usd).toLocaleString()}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async confirmDeletePortfolio() {
+        this.hideDeleteConfirmation();
+
+        if (!this.currentSetForgetPortfolio) {
+            this.showNotification('No portfolio selected', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/${this.currentSetForgetPortfolio.portfolio_id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showNotification('Portfolio deleted successfully', 'success');
+                this.hideSetForgetDetailsModal();
+                this.loadSetForgetPortfolios(); // Refresh the list
+            } else {
+                const data = await response.json();
+                this.showNotification(data.error || 'Failed to delete portfolio', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting portfolio:', error);
+            this.showNotification('Failed to delete portfolio', 'error');
+        }
+    }
+
+    // Legacy method - kept for compatibility, now uses modal
+    async deletePortfolio() {
+        this.showDeleteConfirmation();
     }
 }
 
