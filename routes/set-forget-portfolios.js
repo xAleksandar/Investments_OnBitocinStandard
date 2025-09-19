@@ -480,8 +480,14 @@ router.get('/public/:shareToken/image', async (req, res) => {
     // Get portfolio performance data
     const performance = await portfolio.calculateCurrentPerformance();
 
+    // Add image generation metadata
+    const imageMetadata = {
+      lastGenerated: lastGenerated,
+      isRegenerated: shouldRegenerate
+    };
+
     // Generate the image
-    const imageBuffer = await imageGenerator.generatePortfolioImage(performance);
+    const imageBuffer = await imageGenerator.generatePortfolioImage(performance, imageMetadata);
 
     // Update last generation timestamp
     await pool.query(
@@ -502,6 +508,62 @@ router.get('/public/:shareToken/image', async (req, res) => {
   } catch (error) {
     console.error('Generate portfolio image error:', error);
     res.status(500).json({ error: 'Failed to generate portfolio image' });
+  }
+});
+
+// Get portfolio image metadata (timestamp info)
+router.get('/public/:shareToken/image-info', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+
+    // Get portfolio and last image generation time
+    const portfolioRecord = await pool.query(
+      'SELECT last_image_generated FROM set_forget_portfolios WHERE share_token = $1',
+      [shareToken]
+    );
+
+    if (portfolioRecord.rows.length === 0) {
+      return res.status(404).json({ error: 'Portfolio not found' });
+    }
+
+    const lastGenerated = portfolioRecord.rows[0]?.last_image_generated;
+
+    if (!lastGenerated) {
+      return res.json({
+        hasGeneratedImage: false,
+        message: 'Image will be generated fresh'
+      });
+    }
+
+    const now = new Date();
+    const lastGen = new Date(lastGenerated);
+    const minutesAgo = Math.floor((now - lastGen) / (1000 * 60));
+    const hoursAgo = Math.floor(minutesAgo / 60);
+    const hoursUntilRefresh = Math.max(0, 24 - hoursAgo);
+
+    let message;
+    if (minutesAgo < 2) {
+      message = 'Image was just generated';
+    } else if (hoursAgo < 1) {
+      message = 'Image was generated less than 1 hour ago';
+    } else if (hoursUntilRefresh > 0) {
+      message = `Image was generated ${hoursAgo} hour${hoursAgo === 1 ? '' : 's'} ago, can be refreshed in ${hoursUntilRefresh} hour${hoursUntilRefresh === 1 ? '' : 's'}`;
+    } else {
+      message = `Image was generated ${hoursAgo} hour${hoursAgo === 1 ? '' : 's'} ago, ready for refresh`;
+    }
+
+    res.json({
+      hasGeneratedImage: true,
+      lastGenerated: lastGenerated,
+      hoursAgo: hoursAgo,
+      hoursUntilRefresh: hoursUntilRefresh,
+      canRefresh: hoursUntilRefresh === 0,
+      message: message
+    });
+
+  } catch (error) {
+    console.error('Get portfolio image info error:', error);
+    res.status(500).json({ error: 'Failed to get image information' });
   }
 });
 

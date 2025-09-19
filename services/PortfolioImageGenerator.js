@@ -1,5 +1,6 @@
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { createCanvas, loadImage } = require('canvas');
+const ChartDataLabels = require('chartjs-plugin-datalabels');
 
 class PortfolioImageGenerator {
   constructor() {
@@ -7,16 +8,20 @@ class PortfolioImageGenerator {
     this.chartRenderer = new ChartJSNodeCanvas({
       width: 400,
       height: 400,
-      backgroundColour: 'transparent'
+      backgroundColour: 'transparent',
+      plugins: {
+        modern: ['chartjs-plugin-datalabels']
+      }
     });
   }
 
   /**
    * Generate a shareable portfolio image
    * @param {Object} portfolioData - Portfolio performance data
+   * @param {Object} imageMetadata - Image generation metadata (optional)
    * @returns {Buffer} PNG image buffer
    */
-  async generatePortfolioImage(portfolioData) {
+  async generatePortfolioImage(portfolioData, imageMetadata = null) {
     const width = 1200;
     const height = 630;
 
@@ -33,12 +38,12 @@ class PortfolioImageGenerator {
 
     // Bitcoin Standard Platform branding
     ctx.fillStyle = '#f7931a';
-    ctx.font = 'bold 36px Arial';
+    ctx.font = 'bold 46px Arial';
     ctx.fillText('Bitcoin Standard Platform', 60, 80);
 
     // Portfolio title
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px Arial';
+    ctx.font = 'bold 36px Arial';
     ctx.fillText(`Portfolio: ${portfolioData.portfolio_name}`, 60, 130);
 
     // Performance metrics
@@ -46,24 +51,23 @@ class PortfolioImageGenerator {
     const performanceColor = performance >= 0 ? '#10b981' : '#ef4444';
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '20px Arial';
+    ctx.font = '26px Arial';
     ctx.fillText('Performance vs Bitcoin:', 60, 180);
 
     ctx.fillStyle = performanceColor;
-    ctx.font = 'bold 24px Arial';
+    ctx.font = 'bold 31px Arial';
     const performanceText = `${performance >= 0 ? '+' : ''}${performance.toFixed(2)}%`;
     ctx.fillText(performanceText, 60, 210);
 
-    // Current value
+    // Current value and days tracked on the right side
     ctx.fillStyle = '#ffffff';
-    ctx.font = '18px Arial';
+    ctx.font = '23px Arial';
     const btcValue = (portfolioData.current_value_sats / 100000000).toFixed(4);
-    ctx.fillText(`Current Value: ${btcValue} BTC`, 60, 250);
+    ctx.fillText(`Current Value: ${btcValue} BTC`, 400, 180);
 
-    // Days tracked
     ctx.fillStyle = '#9ca3af';
-    ctx.font = '16px Arial';
-    ctx.fillText(`Tracked for ${portfolioData.days_tracked} days`, 60, 280);
+    ctx.font = '21px Arial';
+    ctx.fillText(`Tracked for ${portfolioData.days_tracked} days`, 400, 210);
 
     // Generate pie chart for allocations
     const pieChart = await this.generateAllocationChart(portfolioData.allocations);
@@ -73,42 +77,85 @@ class PortfolioImageGenerator {
     const chartY = 115;
     ctx.drawImage(pieChart, chartX, chartY);
 
-    // Asset allocation legend
-    let legendY = 340;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px Arial';
-    ctx.fillText('Asset Allocation:', 60, legendY);
+    // Asset allocation legend organized by categories
+    let legendY = 250;
 
-    legendY += 30;
-    ctx.font = '14px Arial';
+    // Group allocations by category
+    const allocationsByCategory = {};
+    portfolioData.allocations.forEach(allocation => {
+      const category = this.getAssetCategory(allocation.asset_symbol);
+      if (!allocationsByCategory[category]) {
+        allocationsByCategory[category] = [];
+      }
+      allocationsByCategory[category].push(allocation);
+    });
 
-    // Sort allocations by percentage for better display
-    const sortedAllocations = [...portfolioData.allocations].sort(
-      (a, b) => parseFloat(b.allocation_percentage) - parseFloat(a.allocation_percentage)
-    );
+    console.log('DEBUG: All allocations:', portfolioData.allocations);
+    console.log('DEBUG: Allocations by category:', allocationsByCategory);
 
-    for (let i = 0; i < Math.min(sortedAllocations.length, 8); i++) {
-      const allocation = sortedAllocations[i];
-      const color = this.getAssetColor(allocation.asset_symbol, i);
+    // Sort categories by total allocation
+    const sortedCategories = Object.entries(allocationsByCategory)
+      .map(([category, allocations]) => ({
+        category,
+        allocations: allocations.sort((a, b) => parseFloat(b.allocation_percentage) - parseFloat(a.allocation_percentage)),
+        totalPercentage: allocations.reduce((sum, a) => sum + parseFloat(a.allocation_percentage), 0)
+      }))
+      .sort((a, b) => b.totalPercentage - a.totalPercentage);
 
-      // Color indicator
-      ctx.fillStyle = color;
-      ctx.fillRect(60, legendY - 12, 12, 12);
+    console.log('DEBUG: Sorted categories:', sortedCategories);
 
-      // Asset text
-      ctx.fillStyle = '#ffffff';
-      const assetText = `${allocation.asset_symbol}: ${parseFloat(allocation.allocation_percentage).toFixed(1)}%`;
-      ctx.fillText(assetText, 80, legendY);
+    let allocationIndex = 0;
+    for (const { category, allocations } of sortedCategories) {
+      console.log(`DEBUG: Processing category ${category} with ${allocations.length} items at Y position ${legendY}`);
 
-      legendY += 25;
-      if (legendY > height - 60) break; // Don't overflow
+      if (legendY > height - 100) {
+        console.log(`DEBUG: Breaking due to overflow at Y ${legendY}, height limit ${height - 100}`);
+        break;
+      }
+
+      // Category header
+      ctx.fillStyle = '#ffb366';
+      ctx.font = 'bold 30px Arial';
+      ctx.fillText(category, 60, legendY);
+      legendY += 35;
+
+      // Assets in category
+      ctx.font = '27px Arial';
+      for (const allocation of allocations) {
+        console.log(`DEBUG: Processing asset ${allocation.asset_symbol} at Y position ${legendY}`);
+
+        if (legendY > height - 80) {
+          console.log(`DEBUG: Breaking asset loop due to overflow at Y ${legendY}, height limit ${height - 80}`);
+          break;
+        }
+
+        const color = this.getAssetColor(allocation.asset_symbol, allocationIndex);
+
+        // Color indicator (larger)
+        ctx.fillStyle = color;
+        ctx.fillRect(75, legendY - 14, 16, 16);
+
+        // Asset text (larger font with full name)
+        ctx.fillStyle = '#ffffff';
+        const fullName = this.getAssetName(allocation.asset_symbol);
+        const assetText = `${fullName}: ${parseFloat(allocation.allocation_percentage).toFixed(1)}%`;
+        ctx.fillText(assetText, 100, legendY);
+
+        console.log(`DEBUG: Rendered ${fullName} at Y ${legendY}`);
+
+        legendY += 32;
+        allocationIndex++;
+      }
+
+      legendY += 15; // Space between categories
     }
 
-    // Footer with creation date and branding
+    // Footer with creation date, image generation info, and branding
     ctx.fillStyle = '#6b7280';
     ctx.font = '12px Arial';
     const createdDate = new Date(portfolioData.created_at).toLocaleDateString();
-    ctx.fillText(`Created: ${createdDate}`, 60, height - 40);
+    ctx.fillText(`Portfolio Created: ${createdDate}`, 60, height - 40);
+
 
     const shareUrl = 'bitcoinstandardplatform.com';
     const urlWidth = ctx.measureText(shareUrl).width;
@@ -151,6 +198,31 @@ class PortfolioImageGenerator {
           },
           tooltip: {
             enabled: false
+          },
+          datalabels: {
+            display: true,
+            color: '#000000',
+            font: {
+              size: 14,
+              weight: 'bold'
+            },
+            // Add white stroke for better visibility on dark backgrounds
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            borderColor: '#ffffff',
+            borderRadius: 3,
+            borderWidth: 1,
+            padding: {
+              top: 2,
+              bottom: 2,
+              left: 4,
+              right: 4
+            },
+            formatter: (value, context) => {
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((value / total) * 100).toFixed(1);
+              const label = context.chart.data.labels[context.dataIndex];
+              return percentage > 5 ? label : ''; // Only show label if slice is > 5%
+            }
           }
         }
       }
@@ -164,6 +236,107 @@ class PortfolioImageGenerator {
     chartCtx.drawImage(chartImage, 0, 0);
 
     return chartCanvas;
+  }
+
+  /**
+   * Get full asset name
+   * @param {string} symbol - Asset symbol
+   * @returns {string} Full asset name
+   */
+  getAssetName(symbol) {
+    const assetNames = {
+      'BTC': 'Bitcoin',
+      'XAU': 'Gold',
+      'XAG': 'Silver',
+      'SPY': 'S&P 500 ETF',
+      'QQQ': 'NASDAQ 100 ETF',
+      'VTI': 'Total Stock Market ETF',
+      'EFA': 'MSCI EAFE ETF',
+      'VXUS': 'Total International Stock ETF',
+      'EWU': 'United Kingdom ETF',
+      'AAPL': 'Apple Inc.',
+      'MSFT': 'Microsoft Corporation',
+      'GOOGL': 'Alphabet Inc.',
+      'AMZN': 'Amazon.com Inc.',
+      'TSLA': 'Tesla Inc.',
+      'META': 'Meta Platforms Inc.',
+      'NVDA': 'NVIDIA Corporation',
+      'JNJ': 'Johnson & Johnson',
+      'V': 'Visa Inc.',
+      'WMT': 'Walmart Inc.',
+      'BRK-B': 'Berkshire Hathaway',
+      'VNQ': 'Real Estate Investment Trust ETF',
+      'VNO': 'Vornado Realty Trust',
+      'PLD': 'Prologis Inc.',
+      'EQIX': 'Equinix Inc.',
+      'TLT': '20+ Year Treasury Bond ETF',
+      'HYG': 'High Yield Corporate Bond ETF',
+      'WTI': 'Crude Oil',
+      'WEAT': 'Wheat ETF',
+      'CPER': 'Copper ETF',
+      'DBA': 'Agriculture ETF',
+      'UNG': 'Natural Gas ETF',
+      'URA': 'Uranium ETF'
+    };
+
+    return assetNames[symbol] || symbol;
+  }
+
+  /**
+   * Get asset category for organization
+   * @param {string} symbol - Asset symbol
+   * @returns {string} Category name
+   */
+  getAssetCategory(symbol) {
+    const categories = {
+      // Cryptocurrencies
+      'BTC': 'Crypto',
+
+      // Precious Metals
+      'XAU': 'Precious Metals',
+      'XAG': 'Precious Metals',
+
+      // Stock Indices
+      'SPY': 'Stock Indices',
+      'QQQ': 'Stock Indices',
+      'VTI': 'Stock Indices',
+      'EFA': 'International Stocks',
+      'VXUS': 'International Stocks',
+      'EWU': 'International Stocks',
+
+      // Individual Stocks
+      'AAPL': 'Individual Stocks',
+      'MSFT': 'Individual Stocks',
+      'GOOGL': 'Individual Stocks',
+      'AMZN': 'Individual Stocks',
+      'TSLA': 'Individual Stocks',
+      'META': 'Individual Stocks',
+      'NVDA': 'Individual Stocks',
+      'JNJ': 'Individual Stocks',
+      'V': 'Individual Stocks',
+      'WMT': 'Individual Stocks',
+      'BRK-B': 'Individual Stocks',
+
+      // Real Estate
+      'VNQ': 'Real Estate',
+      'VNO': 'Real Estate',
+      'PLD': 'Real Estate',
+      'EQIX': 'Real Estate',
+
+      // Bonds
+      'TLT': 'Bonds',
+      'HYG': 'Bonds',
+
+      // Commodities
+      'WTI': 'Commodities',
+      'WEAT': 'Commodities',
+      'CPER': 'Commodities',
+      'DBA': 'Commodities',
+      'UNG': 'Commodities',
+      'URA': 'Commodities'
+    };
+
+    return categories[symbol] || 'Other';
   }
 
   /**
