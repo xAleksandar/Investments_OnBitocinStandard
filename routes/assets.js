@@ -59,12 +59,26 @@ router.get('/prices', async (req, res) => {
       console.log(`Bitcoin API error, using last valid price: $${currentBtcPrice.toFixed(2)}`);
     }
 
-    // Get stock prices from Yahoo Finance (free, no API key required)
-    const stockSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'SPY', 'VNQ'];
+    // Get stock and ETF prices from Yahoo Finance (free, no API key required)
+    const stockSymbols = [
+      // Original stocks
+      'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'SPY', 'VNQ',
+      // New stocks
+      'META', 'BRK-B', 'JNJ', 'V', 'WMT',
+      // Bond ETFs
+      'TLT', 'HYG',
+      // International ETFs
+      'VXUS', 'EFA', 'EWU',
+      // REITs
+      'VNO', 'PLD', 'EQIX',
+      // Commodity ETFs
+      'URA', 'DBA', 'CPER', 'WEAT', 'UNG'
+    ];
     let stockPrices = {};
 
     // Fallback prices if API fails
     const fallbackStockPrices = {
+      // Original stocks
       'AAPL': 175.50,
       'TSLA': 248.30,
       'MSFT': 378.20,
@@ -72,7 +86,30 @@ router.get('/prices', async (req, res) => {
       'AMZN': 145.80,
       'NVDA': 485.60,
       'SPY': 450.00,
-      'VNQ': 95.00
+      'VNQ': 95.00,
+      // New stocks
+      'META': 325.00,
+      'BRK-B': 420.00,
+      'JNJ': 165.00,
+      'V': 265.00,
+      'WMT': 165.00,
+      // Bond ETFs
+      'TLT': 92.00,
+      'HYG': 79.50,
+      // International ETFs
+      'VXUS': 58.00,
+      'EFA': 78.50,
+      'EWU': 35.00,
+      // REITs
+      'VNO': 28.50,
+      'PLD': 130.00,
+      'EQIX': 750.00,
+      // Commodity ETFs
+      'URA': 25.50,
+      'DBA': 20.00,
+      'CPER': 28.00,
+      'WEAT': 7.50,
+      'UNG': 9.50
     };
 
     // Fetch real stock prices from Yahoo Finance
@@ -104,11 +141,15 @@ router.get('/prices', async (req, res) => {
       stockPrices = fallbackStockPrices;
     }
 
-    // Get commodity prices - fallbacks first
+    // Get commodity and international index prices - fallbacks first
     let commodityPrices = {
+      // Original commodities
       'XAU': 2700,  // Gold per troy ounce - default fallback
       'XAG': 32,    // Silver per troy ounce - default fallback
-      'WTI': 75     // Oil per barrel - default fallback
+      'WTI': 75,    // Oil per barrel - default fallback
+      // International indices (approximate fallback values)
+      '^GDAXI': 16000, // DAX points
+      '^N225': 33000  // Nikkei 225 points
     };
 
     // Try to fetch gold and silver prices from Yahoo Finance
@@ -154,6 +195,27 @@ router.get('/prices', async (req, res) => {
       console.log(`WTI Oil: Fetched real price: $${oilPrice}`);
     } catch (error) {
       console.log('WTI Oil: Failed to fetch, using fallback price');
+    }
+
+    // Try to fetch remaining international indices
+    const internationalIndices = [
+      { symbol: '^GDAXI', key: '^GDAXI', name: 'DAX' },
+      { symbol: '^N225', key: '^N225', name: 'Nikkei 225' }
+    ];
+
+    for (const index of internationalIndices) {
+      try {
+        const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${index.symbol}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        const price = response.data.chart.result[0].meta.regularMarketPrice;
+        commodityPrices[index.key] = price;
+        console.log(`${index.name}: Fetched real price: ${price}`);
+      } catch (error) {
+        console.log(`${index.name}: Failed to fetch, using fallback price`);
+      }
     }
 
     const prices = {
@@ -222,8 +284,10 @@ router.get('/performance/:symbol/:period', async (req, res) => {
 
         // Map symbols to Yahoo Finance tickers
         const yahooSymbols = {
+            // Original assets
             'XAU': 'GC=F',    // Gold futures
             'XAG': 'SI=F',    // Silver futures
+            'WTI': 'CL=F',    // Crude oil futures
             'SPY': 'SPY',
             'AAPL': 'AAPL',
             'TSLA': 'TSLA',
@@ -232,7 +296,38 @@ router.get('/performance/:symbol/:period', async (req, res) => {
             'AMZN': 'AMZN',
             'NVDA': 'NVDA',
             'VNQ': 'VNQ',
-            'WTI': 'CL=F'     // Crude oil futures
+
+            // New stocks
+            'META': 'META',
+            'BRK-B': 'BRK-B',
+            'JNJ': 'JNJ',
+            'V': 'V',
+            'WMT': 'WMT',
+
+            // Bond ETFs
+            'TLT': 'TLT',
+            'HYG': 'HYG',
+
+            // International ETFs
+            'VXUS': 'VXUS',
+            'EFA': 'EFA',
+            'EWU': 'EWU',
+
+            // REITs
+            'VNO': 'VNO',
+            'PLD': 'PLD',
+            'EQIX': 'EQIX',
+
+            // Commodity ETFs
+            'URA': 'URA',
+            'DBA': 'DBA',
+            'CPER': 'CPER',
+            'WEAT': 'WEAT',
+            'UNG': 'UNG',
+
+            // International indices
+            '^GDAXI': '^GDAXI', // DAX
+            '^N225': '^N225'    // Nikkei 225
         };
 
         const yahooSymbol = yahooSymbols[symbol];

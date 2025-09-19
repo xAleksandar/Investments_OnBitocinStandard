@@ -488,7 +488,11 @@ class BitcoinGame {
         newSelector.addEventListener('change', () => {
             this.updateAssetChart();
             this.loadAssetPageMetrics();
+            this.updateAssetDescription();
         });
+
+        // Initialize description for default selected asset
+        this.updateAssetDescription();
     }
 
     async loadAssetPageMetrics() {
@@ -650,6 +654,7 @@ class BitcoinGame {
 
         // Different symbol mapping based on denomination
         const symbolMapBTC = {
+            // Original assets
             'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',
             'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',
             'SPY': 'AMEX:SPY/BITSTAMP:BTCUSD',
@@ -660,10 +665,41 @@ class BitcoinGame {
             'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',
             'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',
             'VNQ': 'AMEX:VNQ/BITSTAMP:BTCUSD',
-            'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'
+            'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD',
+
+            // New stocks
+            'META': 'NASDAQ:META/BITSTAMP:BTCUSD',
+            'BRK-B': 'NYSE:BRK.B/BITSTAMP:BTCUSD',
+            'JNJ': 'NYSE:JNJ/BITSTAMP:BTCUSD',
+            'V': 'NYSE:V/BITSTAMP:BTCUSD',
+            'WMT': 'NYSE:WMT/BITSTAMP:BTCUSD',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT/BITSTAMP:BTCUSD',
+            'HYG': 'AMEX:HYG/BITSTAMP:BTCUSD',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS/BITSTAMP:BTCUSD',
+            'EFA': 'AMEX:EFA/BITSTAMP:BTCUSD',
+            'EWU': 'AMEX:EWU/BITSTAMP:BTCUSD',
+            '^GDAXI': 'TVC:DAX/BITSTAMP:BTCUSD',
+            '^N225': 'TVC:NI225/BITSTAMP:BTCUSD',
+
+            // REITs
+            'VNO': 'NYSE:VNO/BITSTAMP:BTCUSD',
+            'PLD': 'NYSE:PLD/BITSTAMP:BTCUSD',
+            'EQIX': 'NASDAQ:EQIX/BITSTAMP:BTCUSD',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA/BITSTAMP:BTCUSD',
+            'DBA': 'AMEX:DBA/BITSTAMP:BTCUSD',
+            'CPER': 'AMEX:CPER/BITSTAMP:BTCUSD',
+            'WEAT': 'AMEX:WEAT/BITSTAMP:BTCUSD',
+            'UNG': 'AMEX:UNG/BITSTAMP:BTCUSD'
         };
 
         const symbolMapUSD = {
+            // Original assets
             'XAU': 'TVC:GOLD',
             'XAG': 'TVC:SILVER',
             'SPY': 'AMEX:SPY',
@@ -674,7 +710,37 @@ class BitcoinGame {
             'AMZN': 'NASDAQ:AMZN',
             'NVDA': 'NASDAQ:NVDA',
             'VNQ': 'AMEX:VNQ',
-            'WTI': 'TVC:USOIL'
+            'WTI': 'TVC:USOIL',
+
+            // New stocks
+            'META': 'NASDAQ:META',
+            'BRK-B': 'NYSE:BRK.B',
+            'JNJ': 'NYSE:JNJ',
+            'V': 'NYSE:V',
+            'WMT': 'NYSE:WMT',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT',
+            'HYG': 'AMEX:HYG',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            '^GDAXI': 'TVC:DAX',
+            '^N225': 'TVC:NI225',
+
+            // REITs
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            'UNG': 'AMEX:UNG'
         };
 
         const symbolMap = denomination === 'USD' ? symbolMapUSD : symbolMapBTC;
@@ -714,6 +780,244 @@ class BitcoinGame {
             tvScript.src = 'https://s3.tradingview.com/tv.js';
             tvScript.onload = createWidget;
             document.head.appendChild(tvScript);
+        }
+    }
+
+    updateAssetDescription() {
+        const selector = document.getElementById('assetSelector');
+        if (!selector) return;
+
+        const selectedAsset = selector.value;
+        const titleElement = document.getElementById('assetTitle');
+        const descriptionElement = document.getElementById('assetDescriptionText');
+        const categoryElement = document.getElementById('assetCategory');
+
+        const assetDescriptions = {
+            // Popular Assets
+            'XAU': {
+                title: 'Gold (XAU)',
+                description: 'Gold has been humanity\'s store of value for over 5,000 years and remains the most recognized alternative to fiat currency. Central banks hold gold as reserves, and investors traditionally view it as a hedge against inflation and economic uncertainty. However, when measured against Bitcoin, gold has consistently underperformed, revealing Bitcoin\'s superior monetary properties as the ultimate store of value for the digital age.',
+                category: 'Commodity',
+                tags: ['Traditional Store of Value', 'Central Bank Reserve']
+            },
+            'SPY': {
+                title: 'SPDR S&P 500 ETF (SPY)',
+                description: 'SPY tracks the S&P 500 index, representing the largest 500 publicly traded companies in America. It\'s the world\'s largest and most traded ETF, with over $400 billion in assets. Often considered the benchmark for U.S. stock market performance, SPY is used by institutions and individuals as a core holding. Yet even this diversified exposure to America\'s top companies has lost significant value when priced in Bitcoin.',
+                category: 'Stock ETF',
+                tags: ['Market Benchmark', 'Institutional Favorite']
+            },
+            'AAPL': {
+                title: 'Apple Inc. (AAPL)',
+                description: 'Apple is the world\'s most valuable company, known for revolutionary products like the iPhone, iPad, and Mac. With over $3 trillion in market capitalization, Apple has been many investors\' favorite "safe" technology stock. The company generates massive cash flows and has a loyal customer base globally. Despite its dominance, even Apple\'s impressive growth pales in comparison to Bitcoin\'s performance as a store of value.',
+                category: 'Technology Stock',
+                tags: ['Largest Company', 'Consumer Technology']
+            },
+            'TSLA': {
+                title: 'Tesla Inc. (TSLA)',
+                description: 'Tesla revolutionized the automotive industry by making electric vehicles mainstream and desirable. Led by Elon Musk, Tesla has expanded into energy storage, solar panels, and autonomous driving technology. The company famously added Bitcoin to its treasury in 2021, recognizing its superior monetary properties. Tesla represents the future of transportation, yet Bitcoin represents the future of money.',
+                category: 'Technology Stock',
+                tags: ['Electric Vehicles', 'Bitcoin Adopter']
+            },
+            'META': {
+                title: 'Meta Platforms Inc. (META)',
+                description: 'Meta (formerly Facebook) owns the world\'s largest social media platforms including Facebook, Instagram, and WhatsApp, connecting over 3 billion people globally. The company is heavily investing in the "metaverse" and virtual reality technologies. Despite controlling how billions communicate and share information, Meta\'s stock has struggled to maintain its value against Bitcoin\'s monetary superiority.',
+                category: 'Technology Stock',
+                tags: ['Social Media', 'Metaverse Pioneer']
+            },
+
+            // Technology Stocks
+            'MSFT': {
+                title: 'Microsoft Corporation (MSFT)',
+                description: 'Microsoft is a global technology leader in cloud computing (Azure), productivity software (Office 365), and operating systems (Windows). The company has successfully transitioned to a subscription-based model and dominates enterprise software. With consistent revenue growth and strong fundamentals, Microsoft represents "stable" tech investing, yet it still loses purchasing power when measured in Bitcoin.',
+                category: 'Technology Stock',
+                tags: ['Cloud Computing', 'Enterprise Software']
+            },
+            'GOOGL': {
+                title: 'Alphabet Inc. (GOOGL)',
+                description: 'Alphabet is Google\'s parent company, controlling the world\'s dominant search engine and advertising platform. Google processes over 8 billion searches daily and owns YouTube, Android, and Google Cloud. The company has near-monopolistic control over internet information flow, generating massive profits from advertising. Yet even this digital dominance cannot compete with Bitcoin as a store of value.',
+                category: 'Technology Stock',
+                tags: ['Search Engine', 'Digital Advertising']
+            },
+            'AMZN': {
+                title: 'Amazon.com Inc. (AMZN)',
+                description: 'Amazon transformed from an online bookstore into the "everything store" and cloud computing leader (AWS). The company dominates e-commerce and provides the infrastructure powering much of the modern internet. Amazon Web Services alone generates billions in high-margin revenue. Despite revolutionizing commerce and computing, Amazon\'s stock value has declined significantly when priced in Bitcoin.',
+                category: 'Technology Stock',
+                tags: ['E-commerce', 'Cloud Infrastructure']
+            },
+            'NVDA': {
+                title: 'NVIDIA Corporation (NVDA)',
+                description: 'NVIDIA designs the graphics processing units (GPUs) that power gaming, artificial intelligence, and cryptocurrency mining. The company\'s chips are essential for AI development and machine learning applications. Ironically, many NVIDIA GPUs are used to mine Bitcoin and other cryptocurrencies, yet the company\'s stock still underperforms Bitcoin as an investment.',
+                category: 'Technology Stock',
+                tags: ['AI Hardware', 'GPU Manufacturing']
+            },
+
+            // Traditional Stocks
+            'BRK-B': {
+                title: 'Berkshire Hathaway Inc. Class B (BRK-B)',
+                description: 'Berkshire Hathaway is Warren Buffett\'s legendary investment conglomerate, often called the world\'s most successful investment vehicle. The company owns dozens of businesses and holds massive stock positions in Apple, Coca-Cola, and other blue-chip companies. Buffett has famously criticized Bitcoin, calling it "rat poison squared," yet even his proven investment strategy has underperformed Bitcoin over the past decade.',
+                category: 'Conglomerate',
+                tags: ['Warren Buffett', 'Value Investing']
+            },
+            'JNJ': {
+                title: 'Johnson & Johnson (JNJ)',
+                description: 'Johnson & Johnson is one of the world\'s largest healthcare companies, producing pharmaceuticals, medical devices, and consumer products. The company has paid increasing dividends for 59 consecutive years, making it a favorite among income investors. J&J represents stability and essential healthcare needs, yet even this defensive stock has lost significant value when measured against Bitcoin.',
+                category: 'Healthcare Stock',
+                tags: ['Dividend Aristocrat', 'Healthcare Essential']
+            },
+            'V': {
+                title: 'Visa Inc. (V)',
+                description: 'Visa operates the world\'s largest payment network, processing over 150 billion transactions annually across 200+ countries. The company earns fees on nearly every credit and debit card transaction globally, creating a near-monopolistic "tollbooth" business model. Ironically, while Visa facilitates fiat currency transactions, Bitcoin offers a superior payment network that eliminates the need for intermediaries.',
+                category: 'Financial Services',
+                tags: ['Payment Network', 'Transaction Fees']
+            },
+            'WMT': {
+                title: 'Walmart Inc. (WMT)',
+                description: 'Walmart is the world\'s largest retailer, serving 230 million customers weekly across 10,500 stores in 24 countries. The company pioneered efficient supply chain management and low-cost retail operations. Walmart represents essential consumer goods and services that people need regardless of economic conditions, yet even this defensive retail giant has declined in value when priced in Bitcoin.',
+                category: 'Retail Stock',
+                tags: ['Largest Retailer', 'Consumer Staples']
+            },
+
+            // Bonds
+            'TLT': {
+                title: 'iShares 20+ Year Treasury Bond ETF (TLT)',
+                description: 'TLT provides exposure to U.S. Treasury bonds with 20+ year maturities, traditionally considered the "safest" investment in the world. These bonds are backed by the full faith and credit of the U.S. government and have been the go-to safe haven for institutional investors. However, when measured against Bitcoin, even the safest government bonds have lost tremendous purchasing power, highlighting the debasement of fiat currency.',
+                category: 'Bond ETF',
+                tags: ['Government Bonds', 'Traditional Safe Haven']
+            },
+            'HYG': {
+                title: 'iShares iBoxx $ High Yield Corporate Bond ETF (HYG)',
+                description: 'HYG tracks high-yield corporate bonds, also known as "junk bonds," from companies with lower credit ratings. These bonds offer higher interest rates to compensate for increased default risk. Professional investors use HYG for income generation and portfolio diversification. Despite offering higher yields than government bonds, HYG has still lost significant value when priced in Bitcoin.',
+                category: 'Bond ETF',
+                tags: ['High Yield', 'Corporate Debt']
+            },
+
+            // International Markets
+            'EWU': {
+                title: 'iShares MSCI United Kingdom ETF (EWU)',
+                description: 'EWU provides exposure to large and mid-capitalization UK stocks, including giants like Shell, AstraZeneca, and ASML. This ETF tracks the performance of the UK economy and provides investors with easy access to British markets. EWU shows how even the most established international markets have significantly underperformed Bitcoin, demonstrating Bitcoin\'s global monetary superiority over traditional geographic diversification strategies.',
+                category: 'International ETF',
+                tags: ['UK Market', 'European Exposure']
+            },
+            '^GDAXI': {
+                title: 'DAX Index (Germany)',
+                description: 'The DAX tracks the 40 largest German companies including BMW, SAP, and Siemens. Germany has Europe\'s largest economy and is known for manufacturing excellence and engineering prowess. The DAX represents industrial strength and European economic leadership, yet even Germany\'s robust economy has seen its market lose substantial value when measured against Bitcoin.',
+                category: 'International Index',
+                tags: ['German Market', 'Industrial Economy']
+            },
+            '^N225': {
+                title: 'Nikkei 225 Index (Japan)',
+                description: 'The Nikkei 225 includes Japan\'s largest companies like Toyota, Sony, and SoftBank. Japan has the world\'s third-largest economy and is known for technological innovation and manufacturing excellence. The Nikkei peaked in 1989 and has struggled for decades, illustrating the consequences of monetary manipulation. Bitcoin offers a stark contrast as a deflationary alternative to Japan\'s inflationary monetary policy.',
+                category: 'International Index',
+                tags: ['Japanese Market', 'Technology Innovation']
+            },
+            'VXUS': {
+                title: 'Vanguard Total International Stock ETF (VXUS)',
+                description: 'VXUS provides broad exposure to international developed and emerging markets outside the United States, holding over 7,000 stocks from companies in Europe, Asia, and emerging markets. This ETF is popular for global diversification, giving investors exposure to international economic growth. However, even this broad international diversification has failed to preserve value when measured against Bitcoin.',
+                category: 'International ETF',
+                tags: ['Global Diversification', 'Emerging Markets']
+            },
+            'EFA': {
+                title: 'iShares MSCI EAFE ETF (EFA)',
+                description: 'EFA tracks developed international markets in Europe, Australasia, and the Far East (EAFE), excluding the U.S. and Canada. The fund holds companies like Nestlé, ASML, and Samsung, representing established international businesses. EFA is a cornerstone holding for investors seeking international developed market exposure, yet it has consistently lost value when priced in Bitcoin.',
+                category: 'International ETF',
+                tags: ['Developed Markets', 'International Blue Chips']
+            },
+
+            // Real Estate
+            'VNQ': {
+                title: 'Vanguard Real Estate ETF (VNQ)',
+                description: 'VNQ provides exposure to U.S. real estate investment trusts (REITs), which own and operate income-producing real estate like shopping centers, apartments, and office buildings. Real estate has traditionally been considered a hedge against inflation and a store of value. However, when measured against Bitcoin, even real estate has proven to be a poor store of value in the digital age.',
+                category: 'REIT ETF',
+                tags: ['Real Estate', 'Income Producing']
+            },
+            'VNO': {
+                title: 'Vornado Realty Trust (VNO)',
+                description: 'Vornado is one of the largest owners and managers of commercial real estate in the United States, with a portfolio concentrated in Manhattan and other prime locations. The company owns iconic properties including office buildings and retail spaces in New York City. Despite owning some of the world\'s most valuable real estate, VNO has lost significant value when priced in Bitcoin.',
+                category: 'REIT',
+                tags: ['Commercial Real Estate', 'Manhattan Properties']
+            },
+            'PLD': {
+                title: 'Prologis Inc. (PLD)',
+                description: 'Prologis is the world\'s largest industrial real estate company, owning and developing logistics facilities and distribution centers. The company benefits from the growth of e-commerce and global supply chains, with properties leased by Amazon, FedEx, and other logistics leaders. Despite the essential nature of logistics real estate, PLD has underperformed Bitcoin as a store of value.',
+                category: 'REIT',
+                tags: ['Industrial Real Estate', 'E-commerce Infrastructure']
+            },
+            'EQIX': {
+                title: 'Equinix Inc. (EQIX)',
+                description: 'Equinix operates data centers and provides colocation services for cloud computing, content delivery, and digital infrastructure. The company\'s facilities house the servers and networking equipment that power the modern internet. Equinix is essential digital infrastructure, yet even this critical technology real estate has declined in value when measured against Bitcoin.',
+                category: 'REIT',
+                tags: ['Data Centers', 'Digital Infrastructure']
+            },
+
+            // Commodities
+            'XAG': {
+                title: 'Silver (XAG)',
+                description: 'Silver is both a precious metal and an industrial commodity, used in electronics, solar panels, and medical applications. Often called "poor man\'s gold," silver has monetary properties but also significant industrial demand. Silver bugs argue it\'s undervalued relative to gold, but when measured against Bitcoin, silver has lost substantial purchasing power, demonstrating Bitcoin\'s superior monetary properties.',
+                category: 'Commodity',
+                tags: ['Precious Metal', 'Industrial Use']
+            },
+            'WTI': {
+                title: 'Crude Oil WTI (WTI)',
+                description: 'West Texas Intermediate (WTI) crude oil is a key energy commodity and economic indicator. Oil powers transportation, heating, and chemical production worldwide. Countries have fought wars over oil access, and oil prices significantly impact global inflation. Despite oil\'s critical importance to the global economy, it has lost value against Bitcoin, highlighting Bitcoin\'s emergence as the superior store of value.',
+                category: 'Commodity',
+                tags: ['Energy Source', 'Economic Indicator']
+            },
+            'CPER': {
+                title: 'United States Copper Index Fund (CPER)',
+                description: 'CPER provides exposure to copper prices through futures contracts, allowing investors to participate in copper\'s performance without physical storage. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. This ETF makes copper investing accessible to retail investors, yet even this economically critical metal has declined significantly when priced in Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Copper Exposure', 'Economic Indicator']
+            },
+            'WEAT': {
+                title: 'Teucrium Wheat Fund (WEAT)',
+                description: 'WEAT provides exposure to wheat prices through futures contracts, allowing investors to gain exposure to one of the world\'s most important food crops. Wheat feeds billions of people globally and prices are influenced by weather, geopolitics, and global demand. This ETF makes agricultural commodity investing accessible, yet despite representing essential food security, it has lost purchasing power when measured against Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Agricultural Exposure', 'Food Security']
+            },
+            'UNG': {
+                title: 'United States Natural Gas Fund (UNG)',
+                description: 'UNG provides exposure to natural gas prices through futures contracts, allowing investors to participate in this critical energy commodity. Natural gas is essential for heating, electricity generation, and industrial processes, gaining importance as a "cleaner" fossil fuel. This ETF makes energy commodity investing accessible to retail investors, yet despite natural gas\'s essential role in the energy transition, it has underperformed Bitcoin as a store of value.',
+                category: 'Commodity ETF',
+                tags: ['Natural Gas Exposure', 'Energy Transition']
+            },
+            'URA': {
+                title: 'Global X Uranium ETF (URA)',
+                description: 'URA provides exposure to companies involved in uranium mining and nuclear energy production. Uranium is essential for nuclear power generation, which provides clean, baseload electricity. With growing focus on carbon-free energy, uranium demand is expected to increase. Nuclear energy powers Bitcoin mining operations globally, yet even this critical energy commodity has lost value when priced in Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Nuclear Energy', 'Clean Power']
+            },
+            'DBA': {
+                title: 'Invesco DB Agriculture Fund (DBA)',
+                description: 'DBA tracks agricultural commodities including corn, wheat, soybeans, and sugar - the building blocks of global food systems. Agriculture feeds the world\'s population and is essential for human survival. Climate change and population growth are increasing agricultural commodity demand. Despite representing humanity\'s most basic needs, agricultural commodities have lost significant value when measured against Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Agricultural Products', 'Food Security']
+            }
+        };
+
+        const assetInfo = assetDescriptions[selectedAsset];
+        if (assetInfo) {
+            titleElement.textContent = assetInfo.title;
+            descriptionElement.textContent = assetInfo.description;
+            categoryElement.textContent = assetInfo.category;
+
+            // Update category color based on type
+            const categoryColors = {
+                'Technology Stock': 'bg-blue-100 text-blue-800',
+                'Stock ETF': 'bg-green-100 text-green-800',
+                'Commodity': 'bg-yellow-100 text-yellow-800',
+                'Bond ETF': 'bg-purple-100 text-purple-800',
+                'International Index': 'bg-indigo-100 text-indigo-800',
+                'International ETF': 'bg-indigo-100 text-indigo-800',
+                'REIT': 'bg-orange-100 text-orange-800',
+                'REIT ETF': 'bg-orange-100 text-orange-800',
+                'Commodity ETF': 'bg-yellow-100 text-yellow-800',
+                'Conglomerate': 'bg-gray-100 text-gray-800',
+                'Healthcare Stock': 'bg-red-100 text-red-800',
+                'Financial Services': 'bg-emerald-100 text-emerald-800',
+                'Retail Stock': 'bg-pink-100 text-pink-800'
+            };
+
+            categoryElement.className = `px-3 py-1 text-sm rounded-full font-medium ${categoryColors[assetInfo.category] || 'bg-gray-100 text-gray-800'}`;
         }
     }
 
@@ -1629,16 +1933,53 @@ class BitcoinGame {
 
         // Map assets to TradingView symbols
         const symbolMap = {
+            // Crypto
             'BTC': 'BITSTAMP:BTCUSD',
+
+            // Original stocks
             'AAPL': 'NASDAQ:AAPL',
             'TSLA': 'NASDAQ:TSLA',
             'MSFT': 'NASDAQ:MSFT',
             'GOOGL': 'NASDAQ:GOOGL',
             'AMZN': 'NASDAQ:AMZN',
             'NVDA': 'NASDAQ:NVDA',
+            'SPY': 'AMEX:SPY',
+            'VNQ': 'AMEX:VNQ',
+
+            // New stocks
+            'META': 'NASDAQ:META',
+            'BRK-B': 'NYSE:BRK.B',
+            'JNJ': 'NYSE:JNJ',
+            'V': 'NYSE:V',
+            'WMT': 'NYSE:WMT',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT',
+            'HYG': 'AMEX:HYG',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            '^GDAXI': 'TVC:DAX',
+            '^N225': 'TVC:NI225',
+
+            // REITs
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+
+            // Commodities
             'XAU': 'TVC:GOLD',
             'XAG': 'TVC:SILVER',
-            'WTI': 'TVC:USOIL'
+            'WTI': 'TVC:USOIL',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            'UNG': 'AMEX:UNG'
         };
 
         // Create ratio symbol

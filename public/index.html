@@ -942,18 +942,81 @@
                     <div class="mb-6">
                         <label class="block text-gray-700 text-sm font-bold mb-2">Select Asset to Analyze</label>
                         <select id="assetSelector" class="w-full md:w-auto px-4 py-2 border rounded-lg">
-                            <option value="XAU">Gold (XAU)</option>
-                            <option value="XAG">Silver (XAG)</option>
-                            <option value="SPY">S&P 500 (SPY)</option>
-                            <option value="AAPL">Apple (AAPL)</option>
-                            <option value="TSLA">Tesla (TSLA)</option>
-                            <option value="MSFT">Microsoft (MSFT)</option>
-                            <option value="GOOGL">Google (GOOGL)</option>
-                            <option value="AMZN">Amazon (AMZN)</option>
-                            <option value="NVDA">NVIDIA (NVDA)</option>
-                            <option value="VNQ">Real Estate (VNQ)</option>
-                            <option value="WTI">Crude Oil (WTI)</option>
+                            <!-- Popular Assets -->
+                            <optgroup label="🔥 Popular Assets">
+                                <option value="XAU">Gold (XAU)</option>
+                                <option value="SPY">S&P 500 (SPY)</option>
+                                <option value="AAPL">Apple (AAPL)</option>
+                                <option value="TSLA">Tesla (TSLA)</option>
+                                <option value="META">Meta (META)</option>
+                            </optgroup>
+
+                            <!-- Tech Stocks -->
+                            <optgroup label="💻 Technology Stocks">
+                                <option value="AAPL">Apple (AAPL)</option>
+                                <option value="MSFT">Microsoft (MSFT)</option>
+                                <option value="GOOGL">Google (GOOGL)</option>
+                                <option value="META">Meta (META)</option>
+                                <option value="NVDA">NVIDIA (NVDA)</option>
+                                <option value="TSLA">Tesla (TSLA)</option>
+                                <option value="AMZN">Amazon (AMZN)</option>
+                            </optgroup>
+
+                            <!-- Traditional Stocks -->
+                            <optgroup label="🏢 Traditional Stocks">
+                                <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
+                                <option value="JNJ">Johnson & Johnson (JNJ)</option>
+                                <option value="V">Visa (V)</option>
+                                <option value="WMT">Walmart (WMT)</option>
+                            </optgroup>
+
+                            <!-- Bonds -->
+                            <optgroup label="📜 Bonds">
+                                <option value="TLT">20+ Year Treasury (TLT)</option>
+                                <option value="HYG">High Yield Corporate (HYG)</option>
+                            </optgroup>
+
+                            <!-- International Markets -->
+                            <optgroup label="🌍 International Markets">
+                                <option value="EWU">UK Market (EWU)</option>
+                                <option value="^GDAXI">DAX (Germany)</option>
+                                <option value="^N225">Nikkei 225 (Japan)</option>
+                                <option value="VXUS">International Stocks (VXUS)</option>
+                                <option value="EFA">Developed Markets (EFA)</option>
+                            </optgroup>
+
+                            <!-- Real Estate -->
+                            <optgroup label="🏠 Real Estate">
+                                <option value="VNQ">Vanguard REIT (VNQ)</option>
+                                <option value="VNO">Vornado Realty (VNO)</option>
+                                <option value="PLD">Prologis (PLD)</option>
+                                <option value="EQIX">Equinix (EQIX)</option>
+                            </optgroup>
+
+                            <!-- Commodities -->
+                            <optgroup label="🏭 Commodities">
+                                <option value="XAU">Gold (XAU)</option>
+                                <option value="XAG">Silver (XAG)</option>
+                                <option value="WTI">Crude Oil (WTI)</option>
+                                <option value="CPER">Copper (CPER)</option>
+                                <option value="WEAT">Wheat (WEAT)</option>
+                                <option value="UNG">Natural Gas (UNG)</option>
+                                <option value="URA">Uranium (URA)</option>
+                                <option value="DBA">Agriculture (DBA)</option>
+                            </optgroup>
                         </select>
+                    </div>
+
+                    <!-- Asset Description Section -->
+                    <div id="assetDescription" class="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                        <h3 id="assetTitle" class="text-xl font-bold text-gray-900 mb-3">Gold (XAU)</h3>
+                        <p id="assetDescriptionText" class="text-gray-700 leading-relaxed">
+                            Gold has been humanity's store of value for over 5,000 years and remains the most recognized alternative to fiat currency. Central banks hold gold as reserves, and investors traditionally view it as a hedge against inflation and economic uncertainty. However, when measured against Bitcoin, gold has consistently underperformed, revealing Bitcoin's superior monetary properties as the ultimate store of value for the digital age.
+                        </p>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <span id="assetCategory" class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium">Commodity</span>
+                            <span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">Traditional Store of Value</span>
+                        </div>
                     </div>
 
                     <!-- Denomination Toggle -->
