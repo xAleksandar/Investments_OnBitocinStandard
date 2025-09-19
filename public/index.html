@@ -1428,6 +1428,66 @@
                     </div>
                 </div>
 
+                <!-- Portfolio Share Modal -->
+                <div id="portfolioShareModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+                    <div class="flex items-center justify-center min-h-screen p-4">
+                        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                            <div class="p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="text-xl font-semibold text-gray-800">Share Your Portfolio</h3>
+                                    <button id="closeShareModal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                                </div>
+
+                                <!-- Image Preview Section -->
+                                <div class="mb-6">
+                                    <h4 class="text-lg font-medium text-gray-700 mb-3">Portfolio Image</h4>
+                                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <div id="imagePreviewContainer" class="text-center">
+                                            <div id="imageLoader" class="text-gray-500 py-8">
+                                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                                                Generating image...
+                                            </div>
+                                            <img id="portfolioImagePreview" class="hidden max-w-full h-auto rounded shadow-lg mx-auto" alt="Portfolio Preview" />
+                                            <div id="imageError" class="hidden text-red-500 py-8">
+                                                Failed to generate image. Please try again.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Share Options -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    <div class="border border-gray-200 rounded-lg p-4">
+                                        <h4 class="font-medium text-gray-700 mb-2">Portfolio Link</h4>
+                                        <div class="flex gap-2">
+                                            <input id="shareUrlInput" type="text" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50" placeholder="Generating link..." />
+                                            <button id="copyUrlBtn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium transition-colors">
+                                                Copy
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="border border-gray-200 rounded-lg p-4">
+                                        <h4 class="font-medium text-gray-700 mb-2">Portfolio Image</h4>
+                                        <div class="flex gap-2">
+                                            <input id="imageUrlInput" type="text" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm bg-gray-50" placeholder="Generating image..." />
+                                            <button id="downloadImageBtn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded text-sm font-medium transition-colors">
+                                                Download
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex justify-end">
+                                    <button id="shareModalCloseBtn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Top Row: Trade Assets (left) + Chart (right) -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Trading Module -->

@@ -3764,6 +3764,52 @@ class BitcoinGame {
             });
         }
 
+        // Share modal event listeners
+        const closeShareModal = document.getElementById('closeShareModal');
+        const shareModalCloseBtn = document.getElementById('shareModalCloseBtn');
+        const copyUrlBtn = document.getElementById('copyUrlBtn');
+        const downloadImageBtn = document.getElementById('downloadImageBtn');
+
+        if (closeShareModal) {
+            // Remove existing listeners to prevent duplicates
+            closeShareModal.replaceWith(closeShareModal.cloneNode(true));
+            const freshCloseBtn = document.getElementById('closeShareModal');
+            if (freshCloseBtn) {
+                freshCloseBtn.addEventListener('click', () => {
+                    this.hideShareModal();
+                });
+            }
+        }
+        if (shareModalCloseBtn) {
+            shareModalCloseBtn.replaceWith(shareModalCloseBtn.cloneNode(true));
+            const freshCloseBtn2 = document.getElementById('shareModalCloseBtn');
+            if (freshCloseBtn2) {
+                freshCloseBtn2.addEventListener('click', () => {
+                    this.hideShareModal();
+                });
+            }
+        }
+        if (copyUrlBtn) {
+            copyUrlBtn.replaceWith(copyUrlBtn.cloneNode(true));
+            const freshCopyBtn = document.getElementById('copyUrlBtn');
+            if (freshCopyBtn) {
+                freshCopyBtn.addEventListener('click', () => {
+                    this.copyShareUrl();
+                });
+            }
+        }
+        if (downloadImageBtn) {
+            // Remove any existing listeners first to prevent duplicates
+            downloadImageBtn.replaceWith(downloadImageBtn.cloneNode(true));
+            // Get the fresh element after replacement
+            const freshDownloadBtn = document.getElementById('downloadImageBtn');
+            if (freshDownloadBtn) {
+                freshDownloadBtn.addEventListener('click', () => {
+                    this.downloadPortfolioImage();
+                });
+            }
+        }
+
         // Donator achievement modal (new)
         const cancelDonationBtn = document.getElementById('cancelDonationBtn');
         const donateBtn = document.getElementById('donateBtn');
@@ -4438,43 +4484,149 @@ class BitcoinGame {
     async sharePortfolio() {
         if (!this.currentSetForgetPortfolio) return;
 
+        // Show the share modal
+        this.showShareModal();
+
         try {
-            // For now, just copy the URL to clipboard
             const portfolioId = this.currentSetForgetPortfolio.portfolio_id;
+            const shareToken = this.currentSetForgetPortfolio.share_token;
 
-            // Get the share token from database
-            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
+            if (!shareToken) {
+                this.showNotification('Share token not available', 'error');
+                this.hideShareModal();
+                return;
+            }
+
+            // Set URLs
+            const shareUrl = `${window.location.origin}/share/${shareToken}`;
+            const imageUrl = `${window.location.origin}/api/set-forget-portfolios/public/${shareToken}/image`;
+
+            // Update URL inputs
+            const shareUrlInput = document.getElementById('shareUrlInput');
+            const imageUrlInput = document.getElementById('imageUrlInput');
+
+            if (shareUrlInput) shareUrlInput.value = shareUrl;
+            if (imageUrlInput) imageUrlInput.value = imageUrl;
+
+            // Store URLs for later use
+            this.currentShareUrl = shareUrl;
+            this.currentImageUrl = imageUrl;
+
+            // Load image preview
+            await this.loadImagePreview(imageUrl);
+
+        } catch (error) {
+            console.error('Error preparing share modal:', error);
+            this.showNotification('Failed to prepare sharing options', 'error');
+        }
+    }
+
+    showShareModal() {
+        const modal = document.getElementById('portfolioShareModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // Reset modal state
+            this.resetShareModal();
+        }
+    }
+
+    hideShareModal() {
+        const modal = document.getElementById('portfolioShareModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    resetShareModal() {
+        // Show loader, hide image and error
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+        const shareUrlInput = document.getElementById('shareUrlInput');
+        const imageUrlInput = document.getElementById('imageUrlInput');
+
+        if (loader) loader.classList.remove('hidden');
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.add('hidden');
+        if (shareUrlInput) shareUrlInput.value = 'Generating link...';
+        if (imageUrlInput) imageUrlInput.value = 'Generating image...';
+    }
+
+    async loadImagePreview(imageUrl) {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+
+        try {
+            // Show loader
+            if (loader) loader.classList.remove('hidden');
+            if (preview) preview.classList.add('hidden');
+            if (error) error.classList.add('hidden');
+
+            // Load image
+            const img = new Image();
+
+            img.onload = () => {
+                if (preview) {
+                    preview.src = imageUrl;
+                    preview.classList.remove('hidden');
                 }
-            });
+                if (loader) loader.classList.add('hidden');
+            };
 
-            if (response.ok) {
-                const portfolio = await response.json();
+            img.onerror = () => {
+                if (loader) loader.classList.add('hidden');
+                if (error) error.classList.remove('hidden');
+                console.error('Failed to load portfolio image');
+            };
 
-                // Use the share token from the portfolio data
-                const shareToken = portfolio.share_token || this.currentSetForgetPortfolio.share_token;
+            img.src = imageUrl;
 
-                if (!shareToken) {
-                    this.showNotification('Share token not available', 'error');
-                    return;
-                }
+        } catch (err) {
+            console.error('Error loading image preview:', err);
+            if (loader) loader.classList.add('hidden');
+            if (error) error.classList.remove('hidden');
+        }
+    }
 
-                const shareUrl = `${window.location.origin}/share/${shareToken}`;
+    async copyShareUrl() {
+        if (!this.currentShareUrl) return;
 
-                if (navigator.clipboard) {
-                    await navigator.clipboard.writeText(shareUrl);
-                    this.showNotification('Share URL copied to clipboard!', 'success');
-                } else {
-                    // Fallback for older browsers
-                    prompt('Copy this URL to share your portfolio:', shareUrl);
-                }
+        try {
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(this.currentShareUrl);
+                this.showNotification('Portfolio URL copied to clipboard!', 'success');
             } else {
-                this.showNotification('Failed to generate share link', 'error');
+                // Fallback for older browsers
+                const input = document.getElementById('shareUrlInput');
+                if (input) {
+                    input.select();
+                    document.execCommand('copy');
+                    this.showNotification('Portfolio URL copied to clipboard!', 'success');
+                }
             }
         } catch (error) {
-            console.error('Error sharing portfolio:', error);
-            this.showNotification('Failed to generate share link', 'error');
+            console.error('Error copying URL:', error);
+            this.showNotification('Failed to copy URL', 'error');
+        }
+    }
+
+    async downloadPortfolioImage() {
+        if (!this.currentImageUrl) return;
+
+        try {
+            // Create a temporary link to download the image
+            const link = document.createElement('a');
+            link.href = this.currentImageUrl;
+            link.download = `portfolio-${this.currentSetForgetPortfolio.portfolio_name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            this.showNotification('Portfolio image download started!', 'success');
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            this.showNotification('Failed to download image', 'error');
         }
     }
 
@@ -4645,23 +4797,40 @@ class BitcoinGame {
 
         const sharedPageHTML = `
             <div id="sharedPortfolioPage" class="min-h-screen bg-gray-50">
-                <!-- Simple Header -->
-                <header class="bg-white shadow-sm border-b">
-                    <div class="max-w-4xl mx-auto px-4 py-4">
+                <!-- Enhanced Header with Branding -->
+                <header class="bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg">
+                    <div class="max-w-4xl mx-auto px-4 py-6">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h1 class="text-2xl font-bold text-gray-900">${portfolio.portfolio_name}</h1>
-                                <p class="text-gray-600">Shared Bitcoin-Denominated Portfolio</p>
+                                <div class="flex items-center mb-2">
+                                    <span class="text-2xl mr-2">₿</span>
+                                    <span class="text-lg font-semibold">Bitcoin Standard Platform</span>
+                                </div>
+                                <h1 class="text-3xl font-bold">${portfolio.portfolio_name}</h1>
+                                <p class="text-orange-100 mt-1">Set & Forget Portfolio • Bitcoin-Denominated Performance</p>
                             </div>
                             <div class="text-right">
-                                <div class="text-sm text-gray-500">Total Performance</div>
-                                <div class="text-2xl font-bold ${performanceColor}">
+                                <div class="text-sm text-orange-200">Performance vs HODL</div>
+                                <div class="text-3xl font-bold ${portfolio.total_performance_percent >= 0 ? 'text-green-300' : 'text-red-300'}">
                                     ${performanceSign}${portfolio.total_performance_percent.toFixed(2)}%
                                 </div>
+                                <div class="text-sm text-orange-200 mt-1">${portfolio.days_tracked} days tracked</div>
                             </div>
                         </div>
                     </div>
                 </header>
+
+                <!-- Bitcoin Standard Message Banner -->
+                <div class="bg-gray-900 text-white">
+                    <div class="max-w-4xl mx-auto px-4 py-4">
+                        <div class="flex items-center justify-center space-x-4 text-sm">
+                            <span>📊</span>
+                            <span>All values measured in Bitcoin • The ultimate unit of account</span>
+                            <span>⚡</span>
+                            <span>Demonstrating the opportunity cost of not holding BTC</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Portfolio Content -->
                 <main class="max-w-4xl mx-auto px-4 py-8">
@@ -4710,13 +4879,43 @@ class BitcoinGame {
                         </div>
                     </div>
 
-                    <!-- Call to Action -->
-                    <div class="mt-8 bg-orange-50 border border-orange-200 rounded-lg p-6 text-center">
-                        <h3 class="text-lg font-semibold text-orange-900 mb-2">Create Your Own Bitcoin Portfolio</h3>
-                        <p class="text-orange-700 mb-4">Track your investments in Bitcoin terms and see how your assets perform against the ultimate store of value.</p>
-                        <a href="/" class="inline-block bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-6 rounded-lg transition-colors">
-                            Get Started
-                        </a>
+                    <!-- Enhanced Call to Action -->
+                    <div class="mt-8 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-8 text-center shadow-lg">
+                        <div class="mb-4">
+                            <span class="text-4xl">₿</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-orange-900 mb-3">Ready to Embrace the Bitcoin Standard?</h3>
+                        <p class="text-orange-700 mb-6 max-w-2xl mx-auto leading-relaxed">
+                            Create your own Set & Forget portfolio and discover how traditional assets perform when measured against
+                            the ultimate store of value. See the true opportunity cost of not holding Bitcoin.
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">🎯</div>
+                                <div class="font-semibold text-gray-800">Set & Forget</div>
+                                <div class="text-gray-600">10-year tracking</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">📊</div>
+                                <div class="font-semibold text-gray-800">Bitcoin Standard</div>
+                                <div class="text-gray-600">True unit of account</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">🔗</div>
+                                <div class="font-semibold text-gray-800">Share & Compare</div>
+                                <div class="text-gray-600">Beautiful images</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <a href="/" class="inline-block bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105 shadow-lg">
+                                🚀 Create Your Portfolio Now
+                            </a>
+                            <div class="text-xs text-orange-600">
+                                Free to use • No signup required for basic features
+                            </div>
+                        </div>
                     </div>
                 </main>
             </div>
