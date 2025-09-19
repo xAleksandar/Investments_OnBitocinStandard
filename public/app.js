@@ -8,7 +8,181 @@ class BitcoinGame {
         this.priceRefreshInterval = null;
 
         this.initTooltips();
+        this.initTranslation();
         this.init();
+    }
+
+    async initTranslation() {
+        // Wait for translation service to be available
+        while (!window.translationService) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        // Initialize translation service
+        await window.translationService.loadTranslations();
+        this.initLanguageSwitcher();
+
+        // Listen for language changes
+        window.addEventListener('languageChanged', async () => {
+            this.updateLanguageSwitcher();
+            // Update commodity names when language changes
+            this.updateCommodityNames();
+            // Re-translate asset descriptions if on assets page
+            if (this.currentPage === 'assets') {
+                this.updateAssetDescription();
+            }
+            // Re-render current page content with new language
+            await this.rerenderCurrentPage();
+        });
+
+        // Update page translations after initial load
+        setTimeout(async () => {
+            if (window.translationService) {
+                await window.translationService.updatePageTranslations();
+            }
+        }, 100);
+    }
+
+    initLanguageSwitcher() {
+        const languageSwitcher = document.getElementById('languageSwitcher');
+        const languageTrigger = document.getElementById('languageTrigger');
+        const languageDropdown = document.getElementById('languageDropdown');
+        const languageOptions = document.querySelectorAll('.language-option');
+
+        if (!languageSwitcher || !languageTrigger) return;
+
+        // Update current language display
+        this.updateLanguageSwitcher();
+
+        // Toggle dropdown
+        languageTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            languageSwitcher.classList.toggle('open');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            languageSwitcher.classList.remove('open');
+        });
+
+        // Handle language selection
+        languageOptions.forEach(option => {
+            option.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const selectedLang = option.getAttribute('data-lang');
+
+                if (selectedLang !== window.translationService.getCurrentLanguage()) {
+                    await window.translationService.setLanguage(selectedLang);
+                    this.updateLanguageSwitcher();
+                }
+
+                languageSwitcher.classList.remove('open');
+            });
+        });
+    }
+
+    updateLanguageSwitcher() {
+        const currentLanguage = window.translationService?.getCurrentLanguage() || 'en';
+        const currentFlag = document.getElementById('currentFlag');
+        const currentLanguageText = document.getElementById('currentLanguage');
+        const languageOptions = document.querySelectorAll('.language-option');
+
+        if (currentFlag) {
+            currentFlag.className = `language-flag flag-${currentLanguage}`;
+        }
+
+        if (currentLanguageText) {
+            currentLanguageText.textContent = currentLanguage.toUpperCase();
+        }
+
+        // Update active option
+        languageOptions.forEach(option => {
+            const lang = option.getAttribute('data-lang');
+            option.classList.toggle('active', lang === currentLanguage);
+        });
+    }
+
+    async rerenderCurrentPage() {
+        // Re-render content when language changes
+        switch(this.currentPage) {
+            case 'assets':
+                this.updateAssetDescriptions();
+                // Also update static page elements like dropdown categories
+                if (window.translationService) {
+                    await window.translationService.updatePageTranslations();
+                }
+                break;
+            case 'portfolio':
+                await this.updatePortfolioTranslations();
+                break;
+            case 'education':
+                // Education pages will reload content automatically
+                if (window.location.hash.startsWith('#education/')) {
+                    const contentType = window.location.hash.replace('#education/', '');
+                    this.loadEducationalContent(contentType);
+                } else {
+                    this.initEducationPage();
+                }
+                break;
+            default:
+                // For home and other pages, just update translations
+                if (window.translationService) {
+                    await window.translationService.updatePageTranslations();
+                }
+                break;
+        }
+    }
+
+    updateAssetDescriptions() {
+        // Update asset descriptions with translations
+        const assetCards = document.querySelectorAll('[data-asset]');
+        assetCards.forEach(card => {
+            const assetSymbol = card.getAttribute('data-asset');
+            const descElement = card.querySelector('.asset-description');
+            if (descElement && window.translationService) {
+                const translatedDesc = window.translationService.translate(`assets.descriptions.${assetSymbol}`);
+                if (translatedDesc !== `assets.descriptions.${assetSymbol}`) {
+                    descElement.textContent = translatedDesc;
+                }
+            }
+        });
+
+        // Update commodity names in asset selector
+        this.updateCommodityNames();
+    }
+
+    updateCommodityNames() {
+        if (!window.translationService) return;
+
+        const commodityMap = {
+            'XAU': 'gold',
+            'XAG': 'silver',
+            'WTI': 'crudeOil',
+            'CPER': 'copper',
+            'WEAT': 'wheat',
+            'UNG': 'naturalGas',
+            'URA': 'uranium',
+            'DBA': 'agriculture'
+        };
+
+        Object.entries(commodityMap).forEach(([symbol, commodityKey]) => {
+            const options = document.querySelectorAll(`option[value="${symbol}"]`);
+            options.forEach(option => {
+                const translatedName = window.translationService.translate(`assets.commodityNames.${commodityKey}`);
+                if (translatedName !== `assets.commodityNames.${commodityKey}`) {
+                    option.textContent = `${translatedName} (${symbol})`;
+                }
+            });
+        });
+    }
+
+    async updatePortfolioTranslations() {
+        // Update portfolio-specific translations
+        if (window.translationService) {
+            await window.translationService.updatePageTranslations();
+            // Update any dynamically generated content
+            this.updateHoldingsDisplay();
+        }
     }
 
     initTooltips() {
@@ -139,12 +313,16 @@ class BitcoinGame {
     }
 
     navigate(hash) {
+        // Clean up any existing interactive components
+        this.cleanup();
+
         // Hide all pages
         document.getElementById('homePage').classList.add('hidden');
         document.getElementById('assetsPage').classList.add('hidden');
         document.getElementById('mainApp').classList.add('hidden');
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('adminPage').classList.add('hidden');
+        document.getElementById('educationPage').classList.add('hidden');
 
         // Route to appropriate page
         const baseHash = hash.split('?')[0]; // Remove query parameters for switch statement
@@ -194,6 +372,26 @@ class BitcoinGame {
                     this.showNotification('Please login to access admin panel', 'error');
                     this.showLoginForm();
                 }
+                break;
+            case '#education':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.initEducationPage();
+                break;
+            case '#education/why-bitcoin':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('why-bitcoin');
+                break;
+            case '#education/why-not-gold':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('why-not-gold');
+                break;
+            case '#education/fiat-experiment':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('fiat-experiment');
                 break;
             case '#home':
             default:
@@ -435,7 +633,278 @@ class BitcoinGame {
         }
     }
 
-    initAssetsPage(preselectedAsset = null) {
+    initEducationPage() {
+        // Show education overview with links to articles
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent) return;
+
+        const t = window.translationService?.translate.bind(window.translationService) || ((key) => key);
+
+        educationContent.innerHTML = `
+            <div class="max-w-4xl mx-auto py-8">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4" data-translate="education.title">Education</h1>
+                    <p class="text-xl text-gray-600" data-translate="education.subtitle">Learn about Bitcoin and sound money principles</p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-bitcoin'">
+                        <div class="text-orange-500 text-4xl mb-4">₿</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyBitcoin.title">Why Bitcoin?</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyBitcoin.subtitle">Understanding Bitcoin as neutral, apolitical money</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-not-gold'">
+                        <div class="text-yellow-500 text-4xl mb-4">🥇</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyNotGold.title">Why Not Gold?</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyNotGold.subtitle">The history of the gold standard and why it won't return</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/fiat-experiment'">
+                        <div class="text-green-500 text-4xl mb-4">💵</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.fiatExperiment.title">The Fiat Experiment</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.fiatExperiment.subtitle">How we arrived at today's monetary system</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Update translations
+        if (window.translationService) {
+            window.translationService.updatePageTranslations();
+        }
+    }
+
+    async loadEducationalContent(contentType) {
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent) return;
+
+        try {
+            // Show loading state
+            educationContent.innerHTML = '<div class="flex justify-center items-center py-20"><div class="text-xl">Loading...</div></div>';
+
+            // Get current language
+            const currentLang = window.translationService?.getCurrentLanguage() || 'en';
+
+            // Dynamically import the appropriate content file
+            const contentModule = await import(`./content/educational/${contentType}-${currentLang}.js`);
+            const content = contentModule.default || contentModule.content;
+
+            this.renderEducationalContent(content);
+
+        } catch (error) {
+            console.error('Failed to load educational content:', error);
+            educationContent.innerHTML = `
+                <div class="max-w-4xl mx-auto py-8">
+                    <div class="text-center">
+                        <h1 class="text-2xl font-bold text-red-600 mb-4">Content Not Available</h1>
+                        <p class="text-gray-600 mb-6">Sorry, this educational content is not available in the selected language.</p>
+                        <button onclick="window.location.hash = '#education'" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                            Back to Education
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    renderEducationalContent(content) {
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent || !content) return;
+
+        const t = window.translationService?.translate.bind(window.translationService) || ((key) => key);
+
+        // Generate table of contents
+        const tocItems = content.tableOfContents.map(item =>
+            `<li><a href="#${item.id}" class="text-orange-500 hover:text-orange-600">${item.title}</a></li>`
+        ).join('');
+
+        // Generate sections
+        const sectionsHtml = content.sections.map(section => `
+            <section id="${section.id}" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">${section.title}</h2>
+                <div class="prose prose-lg max-w-none">
+                    ${section.content}
+                </div>
+            </section>
+        `).join('');
+
+        // Generate related topics
+        const relatedTopicsHtml = content.relatedTopics.map(topic => `
+            <a href="${topic.link}" class="block bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <h4 class="font-semibold text-gray-800 mb-2">${topic.title}</h4>
+                <p class="text-gray-600 text-sm">${topic.description}</p>
+            </a>
+        `).join('');
+
+        educationContent.innerHTML = `
+            <!-- Reading Progress Bar -->
+            <div class="fixed top-0 left-0 w-full z-50">
+                <div id="readingProgress" class="h-1 bg-orange-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <div class="max-w-4xl mx-auto py-8">
+                <!-- Header -->
+                <div class="mb-8">
+                    <nav class="text-sm text-gray-500 mb-4">
+                        <a href="#education" class="hover:text-orange-500" data-translate="education.backToEducation">Back to Education</a>
+                        <span class="mx-2">→</span>
+                        <span>${content.title}</span>
+                    </nav>
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
+                    <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
+                    <div class="flex items-center space-x-6 text-sm text-gray-500">
+                        <span data-translate="education.readingTime">${content.readingTime} min read</span>
+                        <span data-translate="education.lastUpdated">Last updated: ${content.lastUpdated}</span>
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-4 gap-8">
+                    <!-- Table of Contents -->
+                    <div class="lg:col-span-1">
+                        <div class="sticky top-4">
+                            <h3 class="font-semibold text-gray-800 mb-4" data-translate="education.tableOfContents">Table of Contents</h3>
+                            <ul class="space-y-2 text-sm">
+                                ${tocItems}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="lg:col-span-3">
+                        <article class="prose prose-lg max-w-none">
+                            ${sectionsHtml}
+                        </article>
+
+                        <!-- Related Topics -->
+                        ${content.relatedTopics && content.relatedTopics.length > 0 ? `
+                        <div class="mt-12 pt-8 border-t">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-6" data-translate="education.relatedTopics">Related Topics</h3>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                ${relatedTopicsHtml}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Smooth scroll for table of contents links
+        const tocLinks = educationContent.querySelectorAll('a[href^="#"]');
+        tocLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Initialize reading progress and active section tracking
+        this.initReadingProgress();
+        this.initActiveSection();
+
+        // Update translations
+        if (window.translationService) {
+            window.translationService.updatePageTranslations();
+        }
+    }
+
+    initReadingProgress() {
+        const progressBar = document.getElementById('readingProgress');
+        if (!progressBar) return;
+
+        // Remove any existing scroll listeners
+        if (this.readingProgressHandler) {
+            window.removeEventListener('scroll', this.readingProgressHandler);
+        }
+
+        this.readingProgressHandler = () => {
+            const article = document.querySelector('article');
+            if (!article) return;
+
+            const articleTop = article.offsetTop;
+            const articleHeight = article.offsetHeight;
+            const scrollTop = window.pageYOffset;
+            const windowHeight = window.innerHeight;
+
+            // Calculate reading progress
+            const startReading = articleTop - windowHeight * 0.3;
+            const endReading = articleTop + articleHeight - windowHeight * 0.7;
+            const totalReadingDistance = endReading - startReading;
+
+            let progress = 0;
+            if (scrollTop > startReading) {
+                progress = Math.min((scrollTop - startReading) / totalReadingDistance, 1);
+            }
+
+            progressBar.style.width = `${progress * 100}%`;
+        };
+
+        window.addEventListener('scroll', this.readingProgressHandler);
+    }
+
+    initActiveSection() {
+        // Remove any existing intersection observer
+        if (this.sectionObserver) {
+            this.sectionObserver.disconnect();
+        }
+
+        const sections = document.querySelectorAll('section[id]');
+        const tocLinks = document.querySelectorAll('a[href^="#"]');
+
+        if (sections.length === 0 || tocLinks.length === 0) return;
+
+        this.sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Remove active class from all TOC links
+                    tocLinks.forEach(link => {
+                        link.classList.remove('font-semibold', 'text-orange-600');
+                        link.classList.add('text-orange-500');
+                    });
+
+                    // Add active class to current section's TOC link
+                    const activeLink = document.querySelector(`a[href="#${entry.target.id}"]`);
+                    if (activeLink) {
+                        activeLink.classList.remove('text-orange-500');
+                        activeLink.classList.add('font-semibold', 'text-orange-600');
+                    }
+                }
+            });
+        }, {
+            rootMargin: '-20% 0px -70% 0px',
+            threshold: 0
+        });
+
+        sections.forEach(section => {
+            this.sectionObserver.observe(section);
+        });
+    }
+
+    cleanup() {
+        // Clean up event listeners and observers when navigating away
+        if (this.readingProgressHandler) {
+            window.removeEventListener('scroll', this.readingProgressHandler);
+            this.readingProgressHandler = null;
+        }
+        if (this.sectionObserver) {
+            this.sectionObserver.disconnect();
+            this.sectionObserver = null;
+        }
+        // Clean up any pending asset translation attempts
+        if (this.pendingAssetTranslation) {
+            this.pendingAssetTranslation = false;
+        }
+    }
+
+    async initAssetsPage(preselectedAsset = null) {
         const selector = document.getElementById('assetSelector');
         if (!selector) return;
 
@@ -493,6 +962,23 @@ class BitcoinGame {
 
         // Initialize description for default selected asset
         this.updateAssetDescription();
+
+        // Update page translations for static dropdown categories
+        // (This handles the <optgroup> data-translate attributes)
+        // Wait for translation service to be ready before updating
+        if (window.translationService) {
+            try {
+                await window.translationService.updatePageTranslations();
+            } catch (error) {
+                console.error('Failed to update page translations:', error);
+                // Fallback: try again after a short delay
+                setTimeout(() => {
+                    if (window.translationService) {
+                        window.translationService.updatePageTranslations();
+                    }
+                }, 500);
+            }
+        }
     }
 
     async loadAssetPageMetrics() {
@@ -578,17 +1064,24 @@ class BitcoinGame {
                         const assetMultiplier = (details.assetPriceCurrent / details.assetPriceOld).toFixed(1);
                         const btcMultiplier = (details.btcPriceCurrent / details.btcPriceOld).toFixed(1);
 
-                        const periodLabel = period === '24h' ? '24 hours ago' :
-                                          period === '1y' ? '1 year ago' :
-                                          period === '5y' ? '5 years ago' :
-                                          period === '10y' ? '10 years ago' : period;
+                        // Use translated period labels
+                        const periodLabelKey = period === '24h' ? 'time.twentyFourHoursAgo' :
+                                              period === '1y' ? 'time.oneYearAgo' :
+                                              period === '5y' ? 'time.fiveYearsAgo' :
+                                              period === '10y' ? 'time.tenYearsAgo' : period;
 
-                        const tooltip = `${selectedAsset} vs Bitcoin Performance (${period})\n\n` +
+                        const periodLabel = window.translationService?.translate(periodLabelKey) || period;
+                        const vsPerformance = window.translationService?.translate('tooltips.vsPerformance') || 'vs Bitcoin Performance';
+                        const netPerformance = window.translationService?.translate('tooltips.netPerformance') || 'Net performance';
+                        const bitcoinGrew = window.translationService?.translate('tooltips.bitcoinGrew') || 'Bitcoin grew';
+                        const vs = window.translationService?.translate('tooltips.vs') || 'vs';
+
+                        const tooltip = `${selectedAsset} ${vsPerformance} (${period})\n\n` +
                                       `${periodLabel}:\n` +
                                       `${selectedAsset}: $${details.assetPriceOld.toLocaleString()} → $${details.assetPriceCurrent.toLocaleString()} (${assetMultiplier}x)\n` +
                                       `Bitcoin: $${details.btcPriceOld.toLocaleString()} → $${details.btcPriceCurrent.toLocaleString()} (${btcMultiplier}x)\n\n` +
-                                      `Bitcoin grew ${btcMultiplier}x vs ${selectedAsset}'s ${assetMultiplier}x\n` +
-                                      `Net performance: ${value}%`;
+                                      `${bitcoinGrew} ${btcMultiplier}x ${vs} ${selectedAsset}'s ${assetMultiplier}x\n` +
+                                      `${netPerformance}: ${value}%`;
 
                         // Apply tooltip to the container div instead of just the text
                         this.setupPerformanceTooltip(container || element, tooltip);
@@ -596,11 +1089,14 @@ class BitcoinGame {
                         const value = performance.toFixed(2);
                         element.textContent = `${performance > 0 ? '+' : ''}${value}%`;
                         element.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
-                        this.setupPerformanceTooltip(container || element, `Performance vs Bitcoin over ${period}`);
+                        const performanceOverPeriod = window.translationService?.translate('tooltips.performanceOverPeriod') || 'Performance vs Bitcoin over';
+                        this.setupPerformanceTooltip(container || element, `${performanceOverPeriod} ${period}`);
                     } else {
                         element.textContent = 'N/A';
                         element.className = 'font-semibold text-gray-500';
-                        this.setupPerformanceTooltip(container || element, `Data not available for ${period} period`);
+                        const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                        const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                        this.setupPerformanceTooltip(container || element, `${dataNotAvailable} ${period} ${periodText}`);
                     }
                 }
             });
@@ -616,8 +1112,12 @@ class BitcoinGame {
                 if (assetPriceInBTC && btcPrice && assetPriceInUSD) {
                     // Convert satoshis to BTC (divide by 100,000,000)
                     const assetPriceInBTCConverted = assetPriceInBTC / 100000000;
-                    const btcTooltip = `Current Bitcoin Price: $${btcPrice.toLocaleString()}\n` +
-                                      `Current ${selectedAsset} Price: $${assetPriceInUSD.toLocaleString()}\n\n` +
+                    const currentBitcoinPrice = window.translationService?.translate('tooltips.currentBitcoinPrice') || 'Current Bitcoin Price';
+                    const currentAssetPriceTemplate = window.translationService?.translate('tooltips.currentPrice') || 'Current %ASSET% Price';
+                    const currentAssetPrice = currentAssetPriceTemplate.replace('%ASSET%', selectedAsset);
+
+                    const btcTooltip = `${currentBitcoinPrice}: $${btcPrice.toLocaleString()}\n` +
+                                      `${currentAssetPrice}: $${assetPriceInUSD.toLocaleString()}\n\n` +
                                       `1 ${selectedAsset} = ${assetPriceInBTCConverted.toFixed(8)} BTC\n` +
                                       `1 BTC = ${(1/assetPriceInBTCConverted).toFixed(2)} ${selectedAsset}`;
 
@@ -682,8 +1182,8 @@ class BitcoinGame {
             'VXUS': 'NASDAQ:VXUS/BITSTAMP:BTCUSD',
             'EFA': 'AMEX:EFA/BITSTAMP:BTCUSD',
             'EWU': 'AMEX:EWU/BITSTAMP:BTCUSD',
-            '^GDAXI': 'TVC:DAX/BITSTAMP:BTCUSD',
-            '^N225': 'TVC:NI225/BITSTAMP:BTCUSD',
+            'EWG': 'AMEX:EWG/BITSTAMP:BTCUSD',
+            'EWJ': 'AMEX:EWJ/BITSTAMP:BTCUSD',
 
             // REITs
             'VNO': 'NYSE:VNO/BITSTAMP:BTCUSD',
@@ -727,8 +1227,8 @@ class BitcoinGame {
             'VXUS': 'NASDAQ:VXUS',
             'EFA': 'AMEX:EFA',
             'EWU': 'AMEX:EWU',
-            '^GDAXI': 'TVC:DAX',
-            '^N225': 'TVC:NI225',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
 
             // REITs
             'VNO': 'NYSE:VNO',
@@ -898,16 +1398,16 @@ class BitcoinGame {
                 category: 'International ETF',
                 tags: ['UK Market', 'European Exposure']
             },
-            '^GDAXI': {
-                title: 'DAX Index (Germany)',
-                description: 'The DAX tracks the 40 largest German companies including BMW, SAP, and Siemens. Germany has Europe\'s largest economy and is known for manufacturing excellence and engineering prowess. The DAX represents industrial strength and European economic leadership, yet even Germany\'s robust economy has seen its market lose substantial value when measured against Bitcoin.',
-                category: 'International Index',
+            'EWG': {
+                title: 'iShares MSCI Germany ETF (EWG)',
+                description: 'EWG provides exposure to German equities, tracking the largest companies including BMW, SAP, and Siemens. Germany has Europe\'s largest economy and is known for manufacturing excellence and engineering prowess. This ETF represents German industrial strength and European economic leadership, yet even Germany\'s robust economy has seen this ETF lose substantial value when measured against Bitcoin.',
+                category: 'International ETF',
                 tags: ['German Market', 'Industrial Economy']
             },
-            '^N225': {
-                title: 'Nikkei 225 Index (Japan)',
-                description: 'The Nikkei 225 includes Japan\'s largest companies like Toyota, Sony, and SoftBank. Japan has the world\'s third-largest economy and is known for technological innovation and manufacturing excellence. The Nikkei peaked in 1989 and has struggled for decades, illustrating the consequences of monetary manipulation. Bitcoin offers a stark contrast as a deflationary alternative to Japan\'s inflationary monetary policy.',
-                category: 'International Index',
+            'EWJ': {
+                title: 'iShares MSCI Japan ETF (EWJ)',
+                description: 'EWJ provides exposure to Japanese equities, including Japan\'s largest companies like Toyota, Sony, and SoftBank. Japan has the world\'s third-largest economy and is known for technological innovation and manufacturing excellence. Japanese markets peaked in 1989 and have struggled for decades, illustrating the consequences of monetary manipulation. Bitcoin offers a stark contrast as a deflationary alternative to Japan\'s inflationary monetary policy.',
+                category: 'International ETF',
                 tags: ['Japanese Market', 'Technology Innovation']
             },
             'VXUS': {
@@ -966,7 +1466,7 @@ class BitcoinGame {
                 title: 'United States Copper Index Fund (CPER)',
                 description: 'CPER provides exposure to copper prices through futures contracts, allowing investors to participate in copper\'s performance without physical storage. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. This ETF makes copper investing accessible to retail investors, yet even this economically critical metal has declined significantly when priced in Bitcoin.',
                 category: 'Commodity ETF',
-                tags: ['Copper Exposure', 'Economic Indicator']
+                tags: ['Industrial Metal', 'Economic Indicator']
             },
             'WEAT': {
                 title: 'Teucrium Wheat Fund (WEAT)',
@@ -978,7 +1478,7 @@ class BitcoinGame {
                 title: 'United States Natural Gas Fund (UNG)',
                 description: 'UNG provides exposure to natural gas prices through futures contracts, allowing investors to participate in this critical energy commodity. Natural gas is essential for heating, electricity generation, and industrial processes, gaining importance as a "cleaner" fossil fuel. This ETF makes energy commodity investing accessible to retail investors, yet despite natural gas\'s essential role in the energy transition, it has underperformed Bitcoin as a store of value.',
                 category: 'Commodity ETF',
-                tags: ['Natural Gas Exposure', 'Energy Transition']
+                tags: ['Natural Gas', 'Energy Transition']
             },
             'URA': {
                 title: 'Global X Uranium ETF (URA)',
@@ -990,15 +1490,67 @@ class BitcoinGame {
                 title: 'Invesco DB Agriculture Fund (DBA)',
                 description: 'DBA tracks agricultural commodities including corn, wheat, soybeans, and sugar - the building blocks of global food systems. Agriculture feeds the world\'s population and is essential for human survival. Climate change and population growth are increasing agricultural commodity demand. Despite representing humanity\'s most basic needs, agricultural commodities have lost significant value when measured against Bitcoin.',
                 category: 'Commodity ETF',
-                tags: ['Agricultural Products', 'Food Security']
+                tags: ['Agriculture', 'Food Security']
             }
         };
 
         const assetInfo = assetDescriptions[selectedAsset];
         if (assetInfo) {
-            titleElement.textContent = assetInfo.title;
-            descriptionElement.textContent = assetInfo.description;
-            categoryElement.textContent = assetInfo.category;
+            // Check if translation service is ready and has translations loaded
+            const isTranslationReady = window.translationService &&
+                                     typeof window.translationService.translate === 'function' &&
+                                     window.translationService.getCurrentLanguage &&
+                                     window.translationService.getCurrentLanguage() !== null;
+
+            let translatedTitle, translatedDescription, translatedCategory;
+
+            if (isTranslationReady) {
+                // Translation service is ready, try to get translations
+                translatedTitle = window.translationService.translate(`assets.assetDescriptions.${selectedAsset}.title`);
+                translatedDescription = window.translationService.translate(`assets.assetDescriptions.${selectedAsset}.description`);
+                translatedCategory = window.translationService.translate(`assets.categories.${assetInfo.category}`);
+            }
+
+            // Use translated version if available and valid, otherwise fallback to hardcoded
+            titleElement.textContent = translatedTitle && translatedTitle !== `assets.assetDescriptions.${selectedAsset}.title`
+                ? translatedTitle
+                : assetInfo.title;
+            descriptionElement.textContent = translatedDescription && translatedDescription !== `assets.assetDescriptions.${selectedAsset}.description`
+                ? translatedDescription
+                : assetInfo.description;
+            categoryElement.textContent = translatedCategory && translatedCategory !== `assets.categories.${assetInfo.category}`
+                ? translatedCategory
+                : assetInfo.category;
+
+            // If translation service wasn't ready, set up to retry when it becomes ready
+            if (!isTranslationReady && !this.pendingAssetTranslation) {
+                this.pendingAssetTranslation = true;
+                let retryCount = 0;
+                const maxRetries = 50; // Maximum 5 seconds of retrying (50 * 100ms)
+
+                // Listen for when translation service becomes ready
+                const checkAndRetranslate = () => {
+                    // Stop retrying if we're no longer on assets page or exceeded max retries
+                    if (this.currentPage !== 'assets' || retryCount >= maxRetries) {
+                        this.pendingAssetTranslation = false;
+                        return;
+                    }
+
+                    if (window.translationService &&
+                        typeof window.translationService.translate === 'function' &&
+                        window.translationService.getCurrentLanguage &&
+                        window.translationService.getCurrentLanguage() !== null) {
+                        this.pendingAssetTranslation = false;
+                        // Re-translate the current asset description
+                        this.updateAssetDescription();
+                    } else {
+                        // Check again in a short while
+                        retryCount++;
+                        setTimeout(checkAndRetranslate, 100);
+                    }
+                };
+                setTimeout(checkAndRetranslate, 100);
+            }
 
             // Update category color based on type
             const categoryColors = {
@@ -1018,6 +1570,20 @@ class BitcoinGame {
             };
 
             categoryElement.className = `px-3 py-1 text-sm rounded-full font-medium ${categoryColors[assetInfo.category] || 'bg-gray-100 text-gray-800'}`;
+
+            // Render tags dynamically
+            const tagsContainer = document.getElementById('assetTags');
+            if (tagsContainer && assetInfo.tags) {
+                tagsContainer.innerHTML = assetInfo.tags.map(tag => {
+                    // Use the same readiness check for tags
+                    let translatedTag;
+                    if (isTranslationReady) {
+                        translatedTag = window.translationService.translate(`assets.tags.${tag}`);
+                    }
+                    const displayTag = translatedTag && translatedTag !== `assets.tags.${tag}` ? translatedTag : tag;
+                    return `<span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">${displayTag}</span>`;
+                }).join('');
+            }
         }
     }
 
@@ -1961,8 +2527,8 @@ class BitcoinGame {
             'VXUS': 'NASDAQ:VXUS',
             'EFA': 'AMEX:EFA',
             'EWU': 'AMEX:EWU',
-            '^GDAXI': 'TVC:DAX',
-            '^N225': 'TVC:NI225',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
 
             // REITs
             'VNO': 'NYSE:VNO',

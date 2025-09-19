@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Investment Game</title>
+    <meta name="title-key" content="home.title">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="translation-service.js"></script>
     <style>
         /* Custom dropdown styles */
         .custom-select {
@@ -695,6 +697,80 @@
         .performance-metric {
             cursor: help;
         }
+        /* Language switcher styles */
+        .language-switcher {
+            position: relative;
+            display: inline-block;
+        }
+
+        .language-switcher-trigger {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+
+        .language-switcher-trigger:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .language-switcher-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 140px;
+            display: none;
+        }
+
+        .language-switcher.open .language-switcher-dropdown {
+            display: block;
+        }
+
+        .language-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .language-option:hover {
+            background-color: #f3f4f6;
+        }
+
+        .language-option.active {
+            background-color: #fef3c7;
+            color: #d97706;
+        }
+
+        .language-flag {
+            width: 20px;
+            height: 15px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .flag-en {
+            background: linear-gradient(to bottom, #012169 33%, white 33%, white 66%, #c8102e 66%);
+        }
+
+        .flag-bg {
+            background: linear-gradient(to bottom, white 33%, #00966e 33%, #00966e 66%, #d62612 66%);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -702,19 +778,43 @@
     <nav class="bg-orange-500 text-white p-4">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <div class="flex items-center space-x-6">
-                <h1 class="text-xl font-bold">Bitcoin Investment Game</h1>
+                <h1 class="text-xl font-bold" data-translate="home.title">Bitcoin Investment Game</h1>
                 <div class="hidden md:flex space-x-4">
-                    <a href="#home" class="hover:text-orange-200">Home</a>
-                    <a href="#assets" class="hover:text-orange-200">Assets</a>
-                    <a href="#portfolio" class="hover:text-orange-200">Portfolio</a>
-                    <a href="#admin" id="navAdminLink" class="hover:text-orange-200 hidden">Admin</a>
+                    <a href="#home" class="hover:text-orange-200" data-translate="navigation.home">Home</a>
+                    <a href="#assets" class="hover:text-orange-200" data-translate="navigation.assets">Assets</a>
+                    <a href="#portfolio" class="hover:text-orange-200" data-translate="navigation.portfolio">Portfolio</a>
+                    <a href="#education" class="hover:text-orange-200" data-translate="navigation.education">Learn</a>
+                    <a href="#admin" id="navAdminLink" class="hover:text-orange-200 hidden" data-translate="navigation.admin">Admin</a>
                 </div>
             </div>
-            <div id="navAuth">
-                <button id="navLoginBtn" class="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700">Login / Sign Up</button>
-                <div id="navUserInfo" class="hidden flex items-center space-x-4">
-                    <span id="navUsername"></span>
-                    <button id="navLogoutBtn" class="bg-orange-600 px-3 py-1 rounded">Logout</button>
+            <div class="flex items-center space-x-4">
+                <!-- Language Switcher -->
+                <div class="language-switcher" id="languageSwitcher">
+                    <div class="language-switcher-trigger" id="languageTrigger">
+                        <div class="language-flag flag-en" id="currentFlag"></div>
+                        <span id="currentLanguage">EN</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                    <div class="language-switcher-dropdown" id="languageDropdown">
+                        <div class="language-option" data-lang="en">
+                            <div class="language-flag flag-en"></div>
+                            <span>English</span>
+                        </div>
+                        <div class="language-option" data-lang="bg">
+                            <div class="language-flag flag-bg"></div>
+                            <span>Български</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="navAuth">
+                    <button id="navLoginBtn" class="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700" data-translate="navigation.login">Login / Sign Up</button>
+                    <div id="navUserInfo" class="hidden flex items-center space-x-4">
+                        <span id="navUsername"></span>
+                        <button id="navLogoutBtn" class="bg-orange-600 px-3 py-1 rounded" data-translate="navigation.logout">Logout</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -726,9 +826,9 @@
             <!-- Hero Section -->
             <div class="bg-gradient-to-b from-orange-500 to-orange-400 text-white py-16">
                 <div class="max-w-6xl mx-auto px-6 text-center">
-                    <h1 class="text-4xl md:text-5xl font-bold mb-4">Measure Everything in Bitcoin</h1>
-                    <p class="text-xl mb-8">See how traditional assets perform when priced in the hardest money ever created</p>
-                    <button id="heroLoginBtn" class="bg-white text-orange-500 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-4" data-translate="home.title">Measure Everything in Bitcoin</h1>
+                    <p class="text-xl mb-8" data-translate="home.description">See how traditional assets perform when priced in the hardest money ever created</p>
+                    <button id="heroLoginBtn" class="bg-white text-orange-500 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100" data-translate="home.getStarted">
                         Start Your Portfolio
                     </button>
                 </div>
@@ -737,8 +837,8 @@
             <!-- Example Portfolio Section -->
             <div class="max-w-6xl mx-auto px-6 py-12">
                 <div class="bg-white rounded-lg shadow-md p-8 mb-8">
-                    <h2 class="text-2xl font-bold mb-6">Example Portfolio Performance</h2>
-                    <p class="text-gray-600 mb-4">How a traditional portfolio performs when measured in Bitcoin:</p>
+                    <h2 class="text-2xl font-bold mb-6" data-translate="home.examplePortfolioTitle">Example Portfolio Performance</h2>
+                    <p class="text-gray-600 mb-4" data-translate="home.portfolioDescription">How a traditional portfolio performs when measured in Bitcoin:</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div class="bg-yellow-50 p-4 rounded">
@@ -763,109 +863,109 @@
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="text-center p-4 bg-gray-50 rounded">
-                            <div class="text-sm text-gray-600">1 Year</div>
+                            <div class="text-sm text-gray-600" data-translate="time.oneYear">1 Year</div>
                             <div id="perf1y" class="text-2xl font-bold text-red-600">-15%</div>
                         </div>
                         <div class="text-center p-4 bg-gray-50 rounded">
-                            <div class="text-sm text-gray-600">2 Years</div>
+                            <div class="text-sm text-gray-600" data-translate="time.twoYears">2 Years</div>
                             <div id="perf2y" class="text-2xl font-bold text-red-600">-35%</div>
                         </div>
                         <div class="text-center p-4 bg-gray-50 rounded">
-                            <div class="text-sm text-gray-600">5 Years</div>
+                            <div class="text-sm text-gray-600" data-translate="time.fiveYears">5 Years</div>
                             <div id="perf5y" class="text-2xl font-bold text-red-600">-68%</div>
                         </div>
                         <div class="text-center p-4 bg-gray-50 rounded">
-                            <div class="text-sm text-gray-600">10 Years</div>
+                            <div class="text-sm text-gray-600" data-translate="time.tenYears">10 Years</div>
                             <div id="perf10y" class="text-2xl font-bold text-red-600">-92%</div>
                         </div>
                     </div>
-                    <p class="text-sm text-gray-500 mt-4">* Performance calculated in Bitcoin terms. Most traditional assets lose value against Bitcoin over time.</p>
+                    <p class="text-sm text-gray-500 mt-4" data-translate="home.portfolioDisclaimer">* Performance calculated in Bitcoin terms. Most traditional assets lose value against Bitcoin over time.</p>
                 </div>
 
                 <!-- Popular Assets Grid -->
                 <div class="bg-white rounded-lg shadow-md p-8">
-                    <h2 class="text-2xl font-bold mb-6">Popular Assets vs Bitcoin</h2>
+                    <h2 class="text-2xl font-bold mb-6" data-translate="home.popularAssetsTitle">Popular Assets vs Bitcoin</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="XAU" onclick="window.app.navigateToAsset('XAU')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">Gold / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.goldBitcoin">Gold / Bitcoin</h3>
                             <div id="chartGold" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="goldPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="goldChange" class="font-semibold">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="SPY" onclick="window.app.navigateToAsset('SPY')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">S&P 500 / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.spBitcoin">S&P 500 / Bitcoin</h3>
                             <div id="chartSPY" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="spyPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="spyChange" class="font-semibold">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="AAPL" onclick="window.app.navigateToAsset('AAPL')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">Apple / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.appleBitcoin">Apple / Bitcoin</h3>
                             <div id="chartAAPL" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="aaplPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="aaplChange" class="font-semibold">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="TSLA" onclick="window.app.navigateToAsset('TSLA')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">Tesla / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.teslaBitcoin">Tesla / Bitcoin</h3>
                             <div id="chartTSLA" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="tslaPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="tslaChange" class="font-semibold">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="VNQ" onclick="window.app.navigateToAsset('VNQ')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">Real Estate / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.realEstateBitcoin">Real Estate / Bitcoin</h3>
                             <div id="chartVNQ" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="vnqPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="vnqChange" class="font-semibold">-</span>
                                 </div>
                             </div>
                         </div>
                         <div class="border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow relative" data-asset="WTI" onclick="window.app.navigateToAsset('WTI')" style="z-index: 10;">
-                            <h3 class="font-semibold mb-2">Oil / Bitcoin</h3>
+                            <h3 class="font-semibold mb-2" data-translate="home.oilBitcoin">Oil / Bitcoin</h3>
                             <div id="chartOil" class="h-48 bg-gray-100 rounded mb-3"></div>
                             <div class="space-y-1">
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">Current Price:</span>
+                                    <span class="text-gray-600" data-translate="home.currentPrice">Current Price:</span>
                                     <span id="oilPrice" class="font-mono">0.00000000</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
-                                    <span class="text-gray-600">5 Year:</span>
+                                    <span class="text-gray-600" data-translate="time.fiveYear">5 Year:</span>
                                     <span id="oilChange" class="font-semibold">-</span>
                                 </div>
                             </div>
@@ -873,6 +973,11 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Education Page -->
+        <div id="educationPage" class="hidden bg-gray-50 min-h-screen">
+            <div id="educationContent"></div>
         </div>
 
         <!-- Admin Dashboard Page (Admin Only) -->
@@ -937,13 +1042,13 @@
         <div id="assetsPage" class="hidden">
             <div class="max-w-6xl mx-auto px-6 py-12">
                 <div class="bg-white rounded-lg shadow-md p-8">
-                    <h2 class="text-2xl font-bold mb-6">Asset Information</h2>
+                    <h2 class="text-2xl font-bold mb-6" data-translate="assets.assetInformation">Asset Information</h2>
 
                     <div class="mb-6">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Select Asset to Analyze</label>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" data-translate="assets.selectAsset">Select Asset to Analyze</label>
                         <select id="assetSelector" class="w-full md:w-auto px-4 py-2 border rounded-lg">
                             <!-- Popular Assets -->
-                            <optgroup label="🔥 Popular Assets">
+                            <optgroup label="🔥" data-translate="assets.categories.popularAssets">
                                 <option value="XAU">Gold (XAU)</option>
                                 <option value="SPY">S&P 500 (SPY)</option>
                                 <option value="AAPL">Apple (AAPL)</option>
@@ -952,7 +1057,7 @@
                             </optgroup>
 
                             <!-- Tech Stocks -->
-                            <optgroup label="💻 Technology Stocks">
+                            <optgroup label="💻" data-translate="assets.categories.technologyStocks">
                                 <option value="AAPL">Apple (AAPL)</option>
                                 <option value="MSFT">Microsoft (MSFT)</option>
                                 <option value="GOOGL">Google (GOOGL)</option>
@@ -963,7 +1068,7 @@
                             </optgroup>
 
                             <!-- Traditional Stocks -->
-                            <optgroup label="🏢 Traditional Stocks">
+                            <optgroup label="🏢" data-translate="assets.categories.traditionalStocks">
                                 <option value="BRK-B">Berkshire Hathaway (BRK-B)</option>
                                 <option value="JNJ">Johnson & Johnson (JNJ)</option>
                                 <option value="V">Visa (V)</option>
@@ -971,22 +1076,22 @@
                             </optgroup>
 
                             <!-- Bonds -->
-                            <optgroup label="📜 Bonds">
+                            <optgroup label="📜" data-translate="assets.categories.bonds">
                                 <option value="TLT">20+ Year Treasury (TLT)</option>
                                 <option value="HYG">High Yield Corporate (HYG)</option>
                             </optgroup>
 
                             <!-- International Markets -->
-                            <optgroup label="🌍 International Markets">
-                                <option value="EWU">UK Market (EWU)</option>
-                                <option value="^GDAXI">DAX (Germany)</option>
-                                <option value="^N225">Nikkei 225 (Japan)</option>
-                                <option value="VXUS">International Stocks (VXUS)</option>
-                                <option value="EFA">Developed Markets (EFA)</option>
+                            <optgroup label="🌍" data-translate="assets.categories.internationalMarkets">
+                                <option value="EWU" data-translate="assets.dropdownOptions.UK Market">UK Market (EWU)</option>
+                                <option value="EWG" data-translate="assets.dropdownOptions.Germany ETF">Germany ETF (EWG)</option>
+                                <option value="EWJ">Japan ETF (EWJ)</option>
+                                <option value="VXUS" data-translate="assets.dropdownOptions.International Stocks">International Stocks (VXUS)</option>
+                                <option value="EFA" data-translate="assets.dropdownOptions.Developed Markets">Developed Markets (EFA)</option>
                             </optgroup>
 
                             <!-- Real Estate -->
-                            <optgroup label="🏠 Real Estate">
+                            <optgroup label="🏠" data-translate="assets.categories.realEstate">
                                 <option value="VNQ">Vanguard REIT (VNQ)</option>
                                 <option value="VNO">Vornado Realty (VNO)</option>
                                 <option value="PLD">Prologis (PLD)</option>
@@ -994,7 +1099,7 @@
                             </optgroup>
 
                             <!-- Commodities -->
-                            <optgroup label="🏭 Commodities">
+                            <optgroup label="🏭" data-translate="assets.categories.commodities">
                                 <option value="XAU">Gold (XAU)</option>
                                 <option value="XAG">Silver (XAG)</option>
                                 <option value="WTI">Crude Oil (WTI)</option>
@@ -1015,45 +1120,47 @@
                         </p>
                         <div class="mt-4 flex flex-wrap gap-2">
                             <span id="assetCategory" class="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium">Commodity</span>
-                            <span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">Traditional Store of Value</span>
+                            <div id="assetTags" class="flex flex-wrap gap-2">
+                                <!-- Tags will be dynamically rendered here -->
+                            </div>
                         </div>
                     </div>
 
                     <!-- Denomination Toggle -->
                     <div class="mb-4 flex items-center justify-end">
-                        <span class="mr-3 text-sm font-medium">View in:</span>
+                        <span class="mr-3 text-sm font-medium" data-translate="assets.viewIn">View in:</span>
                         <div class="flex bg-gray-100 rounded-lg p-1">
-                            <button id="btcDenomination" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-500 text-white">Bitcoin</button>
-                            <button id="usdDenomination" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-200">USD</button>
+                            <button id="btcDenomination" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-500 text-white" data-translate="assets.bitcoin">Bitcoin</button>
+                            <button id="usdDenomination" class="px-4 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-200" data-translate="assets.usd">USD</button>
                         </div>
                     </div>
 
                     <!-- Horizontal Performance Metrics -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold mb-3">Performance Metrics</h3>
+                        <h3 class="text-lg font-semibold mb-3" data-translate="assets.performanceMetrics">Performance Metrics</h3>
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">Current (BTC)</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="assets.currentBTC">Current (BTC)</div>
                                 <div id="assetPriceBTC" class="font-mono text-sm font-semibold">0.00000000</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">Current (USD)</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="assets.currentUSD">Current (USD)</div>
                                 <div id="assetPriceUSD" class="font-mono text-sm font-semibold">$0.00</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">24h</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="time.twentyFourHours">24h</div>
                                 <div id="asset24h" class="text-sm font-semibold">-</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">1 Year</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="time.oneYear">1 Year</div>
                                 <div id="asset1y" class="text-sm font-semibold">-</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">5 Years</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="time.fiveYears">5 Years</div>
                                 <div id="asset5y" class="text-sm font-semibold">-</div>
                             </div>
                             <div class="bg-gray-50 rounded p-3">
-                                <div class="text-xs text-gray-600 mb-1">10 Years</div>
+                                <div class="text-xs text-gray-600 mb-1" data-translate="time.tenYears">10 Years</div>
                                 <div id="assetAllTime" class="text-sm font-semibold">-</div>
                             </div>
                         </div>
