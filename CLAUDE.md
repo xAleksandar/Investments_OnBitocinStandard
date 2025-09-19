@@ -226,3 +226,10 @@ Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
 - CoinGecko returns gold price per gram
 - Multiply by 31.1035 to convert to troy ounces
 - Corrected stored amounts in database
+
+# Kiro - tasks list
+I might have created for you a task list in @.kiro/specs/bitcoin-game-enhancements/ - there are 3 files - design.md, which explains the design, requirements.md - how its going to work and tasks.md - a trackable list of where are we at - completed tasks are market with [x], not completed as [ ] - do not change this syntax, do not add to it or amend it in anyway, just mark as done what is done and only if you are marking something as done and want to add additional comments to it then you can amend slightly this point with the most important data, but unless asked for it do not amend any of these documents in this directory. When you are asked to complete a task and you have
+
+# DRY and KISS
+Keep It Simple Stupid - dont overcomplicate the code and architecture
+Dont Repeat Yourself - use templates, modules, reuse CSS, reuse the html and classes, etc, reuse function and more - we want small code base, not bloated with lots of repetitions

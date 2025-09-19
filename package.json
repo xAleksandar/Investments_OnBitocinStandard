@@ -7,7 +7,8 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "setup-db": "node scripts/setup-database.js",
-    "update-db": "node scripts/add-suggestions-table.js"
+    "update-db": "node scripts/add-suggestions-table.js",
+    "update-db:kiro": "node scripts/add-kiro-enhancements.js"
   },
   "dependencies": {
     "express": "^4.18.2",
