@@ -402,7 +402,52 @@ export const translations = {
         refreshPrices: 'Refresh Prices',
         quantity: 'Quantity',
         lockedAssets: 'Locked Assets',
-        availableToSell: 'Available to Sell'
+        availableToSell: 'Available to Sell',
+        portfolioName: 'Portfolio Name',
+        allocationInfo: 'Portfolio Allocation: 1 BTC equivalent',
+        allocationDescription: 'Compare how different asset allocations perform against holding Bitcoin over time.',
+        assetAllocations: 'Asset Allocations',
+        totalAllocation: 'Total Allocation',
+        performanceTracking: 'Performance Tracking',
+        performanceDescription: 'This portfolio will track performance over time to demonstrate the Bitcoin Standard principle.',
+        share: 'Share',
+        selectAsset: 'Select Asset',
+
+        // Image generation texts
+        imageTitle: 'Bitcoin Standard Platform',
+        imagePortfolioLabel: 'Portfolio',
+        imagePerformanceLabel: 'Performance vs Bitcoin',
+        imageCurrentValueLabel: 'Current Value',
+        imageTrackedDaysLabel: 'Tracked for {days} days',
+        imageCreatedLabel: 'Portfolio Created',
+
+        // Portfolio details modal
+        portfolioOverview: 'Portfolio Overview',
+        status: 'Status',
+        daysTracked: 'Days Tracked',
+        created: 'Created',
+        btcPriceAtCreation: 'BTC Price at Creation',
+        performance: 'Performance',
+        initialValue: 'Initial Value',
+        totalPerformance: 'Total Performance',
+        performanceTracking: 'Performance Tracking',
+
+        // Asset allocation details
+        initial: 'Initial',
+        current: 'Current',
+        performanceVsBTC: 'Performance vs BTC',
+
+        // Share modal
+        shareYourPortfolio: 'Share Your Portfolio',
+        portfolioImage: 'Portfolio Image',
+        portfolioLink: 'Portfolio Link',
+        imageGenerated: 'Image was generated {time} ago, can be refreshed in {hours} hours',
+        copy: 'Copy',
+        download: 'Download',
+        close: 'Close',
+        generatingLink: 'Generating link...',
+        generatingImage: 'Generating image...',
+        imageJustGenerated: 'Image was just generated'
     },
 
     trading: {

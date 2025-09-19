@@ -387,7 +387,52 @@ export const translations = {
         refreshPrices: 'Актуализиране на цените',
         quantity: 'Количество',
         lockedAssets: 'Заключени активи',
-        availableToSell: 'Налични за продажба'
+        availableToSell: 'Налични за продажба',
+        portfolioName: 'Име на портфолиото',
+        allocationInfo: 'Разпределение на портфолиото: еквивалент на 1 BTC',
+        allocationDescription: 'Сравнете как различни разпределения на активи се представят спрямо задържането на Биткойн във времето.',
+        assetAllocations: 'Разпределения на активи',
+        totalAllocation: 'Общо разпределение',
+        performanceTracking: 'Проследяване на представянето',
+        performanceDescription: 'Това портфолио ще проследява представянето във времето, за да демонстрира принципа на Биткойн стандарта.',
+        share: 'Споделяне',
+        selectAsset: 'Избор на актив',
+
+        // Image generation texts
+        imageTitle: 'Биткойн стандарт платформа',
+        imagePortfolioLabel: 'Портфолио',
+        imagePerformanceLabel: 'Представяне спрямо Биткойн',
+        imageCurrentValueLabel: 'Текуща стойност',
+        imageTrackedDaysLabel: 'Проследено {days} дни',
+        imageCreatedLabel: 'Портфолио създадено',
+
+        // Portfolio details modal
+        portfolioOverview: 'Преглед на портфолиото',
+        status: 'Статус',
+        daysTracked: 'Проследени дни',
+        created: 'Създадено',
+        btcPriceAtCreation: 'Цена на BTC при създаване',
+        performance: 'Представяне',
+        initialValue: 'Първоначална стойност',
+        totalPerformance: 'Общо представяне',
+        performanceTracking: 'Проследяване на представянето',
+
+        // Asset allocation details
+        initial: 'Първоначално',
+        current: 'Текущо',
+        performanceVsBTC: 'Представяне спрямо BTC',
+
+        // Share modal
+        shareYourPortfolio: 'Споделете вашето портфолио',
+        portfolioImage: 'Изображение на портфолиото',
+        portfolioLink: 'Връзка към портфолиото',
+        imageGenerated: 'Изображението беше генерирано преди {time}, може да бъде обновено след {hours} часа',
+        copy: 'Копиране',
+        download: 'Изтегляне',
+        close: 'Затваряне',
+        generatingLink: 'Генериране на връзка...',
+        generatingImage: 'Генериране на изображение...',
+        imageJustGenerated: 'Изображението беше току-що генерирано'
     },
 
     trading: {
