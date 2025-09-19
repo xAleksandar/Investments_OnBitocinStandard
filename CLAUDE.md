@@ -248,8 +248,14 @@ Be proactive only when developing or when asked, but not when asked to fix one s
 When asked to commit also commit with meaningful messages and useful descriptions, and if there's a need for the other devs to do something on git pull stay so on the description and if tis crucial a keyword in the git commit meain message. When creating commits we must separate files in different commits if they are not related to the same task. Claude.md updates or else changes need to be in different commits as they are instruction for AI, not project amendments visible to the users. Also we dont mention bugfixes that we introduced while working on a feature, we just mention the features.
 additionally when committin we can check if task was completed so we cross it off the Kiro task list.
 
-#Don;'t assume - check
+# Don;'t assume - check
 Don't assume function names, database names, etc - always check.
 Check that database name, check that function name, if you assume even if it makes sense you could make a mistake.
 Maybe its called in a weird way, that API endpoint or that function name.
 Don't assume you need a new list or variable or whatever, check if it exists first so you use it if possible.
+
+# Dont try to commit things from .gitignore-d directories
+They are git ignored for a reason, no version control there.
+
+# Alert for problems
+If while browsing the codebase while working on something if you see a problem alert the user so he knows what you haven oticed that could be a problem - dublicated code, even if not related to your current task, raise awareness of bad code structure, ways to inprove, logical bugs and more. Dont jump on fixing whe noticing, just alert the user, fix after confirmation as something might be intended or decided upon.
