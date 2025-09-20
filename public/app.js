@@ -1012,7 +1012,7 @@ class BitcoinGame {
                 <!-- Header -->
                 <div class="mb-8">
                     <nav class="text-sm mb-4">
-                        <a href="#education" onclick="window.location.hash='#education'; return false;" class="text-orange-500 hover:text-orange-600 font-medium cursor-pointer" data-translate="education.backToEducation">Back to Education</a>
+                        <a href="#education" onclick="window.location.hash='education'; return false;" class="text-orange-500 hover:text-orange-600 font-medium cursor-pointer" data-translate="education.backToEducation">Back to Education</a>
                         <span class="mx-2 text-gray-500">→</span>
                         <span class="text-gray-700">${content.title}</span>
                     </nav>
