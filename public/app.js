@@ -1012,7 +1012,7 @@ class BitcoinGame {
                 <!-- Header -->
                 <div class="mb-8">
                     <nav class="text-sm mb-4">
-                        <a href="#education" onclick="window.location.hash='education'; return false;" class="text-orange-500 hover:text-orange-600 font-medium cursor-pointer" data-translate="education.backToEducation">Back to Education</a>
+                        <a href="#education" class="text-orange-500 hover:text-orange-600 font-medium cursor-pointer" data-translate="education.backToEducation">Back to Education</a>
                         <span class="mx-2 text-gray-500">→</span>
                         <span class="text-gray-700">${content.title}</span>
                     </nav>
@@ -1055,8 +1055,17 @@ class BitcoinGame {
             </div>
         `;
 
+        // Add event listener for Back to Education link
+        const backToEducationLink = educationContent.querySelector('a[href="#education"]');
+        if (backToEducationLink) {
+            backToEducationLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.hash = 'education';
+            });
+        }
+
         // Smooth scroll for table of contents links
-        const tocLinks = educationContent.querySelectorAll('a[href^="#"]');
+        const tocLinks = educationContent.querySelectorAll('a[href^="#"]:not([href="#education"])');
         tocLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
