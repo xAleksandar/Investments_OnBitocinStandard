@@ -1055,26 +1055,30 @@ class BitcoinGame {
             </div>
         `;
 
-        // Add event listener for Back to Education link
-        const backToEducationLink = educationContent.querySelector('a[href="#education"]');
-        if (backToEducationLink) {
-            backToEducationLink.addEventListener('click', (e) => {
+        // Use event delegation for all links in educationContent
+        educationContent.addEventListener('click', (e) => {
+            // Check if clicked element is a link
+            const link = e.target.closest('a[href]');
+            if (!link) return;
+
+            const href = link.getAttribute('href');
+
+            // Handle Back to Education link
+            if (href === '#education') {
                 e.preventDefault();
                 window.location.hash = 'education';
-            });
-        }
+                return;
+            }
 
-        // Smooth scroll for table of contents links
-        const tocLinks = educationContent.querySelectorAll('a[href^="#"]:not([href="#education"])');
-        tocLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
+            // Handle table of contents links (smooth scroll)
+            if (href && href.startsWith('#')) {
                 e.preventDefault();
-                const targetId = link.getAttribute('href').substring(1);
+                const targetId = href.substring(1);
                 const targetElement = document.getElementById(targetId);
                 if (targetElement) {
                     targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-            });
+            }
         });
 
         // Initialize reading progress and active section tracking
