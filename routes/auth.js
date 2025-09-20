@@ -93,11 +93,9 @@ router.get('/verify', async (req, res) => {
     // Get user
     const user = await pool.query('SELECT * FROM users WHERE email = $1', [link.rows[0].email]);
 
-    // Check admin status for JWT token (dual verification)
-    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(email => email.trim()).filter(email => email);
-    const isAdminByEmail = adminEmails.includes(user.rows[0].email);
-    const isAdminByDB = user.rows[0].is_admin === true;
-    const isAdmin = isAdminByEmail || isAdminByDB;
+    // Check admin status for JWT token
+    const { isUserAdminByData } = require('../utils/adminCheck');
+    const isAdmin = await isUserAdminByData(user.rows[0]);
 
     // Generate JWT with admin status
     const jwtToken = jwt.sign(

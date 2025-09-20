@@ -8,7 +8,183 @@ class BitcoinGame {
         this.priceRefreshInterval = null;
 
         this.initTooltips();
+        this.initTranslation();
         this.init();
+    }
+
+    async initTranslation() {
+        // Wait for translation service to be available
+        while (!window.translationService) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        // Initialize translation service
+        await window.translationService.loadTranslations();
+        this.initLanguageSwitcher();
+
+        // Listen for language changes
+        window.addEventListener('languageChanged', async () => {
+            this.updateLanguageSwitcher();
+            // Update commodity names when language changes
+            this.updateCommodityNames();
+            // Re-translate asset descriptions if on assets page
+            if (this.currentPage === 'assets') {
+                this.updateAssetDescription();
+            }
+            // Re-render current page content with new language
+            await this.rerenderCurrentPage();
+        });
+
+        // Update page translations after initial load
+        setTimeout(async () => {
+            if (window.translationService) {
+                await window.translationService.updatePageTranslations();
+            }
+        }, 100);
+    }
+
+    initLanguageSwitcher() {
+        const languageSwitcher = document.getElementById('languageSwitcher');
+        const languageTrigger = document.getElementById('languageTrigger');
+        const languageDropdown = document.getElementById('languageDropdown');
+        const languageOptions = document.querySelectorAll('.language-option');
+
+        if (!languageSwitcher || !languageTrigger) return;
+
+        // Update current language display
+        this.updateLanguageSwitcher();
+
+        // Toggle dropdown
+        languageTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            languageSwitcher.classList.toggle('open');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            languageSwitcher.classList.remove('open');
+        });
+
+        // Handle language selection
+        languageOptions.forEach(option => {
+            option.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const selectedLang = option.getAttribute('data-lang');
+
+                if (selectedLang !== window.translationService.getCurrentLanguage()) {
+                    await window.translationService.setLanguage(selectedLang);
+                    this.updateLanguageSwitcher();
+                }
+
+                languageSwitcher.classList.remove('open');
+            });
+        });
+    }
+
+    updateLanguageSwitcher() {
+        const currentLanguage = window.translationService?.getCurrentLanguage() || 'en';
+        const currentFlag = document.getElementById('currentFlag');
+        const currentLanguageText = document.getElementById('currentLanguage');
+        const languageOptions = document.querySelectorAll('.language-option');
+
+        if (currentFlag) {
+            currentFlag.className = `language-flag flag-${currentLanguage}`;
+        }
+
+        if (currentLanguageText) {
+            currentLanguageText.textContent = currentLanguage.toUpperCase();
+        }
+
+        // Update active option
+        languageOptions.forEach(option => {
+            const lang = option.getAttribute('data-lang');
+            option.classList.toggle('active', lang === currentLanguage);
+        });
+    }
+
+    async rerenderCurrentPage() {
+        // Re-render content when language changes
+        switch(this.currentPage) {
+            case 'assets':
+                this.updateAssetDescriptions();
+                // Also update static page elements like dropdown categories
+                if (window.translationService) {
+                    await window.translationService.updatePageTranslations();
+                }
+                break;
+            case 'portfolio':
+                await this.updatePortfolioTranslations();
+                break;
+            case 'education':
+                // Education pages will reload content automatically
+                if (window.location.hash.startsWith('#education/')) {
+                    const contentType = window.location.hash.replace('#education/', '');
+                    this.loadEducationalContent(contentType);
+                } else {
+                    this.initEducationPage();
+                }
+                break;
+            default:
+                // For home and other pages, just update translations
+                if (window.translationService) {
+                    await window.translationService.updatePageTranslations();
+                }
+                break;
+        }
+    }
+
+    updateAssetDescriptions() {
+        // Update asset descriptions with translations
+        const assetCards = document.querySelectorAll('[data-asset]');
+        assetCards.forEach(card => {
+            const assetSymbol = card.getAttribute('data-asset');
+            const descElement = card.querySelector('.asset-description');
+            if (descElement && window.translationService) {
+                const translatedDesc = window.translationService.translate(`assets.descriptions.${assetSymbol}`);
+                if (translatedDesc !== `assets.descriptions.${assetSymbol}`) {
+                    descElement.textContent = translatedDesc;
+                }
+            }
+        });
+
+        // Update commodity names in asset selector
+        this.updateCommodityNames();
+    }
+
+    updateCommodityNames() {
+        if (!window.translationService) return;
+
+        const commodityMap = {
+            'XAU': 'gold',
+            'XAG': 'silver',
+            'WTI': 'crudeOil',
+            'CPER': 'copper',
+            'WEAT': 'wheat',
+            'UNG': 'naturalGas',
+            'URA': 'uranium',
+            'DBA': 'agriculture'
+        };
+
+        Object.entries(commodityMap).forEach(([symbol, commodityKey]) => {
+            const options = document.querySelectorAll(`option[value="${symbol}"]`);
+            options.forEach(option => {
+                const translatedName = window.translationService.translate(`assets.commodityNames.${commodityKey}`);
+                if (translatedName !== `assets.commodityNames.${commodityKey}`) {
+                    option.textContent = `${translatedName} (${symbol})`;
+                }
+            });
+        });
+    }
+
+    async updatePortfolioTranslations() {
+        // Update portfolio-specific translations
+        if (window.translationService) {
+            await window.translationService.updatePageTranslations();
+            // Update any dynamically generated content
+            this.updateHoldingsDisplay();
+            // Update asset dropdowns in portfolio creation modal
+            this.updateAssetDropdowns();
+        }
     }
 
     initTooltips() {
@@ -77,7 +253,19 @@ class BitcoinGame {
     }
 
     init() {
-        // Set up routing first
+        console.log('App init started, pathname:', window.location.pathname);
+        console.log('Full URL:', window.location.href);
+
+        // Check for share URLs FIRST before any other initialization
+        const isShareUrl = this.handleShareRouting();
+        console.log('handleShareRouting() returned:', isShareUrl);
+        if (isShareUrl) {
+            console.log('Share URL detected, skipping normal app initialization');
+            return;
+        }
+        console.log('Not a share URL, continuing with normal initialization');
+
+        // Set up routing for normal pages
         this.setupRouting();
 
         // Check if we have a token from URL (magic link)
@@ -127,12 +315,16 @@ class BitcoinGame {
     }
 
     navigate(hash) {
+        // Clean up any existing interactive components
+        this.cleanup();
+
         // Hide all pages
         document.getElementById('homePage').classList.add('hidden');
         document.getElementById('assetsPage').classList.add('hidden');
         document.getElementById('mainApp').classList.add('hidden');
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('adminPage').classList.add('hidden');
+        document.getElementById('educationPage').classList.add('hidden');
 
         // Route to appropriate page
         const baseHash = hash.split('?')[0]; // Remove query parameters for switch statement
@@ -172,7 +364,7 @@ class BitcoinGame {
                 break;
             case '#admin':
                 this.currentPage = 'admin';
-                if (this.token && this.user?.isAdmin) {
+                if (this.token && this.isCurrentUserAdmin()) {
                     document.getElementById('adminPage').classList.remove('hidden');
                     this.initAdminDashboard();
                 } else if (this.token) {
@@ -182,6 +374,26 @@ class BitcoinGame {
                     this.showNotification('Please login to access admin panel', 'error');
                     this.showLoginForm();
                 }
+                break;
+            case '#education':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.initEducationPage();
+                break;
+            case '#education/why-bitcoin':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('why-bitcoin');
+                break;
+            case '#education/why-not-gold':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('why-not-gold');
+                break;
+            case '#education/fiat-experiment':
+                this.currentPage = 'education';
+                document.getElementById('educationPage').classList.remove('hidden');
+                this.loadEducationalContent('fiat-experiment');
                 break;
             case '#home':
             default:
@@ -423,7 +635,278 @@ class BitcoinGame {
         }
     }
 
-    initAssetsPage(preselectedAsset = null) {
+    initEducationPage() {
+        // Show education overview with links to articles
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent) return;
+
+        const t = window.translationService?.translate.bind(window.translationService) || ((key) => key);
+
+        educationContent.innerHTML = `
+            <div class="max-w-4xl mx-auto py-8">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4" data-translate="education.title">Education</h1>
+                    <p class="text-xl text-gray-600" data-translate="education.subtitle">Learn about Bitcoin and sound money principles</p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-bitcoin'">
+                        <div class="text-orange-500 text-4xl mb-4">₿</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyBitcoin.title">Why Bitcoin?</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyBitcoin.subtitle">Understanding Bitcoin as neutral, apolitical money</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-not-gold'">
+                        <div class="text-yellow-500 text-4xl mb-4">🥇</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyNotGold.title">Why Not Gold?</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyNotGold.subtitle">The history of the gold standard and why it won't return</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/fiat-experiment'">
+                        <div class="text-green-500 text-4xl mb-4">💵</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.fiatExperiment.title">The Fiat Experiment</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.fiatExperiment.subtitle">How we arrived at today's monetary system</p>
+                        <span class="text-orange-500 font-medium">Read Article →</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Update translations
+        if (window.translationService) {
+            window.translationService.updatePageTranslations();
+        }
+    }
+
+    async loadEducationalContent(contentType) {
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent) return;
+
+        try {
+            // Show loading state
+            educationContent.innerHTML = '<div class="flex justify-center items-center py-20"><div class="text-xl">Loading...</div></div>';
+
+            // Get current language
+            const currentLang = window.translationService?.getCurrentLanguage() || 'en';
+
+            // Dynamically import the appropriate content file
+            const contentModule = await import(`./content/educational/${contentType}-${currentLang}.js`);
+            const content = contentModule.default || contentModule.content;
+
+            this.renderEducationalContent(content);
+
+        } catch (error) {
+            console.error('Failed to load educational content:', error);
+            educationContent.innerHTML = `
+                <div class="max-w-4xl mx-auto py-8">
+                    <div class="text-center">
+                        <h1 class="text-2xl font-bold text-red-600 mb-4">Content Not Available</h1>
+                        <p class="text-gray-600 mb-6">Sorry, this educational content is not available in the selected language.</p>
+                        <button onclick="window.location.hash = '#education'" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                            Back to Education
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    renderEducationalContent(content) {
+        const educationContent = document.getElementById('educationContent');
+        if (!educationContent || !content) return;
+
+        const t = window.translationService?.translate.bind(window.translationService) || ((key) => key);
+
+        // Generate table of contents
+        const tocItems = content.tableOfContents.map(item =>
+            `<li><a href="#${item.id}" class="text-orange-500 hover:text-orange-600">${item.title}</a></li>`
+        ).join('');
+
+        // Generate sections
+        const sectionsHtml = content.sections.map(section => `
+            <section id="${section.id}" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">${section.title}</h2>
+                <div class="prose prose-lg max-w-none">
+                    ${section.content}
+                </div>
+            </section>
+        `).join('');
+
+        // Generate related topics
+        const relatedTopicsHtml = content.relatedTopics.map(topic => `
+            <a href="${topic.link}" class="block bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <h4 class="font-semibold text-gray-800 mb-2">${topic.title}</h4>
+                <p class="text-gray-600 text-sm">${topic.description}</p>
+            </a>
+        `).join('');
+
+        educationContent.innerHTML = `
+            <!-- Reading Progress Bar -->
+            <div class="fixed top-0 left-0 w-full z-50">
+                <div id="readingProgress" class="h-1 bg-orange-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <div class="max-w-4xl mx-auto py-8">
+                <!-- Header -->
+                <div class="mb-8">
+                    <nav class="text-sm text-gray-500 mb-4">
+                        <a href="#education" class="hover:text-orange-500" data-translate="education.backToEducation">Back to Education</a>
+                        <span class="mx-2">→</span>
+                        <span>${content.title}</span>
+                    </nav>
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
+                    <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
+                    <div class="flex items-center space-x-6 text-sm text-gray-500">
+                        <span data-translate="education.readingTime">${content.readingTime} min read</span>
+                        <span data-translate="education.lastUpdated">Last updated: ${content.lastUpdated}</span>
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-4 gap-8">
+                    <!-- Table of Contents -->
+                    <div class="lg:col-span-1">
+                        <div class="sticky top-4">
+                            <h3 class="font-semibold text-gray-800 mb-4" data-translate="education.tableOfContents">Table of Contents</h3>
+                            <ul class="space-y-2 text-sm">
+                                ${tocItems}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="lg:col-span-3">
+                        <article class="prose prose-lg max-w-none">
+                            ${sectionsHtml}
+                        </article>
+
+                        <!-- Related Topics -->
+                        ${content.relatedTopics && content.relatedTopics.length > 0 ? `
+                        <div class="mt-12 pt-8 border-t">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-6" data-translate="education.relatedTopics">Related Topics</h3>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                ${relatedTopicsHtml}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Smooth scroll for table of contents links
+        const tocLinks = educationContent.querySelectorAll('a[href^="#"]');
+        tocLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Initialize reading progress and active section tracking
+        this.initReadingProgress();
+        this.initActiveSection();
+
+        // Update translations
+        if (window.translationService) {
+            window.translationService.updatePageTranslations();
+        }
+    }
+
+    initReadingProgress() {
+        const progressBar = document.getElementById('readingProgress');
+        if (!progressBar) return;
+
+        // Remove any existing scroll listeners
+        if (this.readingProgressHandler) {
+            window.removeEventListener('scroll', this.readingProgressHandler);
+        }
+
+        this.readingProgressHandler = () => {
+            const article = document.querySelector('article');
+            if (!article) return;
+
+            const articleTop = article.offsetTop;
+            const articleHeight = article.offsetHeight;
+            const scrollTop = window.pageYOffset;
+            const windowHeight = window.innerHeight;
+
+            // Calculate reading progress
+            const startReading = articleTop - windowHeight * 0.3;
+            const endReading = articleTop + articleHeight - windowHeight * 0.7;
+            const totalReadingDistance = endReading - startReading;
+
+            let progress = 0;
+            if (scrollTop > startReading) {
+                progress = Math.min((scrollTop - startReading) / totalReadingDistance, 1);
+            }
+
+            progressBar.style.width = `${progress * 100}%`;
+        };
+
+        window.addEventListener('scroll', this.readingProgressHandler);
+    }
+
+    initActiveSection() {
+        // Remove any existing intersection observer
+        if (this.sectionObserver) {
+            this.sectionObserver.disconnect();
+        }
+
+        const sections = document.querySelectorAll('section[id]');
+        const tocLinks = document.querySelectorAll('a[href^="#"]');
+
+        if (sections.length === 0 || tocLinks.length === 0) return;
+
+        this.sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Remove active class from all TOC links
+                    tocLinks.forEach(link => {
+                        link.classList.remove('font-semibold', 'text-orange-600');
+                        link.classList.add('text-orange-500');
+                    });
+
+                    // Add active class to current section's TOC link
+                    const activeLink = document.querySelector(`a[href="#${entry.target.id}"]`);
+                    if (activeLink) {
+                        activeLink.classList.remove('text-orange-500');
+                        activeLink.classList.add('font-semibold', 'text-orange-600');
+                    }
+                }
+            });
+        }, {
+            rootMargin: '-20% 0px -70% 0px',
+            threshold: 0
+        });
+
+        sections.forEach(section => {
+            this.sectionObserver.observe(section);
+        });
+    }
+
+    cleanup() {
+        // Clean up event listeners and observers when navigating away
+        if (this.readingProgressHandler) {
+            window.removeEventListener('scroll', this.readingProgressHandler);
+            this.readingProgressHandler = null;
+        }
+        if (this.sectionObserver) {
+            this.sectionObserver.disconnect();
+            this.sectionObserver = null;
+        }
+        // Clean up any pending asset translation attempts
+        if (this.pendingAssetTranslation) {
+            this.pendingAssetTranslation = false;
+        }
+    }
+
+    async initAssetsPage(preselectedAsset = null) {
         const selector = document.getElementById('assetSelector');
         if (!selector) return;
 
@@ -476,7 +959,28 @@ class BitcoinGame {
         newSelector.addEventListener('change', () => {
             this.updateAssetChart();
             this.loadAssetPageMetrics();
+            this.updateAssetDescription();
         });
+
+        // Initialize description for default selected asset
+        this.updateAssetDescription();
+
+        // Update page translations for static dropdown categories
+        // (This handles the <optgroup> data-translate attributes)
+        // Wait for translation service to be ready before updating
+        if (window.translationService) {
+            try {
+                await window.translationService.updatePageTranslations();
+            } catch (error) {
+                console.error('Failed to update page translations:', error);
+                // Fallback: try again after a short delay
+                setTimeout(() => {
+                    if (window.translationService) {
+                        window.translationService.updatePageTranslations();
+                    }
+                }, 500);
+            }
+        }
     }
 
     async loadAssetPageMetrics() {
@@ -562,17 +1066,24 @@ class BitcoinGame {
                         const assetMultiplier = (details.assetPriceCurrent / details.assetPriceOld).toFixed(1);
                         const btcMultiplier = (details.btcPriceCurrent / details.btcPriceOld).toFixed(1);
 
-                        const periodLabel = period === '24h' ? '24 hours ago' :
-                                          period === '1y' ? '1 year ago' :
-                                          period === '5y' ? '5 years ago' :
-                                          period === '10y' ? '10 years ago' : period;
+                        // Use translated period labels
+                        const periodLabelKey = period === '24h' ? 'time.twentyFourHoursAgo' :
+                                              period === '1y' ? 'time.oneYearAgo' :
+                                              period === '5y' ? 'time.fiveYearsAgo' :
+                                              period === '10y' ? 'time.tenYearsAgo' : period;
 
-                        const tooltip = `${selectedAsset} vs Bitcoin Performance (${period})\n\n` +
+                        const periodLabel = window.translationService?.translate(periodLabelKey) || period;
+                        const vsPerformance = window.translationService?.translate('tooltips.vsPerformance') || 'vs Bitcoin Performance';
+                        const netPerformance = window.translationService?.translate('tooltips.netPerformance') || 'Net performance';
+                        const bitcoinGrew = window.translationService?.translate('tooltips.bitcoinGrew') || 'Bitcoin grew';
+                        const vs = window.translationService?.translate('tooltips.vs') || 'vs';
+
+                        const tooltip = `${selectedAsset} ${vsPerformance} (${period})\n\n` +
                                       `${periodLabel}:\n` +
                                       `${selectedAsset}: $${details.assetPriceOld.toLocaleString()} → $${details.assetPriceCurrent.toLocaleString()} (${assetMultiplier}x)\n` +
                                       `Bitcoin: $${details.btcPriceOld.toLocaleString()} → $${details.btcPriceCurrent.toLocaleString()} (${btcMultiplier}x)\n\n` +
-                                      `Bitcoin grew ${btcMultiplier}x vs ${selectedAsset}'s ${assetMultiplier}x\n` +
-                                      `Net performance: ${value}%`;
+                                      `${bitcoinGrew} ${btcMultiplier}x ${vs} ${selectedAsset}'s ${assetMultiplier}x\n` +
+                                      `${netPerformance}: ${value}%`;
 
                         // Apply tooltip to the container div instead of just the text
                         this.setupPerformanceTooltip(container || element, tooltip);
@@ -580,11 +1091,14 @@ class BitcoinGame {
                         const value = performance.toFixed(2);
                         element.textContent = `${performance > 0 ? '+' : ''}${value}%`;
                         element.className = `font-semibold ${performance > 0 ? 'text-green-600' : 'text-red-600'}`;
-                        this.setupPerformanceTooltip(container || element, `Performance vs Bitcoin over ${period}`);
+                        const performanceOverPeriod = window.translationService?.translate('tooltips.performanceOverPeriod') || 'Performance vs Bitcoin over';
+                        this.setupPerformanceTooltip(container || element, `${performanceOverPeriod} ${period}`);
                     } else {
                         element.textContent = 'N/A';
                         element.className = 'font-semibold text-gray-500';
-                        this.setupPerformanceTooltip(container || element, `Data not available for ${period} period`);
+                        const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                        const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                        this.setupPerformanceTooltip(container || element, `${dataNotAvailable} ${period} ${periodText}`);
                     }
                 }
             });
@@ -600,8 +1114,12 @@ class BitcoinGame {
                 if (assetPriceInBTC && btcPrice && assetPriceInUSD) {
                     // Convert satoshis to BTC (divide by 100,000,000)
                     const assetPriceInBTCConverted = assetPriceInBTC / 100000000;
-                    const btcTooltip = `Current Bitcoin Price: $${btcPrice.toLocaleString()}\n` +
-                                      `Current ${selectedAsset} Price: $${assetPriceInUSD.toLocaleString()}\n\n` +
+                    const currentBitcoinPrice = window.translationService?.translate('tooltips.currentBitcoinPrice') || 'Current Bitcoin Price';
+                    const currentAssetPriceTemplate = window.translationService?.translate('tooltips.currentPrice') || 'Current %ASSET% Price';
+                    const currentAssetPrice = currentAssetPriceTemplate.replace('%ASSET%', selectedAsset);
+
+                    const btcTooltip = `${currentBitcoinPrice}: $${btcPrice.toLocaleString()}\n` +
+                                      `${currentAssetPrice}: $${assetPriceInUSD.toLocaleString()}\n\n` +
                                       `1 ${selectedAsset} = ${assetPriceInBTCConverted.toFixed(8)} BTC\n` +
                                       `1 BTC = ${(1/assetPriceInBTCConverted).toFixed(2)} ${selectedAsset}`;
 
@@ -638,6 +1156,7 @@ class BitcoinGame {
 
         // Different symbol mapping based on denomination
         const symbolMapBTC = {
+            // Original assets
             'XAU': 'TVC:GOLD/BITSTAMP:BTCUSD',
             'XAG': 'TVC:SILVER/BITSTAMP:BTCUSD',
             'SPY': 'AMEX:SPY/BITSTAMP:BTCUSD',
@@ -648,10 +1167,41 @@ class BitcoinGame {
             'AMZN': 'NASDAQ:AMZN/BITSTAMP:BTCUSD',
             'NVDA': 'NASDAQ:NVDA/BITSTAMP:BTCUSD',
             'VNQ': 'AMEX:VNQ/BITSTAMP:BTCUSD',
-            'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD'
+            'WTI': 'TVC:USOIL/BITSTAMP:BTCUSD',
+
+            // New stocks
+            'META': 'NASDAQ:META/BITSTAMP:BTCUSD',
+            'BRK-B': 'NYSE:BRK.B/BITSTAMP:BTCUSD',
+            'JNJ': 'NYSE:JNJ/BITSTAMP:BTCUSD',
+            'V': 'NYSE:V/BITSTAMP:BTCUSD',
+            'WMT': 'NYSE:WMT/BITSTAMP:BTCUSD',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT/BITSTAMP:BTCUSD',
+            'HYG': 'AMEX:HYG/BITSTAMP:BTCUSD',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS/BITSTAMP:BTCUSD',
+            'EFA': 'AMEX:EFA/BITSTAMP:BTCUSD',
+            'EWU': 'AMEX:EWU/BITSTAMP:BTCUSD',
+            'EWG': 'AMEX:EWG/BITSTAMP:BTCUSD',
+            'EWJ': 'AMEX:EWJ/BITSTAMP:BTCUSD',
+
+            // REITs
+            'VNO': 'NYSE:VNO/BITSTAMP:BTCUSD',
+            'PLD': 'NYSE:PLD/BITSTAMP:BTCUSD',
+            'EQIX': 'NASDAQ:EQIX/BITSTAMP:BTCUSD',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA/BITSTAMP:BTCUSD',
+            'DBA': 'AMEX:DBA/BITSTAMP:BTCUSD',
+            'CPER': 'AMEX:CPER/BITSTAMP:BTCUSD',
+            'WEAT': 'AMEX:WEAT/BITSTAMP:BTCUSD',
+            'UNG': 'AMEX:UNG/BITSTAMP:BTCUSD'
         };
 
         const symbolMapUSD = {
+            // Original assets
             'XAU': 'TVC:GOLD',
             'XAG': 'TVC:SILVER',
             'SPY': 'AMEX:SPY',
@@ -662,7 +1212,37 @@ class BitcoinGame {
             'AMZN': 'NASDAQ:AMZN',
             'NVDA': 'NASDAQ:NVDA',
             'VNQ': 'AMEX:VNQ',
-            'WTI': 'TVC:USOIL'
+            'WTI': 'TVC:USOIL',
+
+            // New stocks
+            'META': 'NASDAQ:META',
+            'BRK-B': 'NYSE:BRK.B',
+            'JNJ': 'NYSE:JNJ',
+            'V': 'NYSE:V',
+            'WMT': 'NYSE:WMT',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT',
+            'HYG': 'AMEX:HYG',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
+
+            // REITs
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            'UNG': 'AMEX:UNG'
         };
 
         const symbolMap = denomination === 'USD' ? symbolMapUSD : symbolMapBTC;
@@ -705,6 +1285,310 @@ class BitcoinGame {
         }
     }
 
+    updateAssetDescription() {
+        const selector = document.getElementById('assetSelector');
+        if (!selector) return;
+
+        const selectedAsset = selector.value;
+        const titleElement = document.getElementById('assetTitle');
+        const descriptionElement = document.getElementById('assetDescriptionText');
+        const categoryElement = document.getElementById('assetCategory');
+
+        const assetDescriptions = {
+            // Popular Assets
+            'XAU': {
+                title: 'Gold (XAU)',
+                description: 'Gold has been humanity\'s store of value for over 5,000 years and remains the most recognized alternative to fiat currency. Central banks hold gold as reserves, and investors traditionally view it as a hedge against inflation and economic uncertainty. However, when measured against Bitcoin, gold has consistently underperformed, revealing Bitcoin\'s superior monetary properties as the ultimate store of value for the digital age.',
+                category: 'Commodity',
+                tags: ['Traditional Store of Value', 'Central Bank Reserve']
+            },
+            'SPY': {
+                title: 'SPDR S&P 500 ETF (SPY)',
+                description: 'SPY tracks the S&P 500 index, representing the largest 500 publicly traded companies in America. It\'s the world\'s largest and most traded ETF, with over $400 billion in assets. Often considered the benchmark for U.S. stock market performance, SPY is used by institutions and individuals as a core holding. Yet even this diversified exposure to America\'s top companies has lost significant value when priced in Bitcoin.',
+                category: 'Stock ETF',
+                tags: ['Market Benchmark', 'Institutional Favorite']
+            },
+            'AAPL': {
+                title: 'Apple Inc. (AAPL)',
+                description: 'Apple is the world\'s most valuable company, known for revolutionary products like the iPhone, iPad, and Mac. With over $3 trillion in market capitalization, Apple has been many investors\' favorite "safe" technology stock. The company generates massive cash flows and has a loyal customer base globally. Despite its dominance, even Apple\'s impressive growth pales in comparison to Bitcoin\'s performance as a store of value.',
+                category: 'Technology Stock',
+                tags: ['Largest Company', 'Consumer Technology']
+            },
+            'TSLA': {
+                title: 'Tesla Inc. (TSLA)',
+                description: 'Tesla revolutionized the automotive industry by making electric vehicles mainstream and desirable. Led by Elon Musk, Tesla has expanded into energy storage, solar panels, and autonomous driving technology. The company famously added Bitcoin to its treasury in 2021, recognizing its superior monetary properties. Tesla represents the future of transportation, yet Bitcoin represents the future of money.',
+                category: 'Technology Stock',
+                tags: ['Electric Vehicles', 'Bitcoin Adopter']
+            },
+            'META': {
+                title: 'Meta Platforms Inc. (META)',
+                description: 'Meta (formerly Facebook) owns the world\'s largest social media platforms including Facebook, Instagram, and WhatsApp, connecting over 3 billion people globally. The company is heavily investing in the "metaverse" and virtual reality technologies. Despite controlling how billions communicate and share information, Meta\'s stock has struggled to maintain its value against Bitcoin\'s monetary superiority.',
+                category: 'Technology Stock',
+                tags: ['Social Media', 'Metaverse Pioneer']
+            },
+
+            // Technology Stocks
+            'MSFT': {
+                title: 'Microsoft Corporation (MSFT)',
+                description: 'Microsoft is a global technology leader in cloud computing (Azure), productivity software (Office 365), and operating systems (Windows). The company has successfully transitioned to a subscription-based model and dominates enterprise software. With consistent revenue growth and strong fundamentals, Microsoft represents "stable" tech investing, yet it still loses purchasing power when measured in Bitcoin.',
+                category: 'Technology Stock',
+                tags: ['Cloud Computing', 'Enterprise Software']
+            },
+            'GOOGL': {
+                title: 'Alphabet Inc. (GOOGL)',
+                description: 'Alphabet is Google\'s parent company, controlling the world\'s dominant search engine and advertising platform. Google processes over 8 billion searches daily and owns YouTube, Android, and Google Cloud. The company has near-monopolistic control over internet information flow, generating massive profits from advertising. Yet even this digital dominance cannot compete with Bitcoin as a store of value.',
+                category: 'Technology Stock',
+                tags: ['Search Engine', 'Digital Advertising']
+            },
+            'AMZN': {
+                title: 'Amazon.com Inc. (AMZN)',
+                description: 'Amazon transformed from an online bookstore into the "everything store" and cloud computing leader (AWS). The company dominates e-commerce and provides the infrastructure powering much of the modern internet. Amazon Web Services alone generates billions in high-margin revenue. Despite revolutionizing commerce and computing, Amazon\'s stock value has declined significantly when priced in Bitcoin.',
+                category: 'Technology Stock',
+                tags: ['E-commerce', 'Cloud Infrastructure']
+            },
+            'NVDA': {
+                title: 'NVIDIA Corporation (NVDA)',
+                description: 'NVIDIA designs the graphics processing units (GPUs) that power gaming, artificial intelligence, and cryptocurrency mining. The company\'s chips are essential for AI development and machine learning applications. Ironically, many NVIDIA GPUs are used to mine Bitcoin and other cryptocurrencies, yet the company\'s stock still underperforms Bitcoin as an investment.',
+                category: 'Technology Stock',
+                tags: ['AI Hardware', 'GPU Manufacturing']
+            },
+
+            // Traditional Stocks
+            'BRK-B': {
+                title: 'Berkshire Hathaway Inc. Class B (BRK-B)',
+                description: 'Berkshire Hathaway is Warren Buffett\'s legendary investment conglomerate, often called the world\'s most successful investment vehicle. The company owns dozens of businesses and holds massive stock positions in Apple, Coca-Cola, and other blue-chip companies. Buffett has famously criticized Bitcoin, calling it "rat poison squared," yet even his proven investment strategy has underperformed Bitcoin over the past decade.',
+                category: 'Conglomerate',
+                tags: ['Warren Buffett', 'Value Investing']
+            },
+            'JNJ': {
+                title: 'Johnson & Johnson (JNJ)',
+                description: 'Johnson & Johnson is one of the world\'s largest healthcare companies, producing pharmaceuticals, medical devices, and consumer products. The company has paid increasing dividends for 59 consecutive years, making it a favorite among income investors. J&J represents stability and essential healthcare needs, yet even this defensive stock has lost significant value when measured against Bitcoin.',
+                category: 'Healthcare Stock',
+                tags: ['Dividend Aristocrat', 'Healthcare Essential']
+            },
+            'V': {
+                title: 'Visa Inc. (V)',
+                description: 'Visa operates the world\'s largest payment network, processing over 150 billion transactions annually across 200+ countries. The company earns fees on nearly every credit and debit card transaction globally, creating a near-monopolistic "tollbooth" business model. Ironically, while Visa facilitates fiat currency transactions, Bitcoin offers a superior payment network that eliminates the need for intermediaries.',
+                category: 'Financial Services',
+                tags: ['Payment Network', 'Transaction Fees']
+            },
+            'WMT': {
+                title: 'Walmart Inc. (WMT)',
+                description: 'Walmart is the world\'s largest retailer, serving 230 million customers weekly across 10,500 stores in 24 countries. The company pioneered efficient supply chain management and low-cost retail operations. Walmart represents essential consumer goods and services that people need regardless of economic conditions, yet even this defensive retail giant has declined in value when priced in Bitcoin.',
+                category: 'Retail Stock',
+                tags: ['Largest Retailer', 'Consumer Staples']
+            },
+
+            // Bonds
+            'TLT': {
+                title: 'iShares 20+ Year Treasury Bond ETF (TLT)',
+                description: 'TLT provides exposure to U.S. Treasury bonds with 20+ year maturities, traditionally considered the "safest" investment in the world. These bonds are backed by the full faith and credit of the U.S. government and have been the go-to safe haven for institutional investors. However, when measured against Bitcoin, even the safest government bonds have lost tremendous purchasing power, highlighting the debasement of fiat currency.',
+                category: 'Bond ETF',
+                tags: ['Government Bonds', 'Traditional Safe Haven']
+            },
+            'HYG': {
+                title: 'iShares iBoxx $ High Yield Corporate Bond ETF (HYG)',
+                description: 'HYG tracks high-yield corporate bonds, also known as "junk bonds," from companies with lower credit ratings. These bonds offer higher interest rates to compensate for increased default risk. Professional investors use HYG for income generation and portfolio diversification. Despite offering higher yields than government bonds, HYG has still lost significant value when priced in Bitcoin.',
+                category: 'Bond ETF',
+                tags: ['High Yield', 'Corporate Debt']
+            },
+
+            // International Markets
+            'EWU': {
+                title: 'iShares MSCI United Kingdom ETF (EWU)',
+                description: 'EWU provides exposure to large and mid-capitalization UK stocks, including giants like Shell, AstraZeneca, and ASML. This ETF tracks the performance of the UK economy and provides investors with easy access to British markets. EWU shows how even the most established international markets have significantly underperformed Bitcoin, demonstrating Bitcoin\'s global monetary superiority over traditional geographic diversification strategies.',
+                category: 'International ETF',
+                tags: ['UK Market', 'European Exposure']
+            },
+            'EWG': {
+                title: 'iShares MSCI Germany ETF (EWG)',
+                description: 'EWG provides exposure to German equities, tracking the largest companies including BMW, SAP, and Siemens. Germany has Europe\'s largest economy and is known for manufacturing excellence and engineering prowess. This ETF represents German industrial strength and European economic leadership, yet even Germany\'s robust economy has seen this ETF lose substantial value when measured against Bitcoin.',
+                category: 'International ETF',
+                tags: ['German Market', 'Industrial Economy']
+            },
+            'EWJ': {
+                title: 'iShares MSCI Japan ETF (EWJ)',
+                description: 'EWJ provides exposure to Japanese equities, including Japan\'s largest companies like Toyota, Sony, and SoftBank. Japan has the world\'s third-largest economy and is known for technological innovation and manufacturing excellence. Japanese markets peaked in 1989 and have struggled for decades, illustrating the consequences of monetary manipulation. Bitcoin offers a stark contrast as a deflationary alternative to Japan\'s inflationary monetary policy.',
+                category: 'International ETF',
+                tags: ['Japanese Market', 'Technology Innovation']
+            },
+            'VXUS': {
+                title: 'Vanguard Total International Stock ETF (VXUS)',
+                description: 'VXUS provides broad exposure to international developed and emerging markets outside the United States, holding over 7,000 stocks from companies in Europe, Asia, and emerging markets. This ETF is popular for global diversification, giving investors exposure to international economic growth. However, even this broad international diversification has failed to preserve value when measured against Bitcoin.',
+                category: 'International ETF',
+                tags: ['Global Diversification', 'Emerging Markets']
+            },
+            'EFA': {
+                title: 'iShares MSCI EAFE ETF (EFA)',
+                description: 'EFA tracks developed international markets in Europe, Australasia, and the Far East (EAFE), excluding the U.S. and Canada. The fund holds companies like Nestlé, ASML, and Samsung, representing established international businesses. EFA is a cornerstone holding for investors seeking international developed market exposure, yet it has consistently lost value when priced in Bitcoin.',
+                category: 'International ETF',
+                tags: ['Developed Markets', 'International Blue Chips']
+            },
+
+            // Real Estate
+            'VNQ': {
+                title: 'Vanguard Real Estate ETF (VNQ)',
+                description: 'VNQ provides exposure to U.S. real estate investment trusts (REITs), which own and operate income-producing real estate like shopping centers, apartments, and office buildings. Real estate has traditionally been considered a hedge against inflation and a store of value. However, when measured against Bitcoin, even real estate has proven to be a poor store of value in the digital age.',
+                category: 'REIT ETF',
+                tags: ['Real Estate', 'Income Producing']
+            },
+            'VNO': {
+                title: 'Vornado Realty Trust (VNO)',
+                description: 'Vornado is one of the largest owners and managers of commercial real estate in the United States, with a portfolio concentrated in Manhattan and other prime locations. The company owns iconic properties including office buildings and retail spaces in New York City. Despite owning some of the world\'s most valuable real estate, VNO has lost significant value when priced in Bitcoin.',
+                category: 'REIT',
+                tags: ['Commercial Real Estate', 'Manhattan Properties']
+            },
+            'PLD': {
+                title: 'Prologis Inc. (PLD)',
+                description: 'Prologis is the world\'s largest industrial real estate company, owning and developing logistics facilities and distribution centers. The company benefits from the growth of e-commerce and global supply chains, with properties leased by Amazon, FedEx, and other logistics leaders. Despite the essential nature of logistics real estate, PLD has underperformed Bitcoin as a store of value.',
+                category: 'REIT',
+                tags: ['Industrial Real Estate', 'E-commerce Infrastructure']
+            },
+            'EQIX': {
+                title: 'Equinix Inc. (EQIX)',
+                description: 'Equinix operates data centers and provides colocation services for cloud computing, content delivery, and digital infrastructure. The company\'s facilities house the servers and networking equipment that power the modern internet. Equinix is essential digital infrastructure, yet even this critical technology real estate has declined in value when measured against Bitcoin.',
+                category: 'REIT',
+                tags: ['Data Centers', 'Digital Infrastructure']
+            },
+
+            // Commodities
+            'XAG': {
+                title: 'Silver (XAG)',
+                description: 'Silver is both a precious metal and an industrial commodity, used in electronics, solar panels, and medical applications. Often called "poor man\'s gold," silver has monetary properties but also significant industrial demand. Silver bugs argue it\'s undervalued relative to gold, but when measured against Bitcoin, silver has lost substantial purchasing power, demonstrating Bitcoin\'s superior monetary properties.',
+                category: 'Commodity',
+                tags: ['Precious Metal', 'Industrial Use']
+            },
+            'WTI': {
+                title: 'Crude Oil WTI (WTI)',
+                description: 'West Texas Intermediate (WTI) crude oil is a key energy commodity and economic indicator. Oil powers transportation, heating, and chemical production worldwide. Countries have fought wars over oil access, and oil prices significantly impact global inflation. Despite oil\'s critical importance to the global economy, it has lost value against Bitcoin, highlighting Bitcoin\'s emergence as the superior store of value.',
+                category: 'Commodity',
+                tags: ['Energy Source', 'Economic Indicator']
+            },
+            'CPER': {
+                title: 'United States Copper Index Fund (CPER)',
+                description: 'CPER provides exposure to copper prices through futures contracts, allowing investors to participate in copper\'s performance without physical storage. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. This ETF makes copper investing accessible to retail investors, yet even this economically critical metal has declined significantly when priced in Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Industrial Metal', 'Economic Indicator']
+            },
+            'WEAT': {
+                title: 'Teucrium Wheat Fund (WEAT)',
+                description: 'WEAT provides exposure to wheat prices through futures contracts, allowing investors to gain exposure to one of the world\'s most important food crops. Wheat feeds billions of people globally and prices are influenced by weather, geopolitics, and global demand. This ETF makes agricultural commodity investing accessible, yet despite representing essential food security, it has lost purchasing power when measured against Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Agricultural Exposure', 'Food Security']
+            },
+            'UNG': {
+                title: 'United States Natural Gas Fund (UNG)',
+                description: 'UNG provides exposure to natural gas prices through futures contracts, allowing investors to participate in this critical energy commodity. Natural gas is essential for heating, electricity generation, and industrial processes, gaining importance as a "cleaner" fossil fuel. This ETF makes energy commodity investing accessible to retail investors, yet despite natural gas\'s essential role in the energy transition, it has underperformed Bitcoin as a store of value.',
+                category: 'Commodity ETF',
+                tags: ['Natural Gas', 'Energy Transition']
+            },
+            'URA': {
+                title: 'Global X Uranium ETF (URA)',
+                description: 'URA provides exposure to companies involved in uranium mining and nuclear energy production. Uranium is essential for nuclear power generation, which provides clean, baseload electricity. With growing focus on carbon-free energy, uranium demand is expected to increase. Nuclear energy powers Bitcoin mining operations globally, yet even this critical energy commodity has lost value when priced in Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Nuclear Energy', 'Clean Power']
+            },
+            'DBA': {
+                title: 'Invesco DB Agriculture Fund (DBA)',
+                description: 'DBA tracks agricultural commodities including corn, wheat, soybeans, and sugar - the building blocks of global food systems. Agriculture feeds the world\'s population and is essential for human survival. Climate change and population growth are increasing agricultural commodity demand. Despite representing humanity\'s most basic needs, agricultural commodities have lost significant value when measured against Bitcoin.',
+                category: 'Commodity ETF',
+                tags: ['Agriculture', 'Food Security']
+            }
+        };
+
+        const assetInfo = assetDescriptions[selectedAsset];
+        if (assetInfo) {
+            // Check if translation service is ready and has translations loaded
+            const isTranslationReady = window.translationService &&
+                                     typeof window.translationService.translate === 'function' &&
+                                     window.translationService.getCurrentLanguage &&
+                                     window.translationService.getCurrentLanguage() !== null;
+
+            let translatedTitle, translatedDescription, translatedCategory;
+
+            if (isTranslationReady) {
+                // Translation service is ready, try to get translations
+                translatedTitle = window.translationService.translate(`assets.assetDescriptions.${selectedAsset}.title`);
+                translatedDescription = window.translationService.translate(`assets.assetDescriptions.${selectedAsset}.description`);
+                translatedCategory = window.translationService.translate(`assets.categories.${assetInfo.category}`);
+            }
+
+            // Use translated version if available and valid, otherwise fallback to hardcoded
+            titleElement.textContent = translatedTitle && translatedTitle !== `assets.assetDescriptions.${selectedAsset}.title`
+                ? translatedTitle
+                : assetInfo.title;
+            descriptionElement.textContent = translatedDescription && translatedDescription !== `assets.assetDescriptions.${selectedAsset}.description`
+                ? translatedDescription
+                : assetInfo.description;
+            categoryElement.textContent = translatedCategory && translatedCategory !== `assets.categories.${assetInfo.category}`
+                ? translatedCategory
+                : assetInfo.category;
+
+            // If translation service wasn't ready, set up to retry when it becomes ready
+            if (!isTranslationReady && !this.pendingAssetTranslation) {
+                this.pendingAssetTranslation = true;
+                let retryCount = 0;
+                const maxRetries = 50; // Maximum 5 seconds of retrying (50 * 100ms)
+
+                // Listen for when translation service becomes ready
+                const checkAndRetranslate = () => {
+                    // Stop retrying if we're no longer on assets page or exceeded max retries
+                    if (this.currentPage !== 'assets' || retryCount >= maxRetries) {
+                        this.pendingAssetTranslation = false;
+                        return;
+                    }
+
+                    if (window.translationService &&
+                        typeof window.translationService.translate === 'function' &&
+                        window.translationService.getCurrentLanguage &&
+                        window.translationService.getCurrentLanguage() !== null) {
+                        this.pendingAssetTranslation = false;
+                        // Re-translate the current asset description
+                        this.updateAssetDescription();
+                    } else {
+                        // Check again in a short while
+                        retryCount++;
+                        setTimeout(checkAndRetranslate, 100);
+                    }
+                };
+                setTimeout(checkAndRetranslate, 100);
+            }
+
+            // Update category color based on type
+            const categoryColors = {
+                'Technology Stock': 'bg-blue-100 text-blue-800',
+                'Stock ETF': 'bg-green-100 text-green-800',
+                'Commodity': 'bg-yellow-100 text-yellow-800',
+                'Bond ETF': 'bg-purple-100 text-purple-800',
+                'International Index': 'bg-indigo-100 text-indigo-800',
+                'International ETF': 'bg-indigo-100 text-indigo-800',
+                'REIT': 'bg-orange-100 text-orange-800',
+                'REIT ETF': 'bg-orange-100 text-orange-800',
+                'Commodity ETF': 'bg-yellow-100 text-yellow-800',
+                'Conglomerate': 'bg-gray-100 text-gray-800',
+                'Healthcare Stock': 'bg-red-100 text-red-800',
+                'Financial Services': 'bg-emerald-100 text-emerald-800',
+                'Retail Stock': 'bg-pink-100 text-pink-800'
+            };
+
+            categoryElement.className = `px-3 py-1 text-sm rounded-full font-medium ${categoryColors[assetInfo.category] || 'bg-gray-100 text-gray-800'}`;
+
+            // Render tags dynamically
+            const tagsContainer = document.getElementById('assetTags');
+            if (tagsContainer && assetInfo.tags) {
+                tagsContainer.innerHTML = assetInfo.tags.map(tag => {
+                    // Use the same readiness check for tags
+                    let translatedTag;
+                    if (isTranslationReady) {
+                        translatedTag = window.translationService.translate(`assets.tags.${tag}`);
+                    }
+                    const displayTag = translatedTag && translatedTag !== `assets.tags.${tag}` ? translatedTag : tag;
+                    return `<span class="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">${displayTag}</span>`;
+                }).join('');
+            }
+        }
+    }
+
     updateNavForLoggedInUser() {
         document.getElementById('navLoginBtn').classList.add('hidden');
         document.getElementById('navUserInfo').classList.remove('hidden');
@@ -714,7 +1598,7 @@ class BitcoinGame {
 
         // Show admin link if user is admin
         const navAdminLink = document.getElementById('navAdminLink');
-        if (this.user?.isAdmin && navAdminLink) {
+        if (this.isCurrentUserAdmin() && navAdminLink) {
             navAdminLink.classList.remove('hidden');
         }
     }
@@ -902,6 +1786,9 @@ class BitcoinGame {
                 selectElement.classList.remove('open');
             });
         });
+
+        // Set & Forget Portfolio Event Listeners
+        this.setupSetForgetEventListeners();
     }
 
     async requestMagicLink() {
@@ -994,7 +1881,8 @@ class BitcoinGame {
             this.loadAssets(),
             this.loadPrices(),
             this.loadPortfolio(),
-            this.loadTradeHistory()
+            this.loadTradeHistory(),
+            this.loadSetForgetPortfolios()
         ]);
 
         // Initialize the amount helper after data is loaded
@@ -1613,16 +2501,53 @@ class BitcoinGame {
 
         // Map assets to TradingView symbols
         const symbolMap = {
+            // Crypto
             'BTC': 'BITSTAMP:BTCUSD',
+
+            // Original stocks
             'AAPL': 'NASDAQ:AAPL',
             'TSLA': 'NASDAQ:TSLA',
             'MSFT': 'NASDAQ:MSFT',
             'GOOGL': 'NASDAQ:GOOGL',
             'AMZN': 'NASDAQ:AMZN',
             'NVDA': 'NASDAQ:NVDA',
+            'SPY': 'AMEX:SPY',
+            'VNQ': 'AMEX:VNQ',
+
+            // New stocks
+            'META': 'NASDAQ:META',
+            'BRK-B': 'NYSE:BRK.B',
+            'JNJ': 'NYSE:JNJ',
+            'V': 'NYSE:V',
+            'WMT': 'NYSE:WMT',
+
+            // Bond ETFs
+            'TLT': 'NASDAQ:TLT',
+            'HYG': 'AMEX:HYG',
+
+            // International ETFs and Indices
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
+
+            // REITs
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+
+            // Commodities
             'XAU': 'TVC:GOLD',
             'XAG': 'TVC:SILVER',
-            'WTI': 'TVC:USOIL'
+            'WTI': 'TVC:USOIL',
+
+            // Commodity ETFs
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            'UNG': 'AMEX:UNG'
         };
 
         // Create ratio symbol
@@ -2765,6 +3690,1510 @@ class BitcoinGame {
             clearInterval(this.adminRefreshInterval);
             this.adminRefreshInterval = null;
         }
+    }
+
+    // Set & Forget Portfolio Methods
+    setupSetForgetEventListeners() {
+        // Create Portfolio button
+        const createBtn = document.getElementById('createSetForgetBtn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                this.showSetForgetModal();
+            });
+        }
+
+        // Close modals
+        const closeModal = document.getElementById('closeSetForgetModal');
+        const cancelBtn = document.getElementById('cancelSetForget');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => {
+                this.hideSetForgetModal();
+            });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.hideSetForgetModal();
+            });
+        }
+
+        // Close details modal
+        const closeDetailsModal = document.getElementById('closeSetForgetDetailsModal');
+        if (closeDetailsModal) {
+            closeDetailsModal.addEventListener('click', () => {
+                this.hideSetForgetDetailsModal();
+            });
+        }
+
+        // Form submission
+        const form = document.getElementById('setForgetForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.createSetForgetPortfolio();
+            });
+        }
+
+
+        // Share portfolio button
+        const shareBtn = document.getElementById('sharePortfolioBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                this.sharePortfolio();
+            });
+        }
+
+        // Delete portfolio button (admin only)
+        const deleteBtn = document.getElementById('deletePortfolioBtn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                this.showDeleteConfirmation();
+            });
+        }
+
+        // Delete confirmation modal
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', () => {
+                this.hideDeleteConfirmation();
+            });
+        }
+
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', () => {
+                this.confirmDeletePortfolio();
+            });
+        }
+
+        // Share modal event listeners
+        const closeShareModal = document.getElementById('closeShareModal');
+        const shareModalCloseBtn = document.getElementById('shareModalCloseBtn');
+        const copyUrlBtn = document.getElementById('copyUrlBtn');
+        const downloadImageBtn = document.getElementById('downloadImageBtn');
+
+        if (closeShareModal) {
+            // Remove existing listeners to prevent duplicates
+            closeShareModal.replaceWith(closeShareModal.cloneNode(true));
+            const freshCloseBtn = document.getElementById('closeShareModal');
+            if (freshCloseBtn) {
+                freshCloseBtn.addEventListener('click', () => {
+                    this.hideShareModal();
+                });
+            }
+        }
+        if (shareModalCloseBtn) {
+            shareModalCloseBtn.replaceWith(shareModalCloseBtn.cloneNode(true));
+            const freshCloseBtn2 = document.getElementById('shareModalCloseBtn');
+            if (freshCloseBtn2) {
+                freshCloseBtn2.addEventListener('click', () => {
+                    this.hideShareModal();
+                });
+            }
+        }
+        if (copyUrlBtn) {
+            copyUrlBtn.replaceWith(copyUrlBtn.cloneNode(true));
+            const freshCopyBtn = document.getElementById('copyUrlBtn');
+            if (freshCopyBtn) {
+                freshCopyBtn.addEventListener('click', () => {
+                    this.copyShareUrl();
+                });
+            }
+        }
+        if (downloadImageBtn) {
+            // Remove any existing listeners first to prevent duplicates
+            downloadImageBtn.replaceWith(downloadImageBtn.cloneNode(true));
+            // Get the fresh element after replacement
+            const freshDownloadBtn = document.getElementById('downloadImageBtn');
+            if (freshDownloadBtn) {
+                freshDownloadBtn.addEventListener('click', () => {
+                    this.downloadPortfolioImage();
+                });
+            }
+        }
+
+        // Donator achievement modal (new)
+        const cancelDonationBtn = document.getElementById('cancelDonationBtn');
+        const donateBtn = document.getElementById('donateBtn');
+
+        if (cancelDonationBtn) {
+            cancelDonationBtn.addEventListener('click', () => {
+                this.hideDonatorAchievementModal();
+            });
+        }
+
+        if (donateBtn) {
+            donateBtn.addEventListener('click', () => {
+                this.handleDonatorAchievement();
+            });
+        }
+
+        // Legacy premium upgrade modal (backwards compatibility)
+        const cancelUpgradeBtn = document.getElementById('cancelUpgradeBtn');
+        const upgradeBtn = document.getElementById('upgradeBtn');
+
+        if (cancelUpgradeBtn) {
+            cancelUpgradeBtn.addEventListener('click', () => {
+                this.hidePremiumUpgradeModal();
+            });
+        }
+
+        if (upgradeBtn) {
+            upgradeBtn.addEventListener('click', () => {
+                this.handlePremiumUpgrade();
+            });
+        }
+
+        // Initialize allocation chart canvas
+        this.initAllocationChart();
+    }
+
+    async loadSetForgetPortfolios() {
+        try {
+            const response = await fetch('/api/set-forget-portfolios', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.setForgetPortfolios = data.portfolios; // Store portfolios for limit checking
+                this.displaySetForgetPortfolios(data.portfolios);
+            } else {
+                console.error('Failed to load Set & Forget portfolios');
+            }
+        } catch (error) {
+            console.error('Error loading Set & Forget portfolios:', error);
+        }
+    }
+
+    displaySetForgetPortfolios(portfolios) {
+        const listContainer = document.getElementById('setForgetPortfoliosList');
+        const noPortfoliosMsg = document.getElementById('noSetForgetPortfolios');
+
+        if (!listContainer) return;
+
+        if (portfolios.length === 0) {
+            listContainer.innerHTML = '';
+            noPortfoliosMsg.classList.remove('hidden');
+            return;
+        }
+
+        noPortfoliosMsg.classList.add('hidden');
+
+        listContainer.innerHTML = portfolios.map(portfolio => {
+            const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+            const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer transition-shadow" onclick="window.app.showPortfolioDetails(${portfolio.portfolio_id})">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-semibold text-lg">${portfolio.portfolio_name}</h3>
+                        <span class="text-sm text-gray-500">📊 ${daysRunning} days tracked</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-600">Initial:</span>
+                            <div class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Current:</span>
+                            <div class="font-medium">${this.formatSatoshis(portfolio.current_value_sats)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Performance:</span>
+                            <div class="font-medium ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Created:</span>
+                            <div class="font-medium">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        ${portfolio.allocations.slice(0, 3).map(alloc =>
+                            `<span class="px-2 py-1 bg-gray-100 rounded text-xs">${alloc.asset_symbol} ${alloc.allocation_percentage}%</span>`
+                        ).join('')}
+                        ${portfolio.allocations.length > 3 ? `<span class="px-2 py-1 bg-gray-100 rounded text-xs">+${portfolio.allocations.length - 3} more</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    showSetForgetModal() {
+        // Check portfolio limit for free users FIRST
+        const currentPortfolioCount = this.setForgetPortfolios ? this.setForgetPortfolios.length : 0;
+        const isAdmin = this.isCurrentUserAdmin();
+        const isDonator = this.user.isDonator || false; // TODO: Implement donator status
+
+        if (!isDonator && !isAdmin && currentPortfolioCount >= 1) {
+            this.showDonatorAchievementModal();
+            return;
+        }
+
+        // Store the BTC balance for validation (but we always use 1 BTC equivalent)
+        const btcHolding = this.currentPortfolio?.holdings?.find(h => h.asset_symbol === 'BTC');
+        this.availableBTC = btcHolding ? btcHolding.amount : 0;
+
+        // We always invest the equivalent of 1 BTC (100M sats)
+        this.investmentAmount = 100000000;
+
+        // Clear form
+        this.resetSetForgetForm();
+
+        // Add initial allocation input
+        this.addAllocationInput();
+
+        // Show modal
+        const modal = document.getElementById('setForgetModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideSetForgetModal() {
+        const modal = document.getElementById('setForgetModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+        this.resetSetForgetForm();
+    }
+
+    hideSetForgetDetailsModal() {
+        const modal = document.getElementById('setForgetDetailsModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    resetSetForgetForm() {
+        const form = document.getElementById('setForgetForm');
+        if (form) {
+            form.reset();
+        }
+
+        const allocationsContainer = document.getElementById('allocationInputs');
+        if (allocationsContainer) {
+            allocationsContainer.innerHTML = '';
+        }
+
+        this.updateAllocationTotal();
+        this.clearAllocationChart();
+    }
+
+    getTranslatedText(key, fallback) {
+        if (!window.translationService) {
+            return fallback;
+        }
+        const translated = window.translationService.translate(key);
+        return translated && translated !== key ? translated : fallback;
+    }
+
+    getTranslatedAssetName(asset) {
+        if (!window.translationService) {
+            return `${asset.name} (${asset.symbol})`;
+        }
+
+        // Create translation key based on symbol
+        const translationKey = `assets.assetNames.${asset.symbol.toLowerCase()}${asset.symbol}`;
+        const translated = window.translationService.translate(translationKey);
+
+        // If translation exists, use it, otherwise fallback to original
+        if (translated && translated !== translationKey) {
+            return translated;
+        }
+
+        return `${asset.name} (${asset.symbol})`;
+    }
+
+    addAllocationInput() {
+        const container = document.getElementById('allocationInputs');
+        if (!container) return;
+
+        // Check if we already have an empty allocation input
+        const existingEmpty = Array.from(container.querySelectorAll('.allocation-input')).find(div => {
+            const select = div.querySelector('.asset-select');
+            return !select.value;
+        });
+
+        if (existingEmpty) {
+            return; // Don't add another empty input
+        }
+
+        const div = document.createElement('div');
+        div.className = 'flex gap-3 items-center allocation-input';
+
+        // Get available assets (exclude already selected ones)
+        const availableAssets = this.getAvailableAssets();
+
+        div.innerHTML = `
+            <select class="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
+                <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+            </select>
+            <div class="relative w-20">
+                <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 percentage-input"
+                       placeholder="0" min="5" max="100" step="0.01">
+                <span class="absolute right-2 top-2 text-gray-500 text-sm">%</span>
+            </div>
+            <button type="button" class="text-red-500 hover:text-red-700 remove-allocation" title="Remove">×</button>
+        `;
+
+        container.appendChild(div);
+
+        // Add event listeners
+        const assetSelect = div.querySelector('.asset-select');
+        const percentageInput = div.querySelector('.percentage-input');
+        const removeBtn = div.querySelector('.remove-allocation');
+
+        assetSelect.addEventListener('change', () => {
+            this.updateAssetDropdowns();
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+
+            // If an asset is selected and we don't have 100% allocation, ensure we have one empty row
+            if (assetSelect.value) {
+                this.ensureOneEmptyAllocation();
+            }
+        });
+
+        percentageInput.addEventListener('input', () => {
+            // Validate percentage range
+            const value = parseFloat(percentageInput.value);
+            if (value < 5 && value > 0) {
+                percentageInput.setCustomValidity('Minimum allocation is 5%');
+            } else if (value > 100) {
+                percentageInput.setCustomValidity('Maximum allocation is 100%');
+            } else {
+                percentageInput.setCustomValidity('');
+            }
+
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+            this.ensureOneEmptyAllocation();
+        });
+
+        removeBtn.addEventListener('click', () => {
+            div.remove();
+            this.updateAssetDropdowns();
+            this.updateAllocationTotal();
+            this.updateAllocationChart();
+            this.ensureOneEmptyAllocation();
+        });
+    }
+
+    ensureOneEmptyAllocation() {
+        const currentTotal = this.getCurrentAllocationTotal();
+
+        // If we're at 100%, don't add empty allocation
+        if (currentTotal >= 100) {
+            return;
+        }
+
+        // Check if we have exactly one empty allocation
+        const emptyAllocations = Array.from(document.querySelectorAll('.allocation-input')).filter(div => {
+            const select = div.querySelector('.asset-select');
+            return !select.value;
+        });
+
+        if (emptyAllocations.length === 0) {
+            this.addAllocationInput();
+        } else if (emptyAllocations.length > 1) {
+            // Remove extra empty allocations, keep only one
+            for (let i = 1; i < emptyAllocations.length; i++) {
+                emptyAllocations[i].remove();
+            }
+        }
+    }
+
+    getCurrentAllocationTotal() {
+        const percentageInputs = document.querySelectorAll('.percentage-input');
+        let total = 0;
+        percentageInputs.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+        return total;
+    }
+
+    getAvailableAssets() {
+        // Get all selected assets
+        const selectedAssets = new Set();
+        document.querySelectorAll('.asset-select').forEach(select => {
+            if (select.value) {
+                selectedAssets.add(select.value);
+            }
+        });
+
+        // Return assets not yet selected (including BTC)
+        return this.assets.filter(asset => !selectedAssets.has(asset.symbol));
+    }
+
+    updateAssetDropdowns() {
+        const availableAssets = this.getAvailableAssets();
+
+        document.querySelectorAll('.asset-select').forEach(select => {
+            const currentValue = select.value;
+            const currentAsset = this.assets.find(asset => asset.symbol === currentValue);
+
+            // Rebuild options
+            select.innerHTML = `
+                <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
+                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${currentValue && currentAsset ? `<option value="${currentValue}" selected style="display:none;">${this.getTranslatedAssetName(currentAsset)}</option>` : ''}
+            `;
+
+            // Restore selected value if it was previously selected
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        });
+    }
+
+    updateAllocationTotal() {
+        const total = this.getCurrentAllocationTotal();
+
+        const totalElement = document.getElementById('totalAllocation');
+        if (totalElement) {
+            totalElement.textContent = `${total.toFixed(2)}%`;
+            totalElement.className = total === 100 ? 'font-medium text-green-600' :
+                                   total > 100 ? 'font-medium text-red-600' : 'font-medium text-gray-700';
+        }
+
+        // Enable/disable submit button - check for valid allocations
+        const submitBtn = document.getElementById('createSetForgetSubmit');
+        if (submitBtn) {
+            const validAllocations = this.getValidAllocations();
+            const hasUnselectedAssets = this.hasUnselectedAssets();
+
+            submitBtn.disabled = total !== 100 || validAllocations.length === 0 || hasUnselectedAssets;
+        }
+    }
+
+    getValidAllocations() {
+        const allocationInputs = document.querySelectorAll('.allocation-input');
+        const validAllocations = [];
+
+        allocationInputs.forEach(input => {
+            const assetSelect = input.querySelector('.asset-select');
+            const percentageInput = input.querySelector('.percentage-input');
+
+            const asset = assetSelect.value;
+            const percentage = parseFloat(percentageInput.value) || 0;
+
+            if (asset && percentage >= 5) {
+                validAllocations.push({ asset, percentage });
+            }
+        });
+
+        return validAllocations;
+    }
+
+    hasUnselectedAssets() {
+        const allocationInputs = document.querySelectorAll('.allocation-input');
+
+        for (let input of allocationInputs) {
+            const assetSelect = input.querySelector('.asset-select');
+            const percentageInput = input.querySelector('.percentage-input');
+
+            const asset = assetSelect.value;
+            const percentage = parseFloat(percentageInput.value) || 0;
+
+            // If there's a percentage but no asset selected
+            if (!asset && percentage > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    initAllocationChart() {
+        this.allocationChart = {
+            canvas: document.getElementById('allocationChart'),
+            colors: ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+        };
+    }
+
+    updateAllocationChart() {
+        if (!this.allocationChart || !this.allocationChart.canvas) return;
+
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = Math.min(centerX, centerY) - 20;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Get allocations
+        const allocations = this.getAllocationsFromForm();
+        const totalPercentage = allocations.reduce((sum, alloc) => sum + alloc.percentage, 0);
+
+        if (allocations.length === 0 || totalPercentage === 0) {
+            this.clearAllocationChart();
+            return;
+        }
+
+        // Draw pie chart
+        let currentAngle = -Math.PI / 2; // Start at top
+
+        allocations.forEach((allocation, index) => {
+            const sliceAngle = (allocation.percentage / 100) * 2 * Math.PI;
+            const color = this.allocationChart.colors[index % this.allocationChart.colors.length];
+
+            // Draw slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            currentAngle += sliceAngle;
+        });
+
+        // Update legend
+        this.updateChartLegend(allocations);
+    }
+
+    updateChartLegend(allocations) {
+        const legendContainer = document.getElementById('chartLegend');
+        if (!legendContainer) return;
+
+        legendContainer.innerHTML = allocations.map((allocation, index) => {
+            const color = this.allocationChart.colors[index % this.allocationChart.colors.length];
+            return `
+                <div class="flex items-center gap-2">
+                    <div class="w-4 h-4 rounded" style="background-color: ${color}"></div>
+                    <span class="text-sm">${allocation.asset} (${allocation.percentage.toFixed(1)}%)</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    clearAllocationChart() {
+        if (!this.allocationChart || !this.allocationChart.canvas) return;
+
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw placeholder
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) / 2 - 20, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const legendContainer = document.getElementById('chartLegend');
+        if (legendContainer) {
+            legendContainer.innerHTML = '<p class="text-gray-500 text-sm">Add allocations to see preview</p>';
+        }
+    }
+
+    getAllocationsFromForm() {
+        return this.getValidAllocations();
+    }
+
+    async createSetForgetPortfolio() {
+        // Prevent double submission
+        if (this.isCreatingPortfolio) {
+            return;
+        }
+
+        // Portfolio limit already checked in showSetForgetModal() - no need to check again
+
+        const createBtn = document.getElementById('createSetForgetBtn');
+        const name = document.getElementById('setForgetName').value;
+        const amount = this.investmentAmount; // Always 1 BTC equivalent (100M sats)
+        const allocations = this.getAllocationsFromForm();
+
+        if (!name || allocations.length === 0) {
+            this.showNotification('Please fill in all required fields', 'error');
+            return;
+        }
+
+        // This is a theoretical portfolio - no actual BTC movement required
+
+        const totalPercentage = allocations.reduce((sum, alloc) => sum + alloc.percentage, 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+            this.showNotification('Allocations must sum to exactly 100%', 'error');
+            return;
+        }
+
+        // Convert to API format
+        const apiAllocations = allocations.map(alloc => ({
+            asset_symbol: alloc.asset,
+            allocation_percentage: alloc.percentage
+        }));
+
+        // Set submission flag and disable button
+        this.isCreatingPortfolio = true;
+        if (createBtn) {
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating...';
+        }
+
+        try {
+            const response = await fetch('/api/set-forget-portfolios', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({
+                    name,
+                    initial_btc_amount: amount,
+                    allocations: apiAllocations
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showNotification('Set & Forget portfolio created successfully!', 'success');
+                this.hideSetForgetModal();
+                this.loadSetForgetPortfolios();
+                // No need to refresh main portfolio - this is theoretical
+            } else {
+                this.showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error creating portfolio:', error);
+            this.showNotification('Failed to create portfolio', 'error');
+        } finally {
+            // Always reset submission flag and button state
+            this.isCreatingPortfolio = false;
+            if (createBtn) {
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Portfolio';
+            }
+        }
+    }
+
+    async showPortfolioDetails(portfolioId) {
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                const portfolio = await response.json();
+                this.displayPortfolioDetails(portfolio);
+            } else {
+                this.showNotification('Failed to load portfolio details', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading portfolio details:', error);
+            this.showNotification('Failed to load portfolio details', 'error');
+        }
+    }
+
+    displayPortfolioDetails(portfolio) {
+        const titleElement = document.getElementById('portfolioDetailsTitle');
+        const contentElement = document.getElementById('portfolioDetailsContent');
+        const deleteBtn = document.getElementById('deletePortfolioBtn');
+
+        if (!titleElement || !contentElement) return;
+
+        titleElement.textContent = portfolio.portfolio_name;
+
+        // Show delete button only for admins
+        if (deleteBtn && this.isCurrentUserAdmin()) {
+            deleteBtn.classList.remove('hidden');
+        } else if (deleteBtn) {
+            deleteBtn.classList.add('hidden');
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+
+        contentElement.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">${this.getTranslatedText('portfolio.portfolioOverview', 'Portfolio Overview')}</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.status', 'Status')}:</span>
+                                <span>📊 ${this.getTranslatedText('portfolio.performanceTracking', 'Performance Tracking')}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.daysTracked', 'Days Tracked')}:</span>
+                                <span class="font-medium">${daysRunning}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.created', 'Created')}:</span>
+                                <span>${new Date(portfolio.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.btcPriceAtCreation', 'BTC Price at Creation')}:</span>
+                                <span>$${portfolio.current_btc_price.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">${this.getTranslatedText('portfolio.performance', 'Performance')}</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.initialValue', 'Initial Value')}:</span>
+                                <span class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.currentValue', 'Current Value')}:</span>
+                                <span class="font-medium">${this.formatSatoshis(portfolio.current_value_sats)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>${this.getTranslatedText('portfolio.totalPerformance', 'Total Performance')}:</span>
+                                <span class="font-bold ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Asset Allocations</h4>
+                    <div class="space-y-3">
+                        ${portfolio.allocations.map(alloc => {
+                            const assetPerformanceColor = alloc.asset_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+                            return `
+                                <div class="border border-gray-200 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium">${alloc.asset_symbol}</span>
+                                        <span class="text-sm text-gray-600">${alloc.allocation_percentage}%</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                        <div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                                            <div>${this.getTranslatedText('portfolio.current', 'Current')}: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
+                                        </div>
+                                        <div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: $${alloc.initial_price_usd.toLocaleString()}</div>
+                                            <div>${this.getTranslatedText('portfolio.current', 'Current')}: $${alloc.current_price_usd.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-xs">
+                                        <span class="text-gray-600">${this.getTranslatedText('portfolio.performanceVsBTC', 'Performance vs BTC')}: </span>
+                                        <span class="${assetPerformanceColor} font-medium">
+                                            ${alloc.asset_performance_percent >= 0 ? '+' : ''}${alloc.asset_performance_percent.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Store current portfolio for sharing
+        this.currentSetForgetPortfolio = portfolio;
+
+        // Show modal
+        const modal = document.getElementById('setForgetDetailsModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    async sharePortfolio() {
+        if (!this.currentSetForgetPortfolio) return;
+
+        // Show the share modal
+        this.showShareModal();
+
+        try {
+            const portfolioId = this.currentSetForgetPortfolio.portfolio_id;
+            const shareToken = this.currentSetForgetPortfolio.share_token;
+
+            if (!shareToken) {
+                this.showNotification('Share token not available', 'error');
+                this.hideShareModal();
+                return;
+            }
+
+            // Set URLs
+            const shareUrl = `${window.location.origin}/share/${shareToken}`;
+            const imageUrl = `${window.location.origin}/api/set-forget-portfolios/public/${shareToken}/image`;
+
+            // Update URL inputs
+            const shareUrlInput = document.getElementById('shareUrlInput');
+            const imageUrlInput = document.getElementById('imageUrlInput');
+
+            if (shareUrlInput) shareUrlInput.value = shareUrl;
+            if (imageUrlInput) imageUrlInput.value = imageUrl;
+
+            // Store URLs for later use
+            this.currentShareUrl = shareUrl;
+            this.currentImageUrl = imageUrl;
+
+            // Check metadata and handle generation/display appropriately
+            await this.handleImageGenerationAndDisplay(shareToken, imageUrl);
+
+        } catch (error) {
+            console.error('Error preparing share modal:', error);
+            this.showNotification('Failed to prepare sharing options', 'error');
+        }
+    }
+
+    showShareModal() {
+        const modal = document.getElementById('portfolioShareModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            // Reset modal state
+            this.resetShareModal();
+        }
+    }
+
+    hideShareModal() {
+        const modal = document.getElementById('portfolioShareModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    resetShareModal() {
+        // Show loader, hide image and error
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const shareUrlInput = document.getElementById('shareUrlInput');
+        const imageUrlInput = document.getElementById('imageUrlInput');
+
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating image...
+            `;
+            loader.classList.remove('hidden');
+        }
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.add('hidden');
+        if (infoContainer) infoContainer.classList.add('hidden');
+        if (shareUrlInput) shareUrlInput.value = 'Generating link...';
+        if (imageUrlInput) imageUrlInput.value = 'Generating image...';
+    }
+
+    async loadImagePreview(imageUrl) {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+
+        try {
+            // Show loader
+            if (loader) loader.classList.remove('hidden');
+            if (preview) preview.classList.add('hidden');
+            if (error) error.classList.add('hidden');
+
+            // Load image
+            const img = new Image();
+
+            img.onload = () => {
+                if (preview) {
+                    preview.src = imageUrl;
+                    preview.classList.remove('hidden');
+                }
+                if (loader) loader.classList.add('hidden');
+            };
+
+            img.onerror = () => {
+                if (loader) loader.classList.add('hidden');
+                if (error) error.classList.remove('hidden');
+                console.error('Failed to load portfolio image');
+            };
+
+            img.src = imageUrl;
+
+        } catch (err) {
+            console.error('Error loading image preview:', err);
+            if (loader) loader.classList.add('hidden');
+            if (error) error.classList.remove('hidden');
+        }
+    }
+
+    async loadImageMetadata(shareToken) {
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}/image-info`);
+            if (!response.ok) {
+                console.error('Failed to fetch image metadata');
+                return null;
+            }
+
+            const metadata = await response.json();
+            this.updateImageMetadataDisplay(metadata);
+            return metadata;
+
+        } catch (error) {
+            console.error('Error loading image metadata:', error);
+            return null;
+        }
+    }
+
+    updateImageMetadataDisplay(metadata) {
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (infoContainer && timestampText && metadata) {
+            timestampText.textContent = metadata.message;
+            infoContainer.classList.remove('hidden');
+
+            // Update styling based on refresh status
+            if (metadata.canRefresh || !metadata.hasGeneratedImage) {
+                infoContainer.className = 'mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700';
+            } else {
+                infoContainer.className = 'mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700';
+            }
+        }
+    }
+
+    async handleImageGenerationAndDisplay(shareToken, baseImageUrl) {
+        // Prevent multiple simultaneous executions
+        if (this.isGeneratingImage) {
+            console.log('DEBUG: Already generating image, skipping duplicate call');
+            return;
+        }
+        this.isGeneratingImage = true;
+
+        try {
+            // First, get metadata without displaying it to check if regeneration is needed
+            const metadata = await this.loadImageMetadataQuiet(shareToken);
+            console.log('DEBUG: Metadata received:', metadata);
+
+            const needsRegeneration = !metadata || !metadata.hasGeneratedImage || (metadata.canRefresh && metadata.hoursAgo >= 24);
+            console.log('DEBUG: Needs regeneration:', needsRegeneration);
+
+            if (needsRegeneration) {
+                console.log('DEBUG: Showing generating message');
+                // Show generating message immediately - don't show old timestamp
+                this.showImageGenerating();
+
+                // Trigger image generation
+                try {
+                    const response = await fetch(baseImageUrl, {
+                        method: 'GET',
+                        cache: 'no-cache',
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
+
+                    if (response.ok) {
+                        console.log('DEBUG: Image generated successfully');
+                        // Image was generated successfully, now load it with cache busting
+                        const cacheBustUrl = `${baseImageUrl}?t=${Date.now()}`;
+                        await this.loadImagePreview(cacheBustUrl);
+
+                        // Show "just generated" message instead of fetching from backend
+                        this.showJustGeneratedMessage();
+                    } else {
+                        throw new Error('Failed to generate image');
+                    }
+                } catch (error) {
+                    console.error('Error generating image:', error);
+                    this.showImageError();
+                }
+            } else {
+                console.log('DEBUG: Using existing image, showing metadata');
+                // Image is recent, show metadata and load existing image
+                this.updateImageMetadataDisplay(metadata);
+                const cacheBustUrl = `${baseImageUrl}?t=${Date.now()}`;
+                await this.loadImagePreview(cacheBustUrl);
+            }
+        } finally {
+            this.isGeneratingImage = false;
+        }
+    }
+
+    showJustGeneratedMessage() {
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (infoContainer && timestampText) {
+            timestampText.textContent = this.getTranslatedText('portfolio.imageJustGenerated', 'Image was just generated');
+            infoContainer.classList.remove('hidden');
+            infoContainer.className = 'mt-3 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700';
+        }
+    }
+
+    async loadImageMetadataQuiet(shareToken) {
+        // Load metadata without displaying it
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}/image-info`);
+            if (!response.ok) {
+                console.error('Failed to fetch image metadata');
+                return null;
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error loading image metadata:', error);
+            return null;
+        }
+    }
+
+    showImageGenerating() {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+        const infoContainer = document.getElementById('imageGenerationInfo');
+        const timestampText = document.getElementById('imageTimestampText');
+
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating fresh image...
+            `;
+            loader.classList.remove('hidden');
+        }
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.add('hidden');
+
+        // Update info to show generating status
+        if (infoContainer && timestampText) {
+            timestampText.textContent = 'Generating fresh image...';
+            infoContainer.classList.remove('hidden');
+            infoContainer.className = 'mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700';
+        }
+    }
+
+    showImageError() {
+        const loader = document.getElementById('imageLoader');
+        const preview = document.getElementById('portfolioImagePreview');
+        const error = document.getElementById('imageError');
+
+        if (loader) loader.classList.add('hidden');
+        if (preview) preview.classList.add('hidden');
+        if (error) error.classList.remove('hidden');
+    }
+
+    async copyShareUrl() {
+        if (!this.currentShareUrl) return;
+
+        try {
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(this.currentShareUrl);
+                this.showNotification('Portfolio URL copied to clipboard!', 'success');
+            } else {
+                // Fallback for older browsers
+                const input = document.getElementById('shareUrlInput');
+                if (input) {
+                    input.select();
+                    document.execCommand('copy');
+                    this.showNotification('Portfolio URL copied to clipboard!', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Error copying URL:', error);
+            this.showNotification('Failed to copy URL', 'error');
+        }
+    }
+
+    async downloadPortfolioImage() {
+        if (!this.currentImageUrl) return;
+
+        try {
+            // Use cache busting for download to ensure fresh image
+            const downloadUrl = `${this.currentImageUrl}?t=${Date.now()}`;
+
+            // Create a temporary link to download the image
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = `portfolio-${this.currentSetForgetPortfolio.portfolio_name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            this.showNotification('Portfolio image download started!', 'success');
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            this.showNotification('Failed to download image', 'error');
+        }
+    }
+
+    formatSatoshis(sats) {
+        const btc = sats / 100000000;
+        return btc < 0.001 ? btc.toFixed(8) : btc.toFixed(4);
+    }
+
+    showDeleteConfirmation() {
+        if (!this.currentSetForgetPortfolio || !this.isCurrentUserAdmin()) {
+            this.showNotification('Access denied', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('deleteConfirmModal');
+        const message = document.getElementById('deleteConfirmMessage');
+
+        if (modal && message) {
+            message.textContent = `Are you sure you want to delete the portfolio "${this.currentSetForgetPortfolio.portfolio_name}"? This action cannot be undone.`;
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideDeleteConfirmation() {
+        const modal = document.getElementById('deleteConfirmModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    showDonatorAchievementModal() {
+        const modal = document.getElementById('donatorAchievementModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideDonatorAchievementModal() {
+        const modal = document.getElementById('donatorAchievementModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    handleDonatorAchievement() {
+        this.hideDonatorAchievementModal();
+        this.showNotification('Thank you for your interest! Donation system coming soon. Contact support for early access.', 'info');
+    }
+
+    // Legacy methods for backwards compatibility
+    showPremiumUpgradeModal() {
+        this.showDonatorAchievementModal();
+    }
+
+    hidePremiumUpgradeModal() {
+        this.hideDonatorAchievementModal();
+    }
+
+    handlePremiumUpgrade() {
+        this.handleDonatorAchievement();
+    }
+
+    // Centralized admin check for frontend
+    isCurrentUserAdmin() {
+        return this.user && (this.user.isAdmin || this.user.is_admin);
+    }
+
+    fixNavigationOnSharePage() {
+        console.log('Fixing navigation links for share page');
+
+        // Find all navigation links and make them absolute
+        const navLinks = document.querySelectorAll('nav a[href^="#"]');
+        navLinks.forEach(link => {
+            const originalHref = link.getAttribute('href');
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Navigation click intercepted:', originalHref);
+                window.location.href = '/' + originalHref;
+            });
+        });
+    }
+
+    getBtcPriceAtCreation(portfolio) {
+        // Get BTC price from the first allocation (they all have the same btc_price_usd)
+        if (portfolio.allocations && portfolio.allocations.length > 0) {
+            return parseFloat(portfolio.allocations[0].initial_btc_price_usd || 0);
+        }
+        return 0;
+    }
+
+    handleShareRouting() {
+        const path = window.location.pathname;
+        console.log('Checking share routing for path:', path);
+        console.log('Path length:', path.length);
+        console.log('Expected pattern: /^\/share\/([a-f0-9]{64})$/');
+        const shareMatch = path.match(/^\/share\/([a-f0-9]{64})$/);
+        console.log('Share match result:', shareMatch);
+
+        if (shareMatch) {
+            const shareToken = shareMatch[1];
+            console.log('MATCH FOUND! Loading shared portfolio with token:', shareToken);
+            this.loadSharedPortfolio(shareToken);
+            return true;
+        }
+
+        console.log('NO MATCH - not a valid share URL');
+        return false;
+    }
+
+    async loadSharedPortfolio(shareToken) {
+        try {
+            console.log('Loading shared portfolio with token:', shareToken);
+
+            const response = await fetch(`/api/set-forget-portfolios/public/${shareToken}`);
+
+            if (response.ok) {
+                const portfolioData = await response.json();
+                console.log('Shared portfolio data loaded:', portfolioData);
+                this.displaySharedPortfolio(portfolioData);
+
+                // Fix navigation links to work from share URLs
+                this.fixNavigationOnSharePage();
+
+                // Check if user is logged in and update nav accordingly
+                if (this.token) {
+                    this.updateNavForLoggedInUser();
+                }
+            } else {
+                console.error('Failed to load shared portfolio, status:', response.status);
+                const errorData = await response.json().catch(() => ({error: 'Unknown error'}));
+                console.error('Error data:', errorData);
+
+                // For now, show an alert instead of notification system (which might require login)
+                alert('Shared portfolio not found');
+                window.location.href = '/';
+            }
+        } catch (error) {
+            console.error('Error loading shared portfolio:', error);
+            this.showNotification('Failed to load shared portfolio', 'error');
+            window.location.href = '/';
+        }
+    }
+
+    displaySharedPortfolio(portfolioData) {
+        // Hide all pages first
+        document.getElementById('homePage').classList.add('hidden');
+        document.getElementById('assetsPage').classList.add('hidden');
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('adminPage').classList.add('hidden');
+
+        // Create and show dedicated shared portfolio page
+        this.createSharedPortfolioPage(portfolioData);
+
+        // Update page title
+        document.title = `${portfolioData.portfolio_name} - Bitcoin Investment Portfolio`;
+    }
+
+    createSharedPortfolioPage(portfolio) {
+        // Remove existing shared page if it exists
+        const existing = document.getElementById('sharedPortfolioPage');
+        if (existing) {
+            existing.remove();
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const performanceSign = portfolio.total_performance_percent >= 0 ? '+' : '';
+
+        const sharedPageHTML = `
+            <div id="sharedPortfolioPage" class="min-h-screen bg-gray-50">
+                <!-- Enhanced Header with Branding -->
+                <header class="bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg">
+                    <div class="max-w-4xl mx-auto px-4 py-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="flex items-center mb-2">
+                                    <span class="text-2xl mr-2">₿</span>
+                                    <span class="text-lg font-semibold">Bitcoin Standard Platform</span>
+                                </div>
+                                <h1 class="text-3xl font-bold">${portfolio.portfolio_name}</h1>
+                                <p class="text-orange-100 mt-1">Set & Forget Portfolio • Bitcoin-Denominated Performance</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-orange-200">Performance vs HODL</div>
+                                <div class="text-3xl font-bold ${portfolio.total_performance_percent >= 0 ? 'text-green-300' : 'text-red-300'}">
+                                    ${performanceSign}${portfolio.total_performance_percent.toFixed(2)}%
+                                </div>
+                                <div class="text-sm text-orange-200 mt-1">${portfolio.days_tracked} days tracked</div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Bitcoin Standard Message Banner -->
+                <div class="bg-gray-900 text-white">
+                    <div class="max-w-4xl mx-auto px-4 py-4">
+                        <div class="flex items-center justify-center space-x-4 text-sm">
+                            <span>📊</span>
+                            <span>All values measured in Bitcoin • The ultimate unit of account</span>
+                            <span>⚡</span>
+                            <span>Demonstrating the opportunity cost of not holding BTC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Portfolio Content -->
+                <main class="max-w-4xl mx-auto px-4 py-8">
+                    <!-- Portfolio Status -->
+                    <div class="bg-white rounded-lg p-6 shadow-sm mb-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Status</h3>
+                                <p class="text-gray-600">📊 Performance Tracking</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-500">Created</div>
+                                <div class="font-semibold">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                                <div class="text-xs text-gray-500 mt-1">Days Tracked: ${portfolio.days_tracked}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Portfolio Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Initial Investment</h3>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</p>
+                            <p class="text-sm text-gray-500 mt-1">BTC Price at Creation: $${this.getBtcPriceAtCreation(portfolio).toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Current Value</h3>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.current_value_sats)} BTC</p>
+                            <p class="text-sm text-gray-500 mt-1">Current BTC Price: $${portfolio.current_btc_price.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-6 shadow-sm">
+                            <h3 class="text-lg font-semibold mb-2">Performance</h3>
+                            <p class="text-2xl font-bold ${performanceColor}">${performanceSign}${portfolio.total_performance_percent.toFixed(2)}%</p>
+                            <p class="text-sm text-gray-500 mt-1">vs HODL Bitcoin</p>
+                        </div>
+                    </div>
+
+                    <!-- Asset Allocations -->
+                    <div class="bg-white rounded-lg shadow-sm">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-bold">Asset Allocations</h2>
+                            <p class="text-gray-600 mt-1">Performance measured against Bitcoin</p>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            ${this.generateAllocationHTML(portfolio.allocations)}
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Call to Action -->
+                    <div class="mt-8 bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-200 rounded-xl p-8 text-center shadow-lg">
+                        <div class="mb-4">
+                            <span class="text-4xl">₿</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-orange-900 mb-3">Ready to Embrace the Bitcoin Standard?</h3>
+                        <p class="text-orange-700 mb-6 max-w-2xl mx-auto leading-relaxed">
+                            Create your own Set & Forget portfolio and discover how traditional assets perform when measured against
+                            the ultimate store of value. See the true opportunity cost of not holding Bitcoin.
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">🎯</div>
+                                <div class="font-semibold text-gray-800">Set & Forget</div>
+                                <div class="text-gray-600">10-year tracking</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">📊</div>
+                                <div class="font-semibold text-gray-800">Bitcoin Standard</div>
+                                <div class="text-gray-600">True unit of account</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow-sm">
+                                <div class="text-orange-500 text-xl mb-2">🔗</div>
+                                <div class="font-semibold text-gray-800">Share & Compare</div>
+                                <div class="text-gray-600">Beautiful images</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <a href="/" class="inline-block bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105 shadow-lg">
+                                🚀 Create Your Portfolio Now
+                            </a>
+                            <div class="text-xs text-orange-600">
+                                Free to use • No signup required for basic features
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        `;
+
+        // Insert the shared page into the body
+        const sharedDiv = document.createElement('div');
+        sharedDiv.innerHTML = sharedPageHTML;
+        document.body.appendChild(sharedDiv.firstElementChild);
+    }
+
+    generateAllocationHTML(allocations) {
+        return allocations.map(alloc => {
+            const isPositive = alloc.asset_performance_percent >= 0;
+            const performanceColor = isPositive ? 'text-green-600' : 'text-red-600';
+            const performanceSign = isPositive ? '+' : '';
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center">
+                            <h3 class="text-lg font-semibold">${alloc.asset_symbol}</h3>
+                            <span class="ml-2 px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded">
+                                ${Number(alloc.allocation_percentage).toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">vs BTC Performance</div>
+                            <div class="font-bold ${performanceColor}">
+                                ${performanceSign}${alloc.asset_performance_percent.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <div class="text-gray-600">Initial</div>
+                            <div class="font-medium">${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                            <div class="text-gray-500">$${Number(alloc.initial_price_usd).toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-600">Current</div>
+                            <div class="font-medium">${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
+                            <div class="text-gray-500">$${Number(alloc.current_price_usd).toLocaleString()}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async confirmDeletePortfolio() {
+        this.hideDeleteConfirmation();
+
+        if (!this.currentSetForgetPortfolio) {
+            this.showNotification('No portfolio selected', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/set-forget-portfolios/${this.currentSetForgetPortfolio.portfolio_id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showNotification('Portfolio deleted successfully', 'success');
+                this.hideSetForgetDetailsModal();
+                this.loadSetForgetPortfolios(); // Refresh the list
+            } else {
+                const data = await response.json();
+                this.showNotification(data.error || 'Failed to delete portfolio', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting portfolio:', error);
+            this.showNotification('Failed to delete portfolio', 'error');
+        }
+    }
+
+    // Legacy method - kept for compatibility, now uses modal
+    async deletePortfolio() {
+        this.showDeleteConfirmation();
     }
 }
 

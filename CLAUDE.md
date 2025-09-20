@@ -42,6 +42,9 @@ npm run setup-db
 # Update database with new features (run after git pull when prompted)
 npm run update-db
 
+# Update database for portfolio sharing enhancements (if needed)
+npm run update-db:portfolio-sharing
+
 # Run development server with auto-reload (port 3000)
 npm run dev
 
@@ -226,3 +229,33 @@ Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
 - CoinGecko returns gold price per gram
 - Multiply by 31.1035 to convert to troy ounces
 - Corrected stored amounts in database
+
+# Kiro - tasks list
+I might have created for you a task list in @.kiro/specs/bitcoin-game-enhancements/ - there are 3 files - design.md, which explains the design, requirements.md - how its going to work and tasks.md - a trackable list of where are we at - completed tasks are market with [x], not completed as [ ] - do not change this syntax, do not add to it or amend it in anyway, just mark as done what is done and only if you are marking something as done and want to add additional comments to it then you can amend slightly this point with the most important data, but unless asked for it do not amend any of these documents in this directory. When you are asked to complete a task and you have
+
+# Updating database with scripts
+Other developers are developing this project, so when we do database updates we need to have updates with update-db scripts, as if we run directly the sql commands we will have database mismatch.
+
+# DRY and KISS
+Keep It Simple Stupid - dont overcomplicate the code and architecture
+Dont Repeat Yourself - use templates, modules, reuse CSS, reuse the html and classes, etc, reuse function and more - we want small code base, not bloated with lots of repetitions
+
+# Don't introduce unexpected changes when asked to fix something
+When asked to fix something specific dont introduce new unexpected results.
+Be proactive only when developing or when asked, but not when asked to fix one specific issue that we want to commit after that, we dont want to have other changes that are unplanned, as we are working on a fix.
+
+# Meaningfull commits
+When asked to commit also commit with meaningful messages and useful descriptions, and if there's a need for the other devs to do something on git pull stay so on the description and if tis crucial a keyword in the git commit meain message. When creating commits we must separate files in different commits if they are not related to the same task. Claude.md updates or else changes need to be in different commits as they are instruction for AI, not project amendments visible to the users. Also we dont mention bugfixes that we introduced while working on a feature, we just mention the features.
+additionally when committin we can check if task was completed so we cross it off the Kiro task list.
+
+# Don;'t assume - check
+Don't assume function names, database names, etc - always check.
+Check that database name, check that function name, if you assume even if it makes sense you could make a mistake.
+Maybe its called in a weird way, that API endpoint or that function name.
+Don't assume you need a new list or variable or whatever, check if it exists first so you use it if possible.
+
+# Dont try to commit things from .gitignore-d directories
+They are git ignored for a reason, no version control there.
+
+# Alert for problems
+If while browsing the codebase while working on something if you see a problem alert the user so he knows what you haven oticed that could be a problem - dublicated code, even if not related to your current task, raise awareness of bad code structure, ways to inprove, logical bugs and more. Dont jump on fixing whe noticing, just alert the user, fix after confirmation as something might be intended or decided upon.
