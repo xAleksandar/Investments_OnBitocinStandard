@@ -1011,16 +1011,16 @@ class BitcoinGame {
             <div class="max-w-4xl mx-auto py-8">
                 <!-- Header -->
                 <div class="mb-8">
-                    <nav class="text-sm text-gray-500 mb-4">
-                        <a href="#education" class="hover:text-orange-500" data-translate="education.backToEducation">Back to Education</a>
-                        <span class="mx-2">→</span>
-                        <span>${content.title}</span>
+                    <nav class="text-sm mb-4">
+                        <a href="#education" class="text-orange-500 hover:text-orange-600 font-medium cursor-pointer" data-translate="education.backToEducation">Back to Education</a>
+                        <span class="mx-2 text-gray-500">→</span>
+                        <span class="text-gray-700">${content.title}</span>
                     </nav>
                     <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
                     <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
                     <div class="flex items-center space-x-6 text-sm text-gray-500">
-                        <span data-translate="education.readingTime">${content.readingTime} min read</span>
-                        <span data-translate="education.lastUpdated">Last updated: ${content.lastUpdated}</span>
+                        <span>${content.readingTime} ${t('education.minutesReading')}</span>
+                        <span>${t('education.lastUpdatedLabel')}: ${content.lastUpdated}</span>
                     </div>
                 </div>
 
@@ -1055,17 +1055,35 @@ class BitcoinGame {
             </div>
         `;
 
-        // Smooth scroll for table of contents links
-        const tocLinks = educationContent.querySelectorAll('a[href^="#"]');
-        tocLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
+        // Use event delegation for all links in educationContent
+        educationContent.addEventListener('click', (e) => {
+            // Check if clicked element is a link
+            const link = e.target.closest('a[href]');
+            if (!link) return;
+
+            const href = link.getAttribute('href');
+            console.log('Clicked link with href:', href);
+
+            // Handle Back to Education link
+            if (href === '#education') {
                 e.preventDefault();
-                const targetId = link.getAttribute('href').substring(1);
+                e.stopPropagation();
+                console.log('Navigating to education page');
+                window.location.hash = 'education';
+                // Force navigation if hash doesn't change
+                this.navigate();
+                return;
+            }
+
+            // Handle table of contents links (smooth scroll)
+            if (href && href.startsWith('#')) {
+                e.preventDefault();
+                const targetId = href.substring(1);
                 const targetElement = document.getElementById(targetId);
                 if (targetElement) {
                     targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-            });
+            }
         });
 
         // Initialize reading progress and active section tracking
