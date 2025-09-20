@@ -7,10 +7,100 @@ class BitcoinGame {
         this.currentPage = 'home';
         this.priceRefreshInterval = null;
 
+        // Portfolio baseline: always compare against 1 BTC (100M satoshis)
+        this.PORTFOLIO_BASELINE_SATS = 100000000;
+
         this.initTooltips();
         this.initTranslation();
         this.init();
     }
+
+    // ============ UTILITY FUNCTIONS FOR ASSET DROPDOWNS ============
+
+    /**
+     * Creates a formatted asset display name
+     * @param {Object} asset - Asset object with name and symbol
+     * @returns {string} Formatted display name
+     */
+    formatAssetDisplayName(asset) {
+        return `${asset.name} (${asset.symbol})`;
+    }
+
+    /**
+     * Creates a standard HTML Option element for asset dropdowns
+     * @param {Object} asset - Asset object with name and symbol
+     * @param {boolean} selected - Whether this option should be selected
+     * @returns {HTMLOptionElement} The created option element
+     */
+    createAssetOption(asset, selected = false) {
+        const option = new Option(this.formatAssetDisplayName(asset), asset.symbol);
+        option.selected = selected;
+        return option;
+    }
+
+    /**
+     * Creates a custom dropdown option div for mobile/styled dropdowns
+     * @param {Object} asset - Asset object with name and symbol
+     * @param {boolean} selected - Whether this option should be selected
+     * @returns {HTMLDivElement} The created div element
+     */
+    createCustomAssetOption(asset, selected = false) {
+        const option = document.createElement('div');
+        option.className = `custom-select-option ${selected ? 'selected' : ''}`;
+        option.dataset.value = asset.symbol;
+        option.textContent = this.formatAssetDisplayName(asset);
+        return option;
+    }
+
+    /**
+     * Populates a select element with asset options
+     * @param {HTMLSelectElement} selectElement - The select element to populate
+     * @param {Array} assets - Array of asset objects
+     * @param {string} defaultSymbol - Symbol of the asset to select by default
+     */
+    populateAssetSelect(selectElement, assets, defaultSymbol = null) {
+        // Clear existing options
+        selectElement.innerHTML = '';
+
+        // Add assets as options
+        assets.forEach(asset => {
+            const option = this.createAssetOption(asset, asset.symbol === defaultSymbol);
+            selectElement.appendChild(option);
+        });
+    }
+
+    /**
+     * Populates a custom dropdown container with asset options
+     * @param {HTMLElement} container - The container element for custom options
+     * @param {Array} assets - Array of asset objects
+     * @param {string} defaultSymbol - Symbol of the asset to select by default
+     */
+    populateCustomAssetDropdown(container, assets, defaultSymbol = null) {
+        // Clear existing options
+        container.innerHTML = '';
+
+        // Add assets as custom options
+        assets.forEach(asset => {
+            const option = this.createCustomAssetOption(asset, asset.symbol === defaultSymbol);
+            container.appendChild(option);
+        });
+    }
+
+    /**
+     * Sorts assets for consistent dropdown ordering (BTC first, then alphabetically)
+     * @param {Array} assets - Array of asset objects
+     * @returns {Array} Sorted array of assets
+     */
+    sortAssetsForDropdown(assets) {
+        return [...assets].sort((a, b) => {
+            // BTC always first
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+    }
+
+    // ============ END UTILITY FUNCTIONS ============
 
     async initTranslation() {
         // Wait for translation service to be available
@@ -328,7 +418,7 @@ class BitcoinGame {
             'XAU': 'gold',
             'XAG': 'silver',
             'WTI': 'crudeOil',
-            'CPER': 'copper',
+            'COPPER': 'copper',
             'WEAT': 'wheat',
             'UNG': 'naturalGas',
             'URA': 'uranium',
@@ -1365,7 +1455,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA/BITSTAMP:BTCUSD',
             'DBA': 'AMEX:DBA/BITSTAMP:BTCUSD',
-            'CPER': 'AMEX:CPER/BITSTAMP:BTCUSD',
+            'COPPER': 'COMEX:HG1!/BITSTAMP:BTCUSD',
             'WEAT': 'AMEX:WEAT/BITSTAMP:BTCUSD',
             'UNG': 'AMEX:UNG/BITSTAMP:BTCUSD'
         };
@@ -1410,7 +1500,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'CPER': 'AMEX:CPER',
+            'COPPER': 'COMEX:HG1!',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -1634,10 +1724,10 @@ class BitcoinGame {
                 category: 'Commodity',
                 tags: ['Energy Source', 'Economic Indicator']
             },
-            'CPER': {
-                title: 'United States Copper Index Fund (CPER)',
-                description: 'CPER provides exposure to copper prices through futures contracts, allowing investors to participate in copper\'s performance without physical storage. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. This ETF makes copper investing accessible to retail investors, yet even this economically critical metal has declined significantly when priced in Bitcoin.',
-                category: 'Commodity ETF',
+            'COPPER': {
+                title: 'Copper Futures (COPPER)',
+                description: 'Copper futures provide direct exposure to copper prices, allowing investors to participate in this vital industrial metal\'s performance. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. As one of the most economically sensitive commodities, copper prices reflect global growth expectations, yet even this critical industrial metal has declined significantly when priced in Bitcoin.',
+                category: 'Commodity',
                 tags: ['Industrial Metal', 'Economic Indicator']
             },
             'WEAT': {
@@ -2308,34 +2398,12 @@ class BitcoinGame {
             return;
         }
 
-        fromSelect.innerHTML = '';
-        toSelect.innerHTML = '';
+        // Sort assets consistently
+        const sortedAssets = this.sortAssetsForDropdown(this.assets);
 
-        // Sort assets to put Bitcoin first
-        const sortedAssets = [...this.assets].sort((a, b) => {
-            if (a.symbol === 'BTC') return -1;
-            if (b.symbol === 'BTC') return 1;
-            return a.name.localeCompare(b.name);
-        });
-
-        // Populate both dropdowns with all assets initially
-        sortedAssets.forEach(asset => {
-            const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-            // Set BTC as default for From Asset
-            if (asset.symbol === 'BTC') {
-                option1.selected = true;
-            }
-
-            // Set AMZN as default for To Asset
-            if (asset.symbol === 'AMZN') {
-                option2.selected = true;
-            }
-
-            fromSelect.appendChild(option1);
-            toSelect.appendChild(option2);
-        });
+        // Populate both dropdowns using utility functions
+        this.populateAssetSelect(fromSelect, sortedAssets, 'BTC');
+        this.populateAssetSelect(toSelect, sortedAssets, 'AMZN');
 
         // Populate custom dropdowns for mobile
         this.populateCustomDropdowns(sortedAssets);
@@ -2355,25 +2423,9 @@ class BitcoinGame {
 
         if (!fromCustomOptions || !toCustomOptions) return;
 
-        // Clear existing options
-        fromCustomOptions.innerHTML = '';
-        toCustomOptions.innerHTML = '';
-
-        // Populate custom dropdowns
-        sortedAssets.forEach((asset, index) => {
-            const fromOption = document.createElement('div');
-            fromOption.className = `custom-select-option ${index === 0 ? 'selected' : ''}`;
-            fromOption.dataset.value = asset.symbol;
-            fromOption.textContent = `${asset.name} (${asset.symbol})`;
-
-            const toOption = document.createElement('div');
-            toOption.className = 'custom-select-option';
-            toOption.dataset.value = asset.symbol;
-            toOption.textContent = `${asset.name} (${asset.symbol})`;
-
-            fromCustomOptions.appendChild(fromOption);
-            toCustomOptions.appendChild(toOption);
-        });
+        // Populate custom dropdowns using utility functions
+        this.populateCustomAssetDropdown(fromCustomOptions, sortedAssets, 'BTC');
+        this.populateCustomAssetDropdown(toCustomOptions, sortedAssets, 'AMZN');
 
         // Update trigger text for first option
         const fromTriggerText = document.querySelector('#fromAssetCustom .custom-select-text');
@@ -2721,7 +2773,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'CPER': 'AMEX:CPER',
+            'COPPER': 'COMEX:HG1!',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -2818,12 +2870,7 @@ class BitcoinGame {
         sortedAssets.forEach(asset => {
             // Also exclude whatever is selected in To Asset (can't trade same to same)
             if (asset.symbol !== selectedToAsset) {
-                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-                // Keep the current selection if it's still valid
-                if (asset.symbol === currentFromAsset) {
-                    option.selected = true;
-                }
+                const option = this.createAssetOption(asset, asset.symbol === currentFromAsset);
 
                 fromSelect.appendChild(option);
             }
@@ -2838,16 +2885,14 @@ class BitcoinGame {
                 // User owns BTC, show it
                 const btcAsset = this.assets.find(a => a.symbol === 'BTC');
                 if (btcAsset) {
-                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
-                    option.selected = true;
+                    const option = this.createAssetOption(btcAsset, true);
                     fromSelect.appendChild(option);
                 }
             } else if (!this.holdings || this.holdings.length === 0) {
                 // New user or holdings not loaded yet - show BTC as default
                 const btcAsset = this.assets.find(a => a.symbol === 'BTC');
                 if (btcAsset) {
-                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
-                    option.selected = true;
+                    const option = this.createAssetOption(btcAsset, true);
                     fromSelect.appendChild(option);
                 }
             }
@@ -2888,12 +2933,7 @@ class BitcoinGame {
 
         // Populate To Asset dropdown
         sortedAssets.forEach(asset => {
-            const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-            // Keep the current selection if it's still valid
-            if (asset.symbol === currentToAsset) {
-                option.selected = true;
-            }
+            const option = this.createAssetOption(asset, asset.symbol === currentToAsset);
 
             toSelect.appendChild(option);
         });
@@ -4075,7 +4115,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                             <span class="text-gray-600">Initial:</span>
-                            <div class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</div>
+                            <div class="font-medium">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</div>
                         </div>
                         <div>
                             <span class="text-gray-600">Current:</span>
@@ -4188,6 +4228,117 @@ class BitcoinGame {
         return `${asset.name} (${asset.symbol})`;
     }
 
+    generateCategorizedAssetOptions(availableAssets) {
+        // Define asset categories with emojis and hardcoded display names - matches assets page exactly
+        const assetCategories = {
+            'popularAssets': {
+                emoji: '🔥',
+                translationKey: 'assets.categories.popularAssets',
+                assets: [
+                    { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
+                    { symbol: 'SPY', displayName: 'S&P 500 (SPY)' },
+                    { symbol: 'AAPL', displayName: 'Apple (AAPL)' },
+                    { symbol: 'TSLA', displayName: 'Tesla (TSLA)' },
+                    { symbol: 'META', displayName: 'Meta (META)' }
+                ]
+            },
+            'technologyStocks': {
+                emoji: '💻',
+                translationKey: 'assets.categories.technologyStocks',
+                assets: [
+                    { symbol: 'AAPL', displayName: 'Apple (AAPL)' },
+                    { symbol: 'MSFT', displayName: 'Microsoft (MSFT)' },
+                    { symbol: 'GOOGL', displayName: 'Google (GOOGL)' },
+                    { symbol: 'META', displayName: 'Meta (META)' },
+                    { symbol: 'NVDA', displayName: 'NVIDIA (NVDA)' },
+                    { symbol: 'TSLA', displayName: 'Tesla (TSLA)' },
+                    { symbol: 'AMZN', displayName: 'Amazon (AMZN)' }
+                ]
+            },
+            'traditionalStocks': {
+                emoji: '🏢',
+                translationKey: 'assets.categories.traditionalStocks',
+                assets: [
+                    { symbol: 'BRK-B', displayName: 'Berkshire Hathaway (BRK-B)' },
+                    { symbol: 'JNJ', displayName: 'Johnson & Johnson (JNJ)' },
+                    { symbol: 'V', displayName: 'Visa (V)' },
+                    { symbol: 'WMT', displayName: 'Walmart (WMT)' }
+                ]
+            },
+            'bonds': {
+                emoji: '📜',
+                translationKey: 'assets.categories.bonds',
+                assets: [
+                    { symbol: 'TLT', displayName: '20+ Year Treasury (TLT)', translateKey: 'assets.assetNames.twentyYearTreasuryTLT' },
+                    { symbol: 'HYG', displayName: 'High Yield Corporate (HYG)', translateKey: 'assets.assetNames.highYieldCorporateHYG' }
+                ]
+            },
+            'internationalMarkets': {
+                emoji: '🌍',
+                translationKey: 'assets.categories.internationalMarkets',
+                assets: [
+                    { symbol: 'EWU', displayName: 'UK Market (EWU)', translateKey: 'assets.assetNames.ukMarketEWU' },
+                    { symbol: 'EWG', displayName: 'Germany ETF (EWG)', translateKey: 'assets.assetNames.germanyETFEWG' },
+                    { symbol: 'EWJ', displayName: 'Japan ETF (EWJ)', translateKey: 'assets.assetNames.japanETFEWJ' },
+                    { symbol: 'VXUS', displayName: 'International Stocks (VXUS)', translateKey: 'assets.assetNames.internationalStocksVXUS' },
+                    { symbol: 'EFA', displayName: 'Developed Markets (EFA)', translateKey: 'assets.assetNames.developedMarketsEFA' }
+                ]
+            },
+            'realEstate': {
+                emoji: '🏠',
+                translationKey: 'assets.categories.realEstate',
+                assets: [
+                    { symbol: 'VNQ', displayName: 'Vanguard REIT (VNQ)', translateKey: 'assets.assetNames.vanguardREITVNQ' },
+                    { symbol: 'VNO', displayName: 'Vornado Realty (VNO)' },
+                    { symbol: 'PLD', displayName: 'Prologis (PLD)' },
+                    { symbol: 'EQIX', displayName: 'Equinix (EQIX)' }
+                ]
+            },
+            'commodities': {
+                emoji: '🏭',
+                translationKey: 'assets.categories.commodities',
+                assets: [
+                    { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
+                    { symbol: 'XAG', displayName: 'Silver (XAG)', translateKey: 'assets.assetNames.silverXAG' },
+                    { symbol: 'WTI', displayName: 'Crude Oil (WTI)', translateKey: 'assets.assetNames.crudeOilWTI' },
+                    { symbol: 'COPPER', displayName: 'Copper (COPPER)', translateKey: 'assets.assetNames.copper' },
+                    { symbol: 'WEAT', displayName: 'Wheat (WEAT)', translateKey: 'assets.assetNames.wheatWEAT' },
+                    { symbol: 'UNG', displayName: 'Natural Gas (UNG)', translateKey: 'assets.assetNames.naturalGasUNG' },
+                    { symbol: 'URA', displayName: 'Uranium (URA)', translateKey: 'assets.assetNames.uraniumURA' },
+                    { symbol: 'DBA', displayName: 'Agriculture (DBA)', translateKey: 'assets.assetNames.agricultureDBA' }
+                ]
+            }
+        };
+
+        let optionsHtml = '';
+
+        // Generate optgroups for each category
+        Object.entries(assetCategories).forEach(([categoryKey, categoryInfo]) => {
+            // Filter available assets that belong to this category
+            const categoryAssets = categoryInfo.assets.filter(assetDef =>
+                availableAssets.some(asset => asset.symbol === assetDef.symbol)
+            );
+
+            if (categoryAssets.length > 0) {
+                // Use exact same structure as assets page - just emoji in label with data-translate
+                optionsHtml += `<optgroup label="${categoryInfo.emoji}" data-translate="${categoryInfo.translationKey}">`;
+
+                categoryAssets.forEach(assetDef => {
+                    // Use hardcoded display names with translation keys where available
+                    if (assetDef.translateKey) {
+                        optionsHtml += `<option value="${assetDef.symbol}" data-translate="${assetDef.translateKey}">${assetDef.displayName}</option>`;
+                    } else {
+                        optionsHtml += `<option value="${assetDef.symbol}">${assetDef.displayName}</option>`;
+                    }
+                });
+
+                optionsHtml += '</optgroup>';
+            }
+        });
+
+        return optionsHtml;
+    }
+
     addAllocationInput() {
         const container = document.getElementById('allocationInputs');
         if (!container) return;
@@ -4211,7 +4362,7 @@ class BitcoinGame {
         div.innerHTML = `
             <select class="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
                 <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${this.generateCategorizedAssetOptions(availableAssets)}
             </select>
             <div class="relative w-20">
                 <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 percentage-input"
@@ -4222,6 +4373,13 @@ class BitcoinGame {
         `;
 
         container.appendChild(div);
+
+        // Update translations for the newly added content
+        if (window.translationService && window.translationService.updatePageTranslations) {
+            setTimeout(() => {
+                window.translationService.updatePageTranslations();
+            }, 10);
+        }
 
         // Add event listeners
         const assetSelect = div.querySelector('.asset-select');
@@ -4318,10 +4476,10 @@ class BitcoinGame {
             const currentValue = select.value;
             const currentAsset = this.assets.find(asset => asset.symbol === currentValue);
 
-            // Rebuild options
+            // Rebuild options with categorized structure
             select.innerHTML = `
                 <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${this.generateCategorizedAssetOptions(availableAssets)}
                 ${currentValue && currentAsset ? `<option value="${currentValue}" selected style="display:none;">${this.getTranslatedAssetName(currentAsset)}</option>` : ''}
             `;
 
@@ -4330,6 +4488,13 @@ class BitcoinGame {
                 select.value = currentValue;
             }
         });
+
+        // Update translations for the regenerated content
+        if (window.translationService && window.translationService.updatePageTranslations) {
+            setTimeout(() => {
+                window.translationService.updatePageTranslations();
+            }, 10);
+        }
     }
 
     updateAllocationTotal() {
@@ -4532,7 +4697,6 @@ class BitcoinGame {
                 },
                 body: JSON.stringify({
                     name,
-                    initial_btc_amount: amount,
                     allocations: apiAllocations
                 })
             });
@@ -4629,7 +4793,7 @@ class BitcoinGame {
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
                                 <span>${this.getTranslatedText('portfolio.initialValue', 'Initial Value')}:</span>
-                                <span class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</span>
+                                <span class="font-medium">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</span>
                             </div>
                             <div class="flex justify-between">
                                 <span>${this.getTranslatedText('portfolio.currentValue', 'Current Value')}:</span>
@@ -4656,7 +4820,7 @@ class BitcoinGame {
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
                                         <div>
-                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(Math.floor(this.PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100))} BTC</div>
                                             <div>${this.getTranslatedText('portfolio.current', 'Current')}: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
                                         </div>
                                         <div>
@@ -5227,7 +5391,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white rounded-lg p-6 shadow-sm">
                             <h3 class="text-lg font-semibold mb-2">Initial Investment</h3>
-                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</p>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</p>
                             <p class="text-sm text-gray-500 mt-1">BTC Price at Creation: $${this.getBtcPriceAtCreation(portfolio).toLocaleString()}</p>
                         </div>
                         <div class="bg-white rounded-lg p-6 shadow-sm">
@@ -5326,7 +5490,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div>
                             <div class="text-gray-600">Initial</div>
-                            <div class="font-medium">${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                            <div class="font-medium">${this.formatSatoshis(Math.floor(this.PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100))} BTC</div>
                             <div class="text-gray-500">$${Number(alloc.initial_price_usd).toLocaleString()}</div>
                         </div>
                         <div>
