@@ -820,10 +820,10 @@ class BitcoinGame {
                 </div>
 
                 <div class="grid md:grid-cols-3 gap-8">
-                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-bitcoin'">
-                        <div class="text-orange-500 text-4xl mb-4">₿</div>
-                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyBitcoin.title">Why Bitcoin?</h3>
-                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyBitcoin.subtitle">Understanding Bitcoin as neutral, apolitical money</p>
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/fiat-experiment'">
+                        <div class="text-green-500 text-4xl mb-4">💵</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.fiatExperiment.title">The Fiat Experiment</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.fiatExperiment.subtitle">How we arrived at today's monetary system</p>
                         <span class="text-orange-500 font-medium">Read Article →</span>
                     </div>
 
@@ -834,10 +834,10 @@ class BitcoinGame {
                         <span class="text-orange-500 font-medium">Read Article →</span>
                     </div>
 
-                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/fiat-experiment'">
-                        <div class="text-green-500 text-4xl mb-4">💵</div>
-                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.fiatExperiment.title">The Fiat Experiment</h3>
-                        <p class="text-gray-600 mb-4" data-translate="education.pages.fiatExperiment.subtitle">How we arrived at today's monetary system</p>
+                    <div class="bg-white border rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="window.location.hash = '#education/why-bitcoin'">
+                        <div class="text-orange-500 text-4xl mb-4">₿</div>
+                        <h3 class="text-xl font-semibold mb-3" data-translate="education.pages.whyBitcoin.title">Why Bitcoin?</h3>
+                        <p class="text-gray-600 mb-4" data-translate="education.pages.whyBitcoin.subtitle">Understanding Bitcoin as neutral, apolitical money</p>
                         <span class="text-orange-500 font-medium">Read Article →</span>
                     </div>
                 </div>
