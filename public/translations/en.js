@@ -595,6 +595,8 @@ export const translations = {
         },
         backToEducation: 'Back to Education',
         tableOfContents: 'Table of Contents',
+        minutesReading: 'min read',
+        lastUpdatedLabel: 'Last updated',
         readingTime: '{minutes} min read',
         lastUpdated: 'Last updated: {date}',
         shareArticle: 'Share Article',

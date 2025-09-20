@@ -1011,16 +1011,16 @@ class BitcoinGame {
             <div class="max-w-4xl mx-auto py-8">
                 <!-- Header -->
                 <div class="mb-8">
-                    <nav class="text-sm text-gray-500 mb-4">
-                        <a href="#education" class="hover:text-orange-500" data-translate="education.backToEducation">Back to Education</a>
-                        <span class="mx-2">→</span>
-                        <span>${content.title}</span>
+                    <nav class="text-sm mb-4">
+                        <a href="#education" class="text-orange-500 hover:text-orange-600 font-medium" data-translate="education.backToEducation">Back to Education</a>
+                        <span class="mx-2 text-gray-500">→</span>
+                        <span class="text-gray-700">${content.title}</span>
                     </nav>
                     <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
                     <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
                     <div class="flex items-center space-x-6 text-sm text-gray-500">
-                        <span data-translate="education.readingTime">${content.readingTime} min read</span>
-                        <span data-translate="education.lastUpdated">Last updated: ${content.lastUpdated}</span>
+                        <span>${content.readingTime} ${t('education.minutesReading')}</span>
+                        <span>${t('education.lastUpdatedLabel')}: ${content.lastUpdated}</span>
                     </div>
                 </div>
 
