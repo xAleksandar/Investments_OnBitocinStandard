@@ -392,8 +392,21 @@ router.get('/performance/:symbol/:period', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM assets ORDER BY asset_type, symbol');
-    res.json(result.rows);
+    const { enrichAssetData } = require('../config/assets');
+    const result = await pool.query('SELECT symbol, current_price_usd, last_updated FROM assets ORDER BY symbol');
+    const enrichedAssets = enrichAssetData(result.rows);
+
+    // Sort by type then symbol for consistent ordering
+    enrichedAssets.sort((a, b) => {
+      if (a.type !== b.type) {
+        // Order: crypto, stock, commodity
+        const typeOrder = { 'crypto': 0, 'stock': 1, 'commodity': 2 };
+        return (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99);
+      }
+      return a.symbol.localeCompare(b.symbol);
+    });
+
+    res.json(enrichedAssets);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch assets' });

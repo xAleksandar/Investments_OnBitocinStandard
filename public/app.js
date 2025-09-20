@@ -15,6 +15,93 @@ class BitcoinGame {
         this.init();
     }
 
+    // ============ UTILITY FUNCTIONS FOR ASSET DROPDOWNS ============
+
+    /**
+     * Creates a formatted asset display name
+     * @param {Object} asset - Asset object with name and symbol
+     * @returns {string} Formatted display name
+     */
+    formatAssetDisplayName(asset) {
+        return `${asset.name} (${asset.symbol})`;
+    }
+
+    /**
+     * Creates a standard HTML Option element for asset dropdowns
+     * @param {Object} asset - Asset object with name and symbol
+     * @param {boolean} selected - Whether this option should be selected
+     * @returns {HTMLOptionElement} The created option element
+     */
+    createAssetOption(asset, selected = false) {
+        const option = new Option(this.formatAssetDisplayName(asset), asset.symbol);
+        option.selected = selected;
+        return option;
+    }
+
+    /**
+     * Creates a custom dropdown option div for mobile/styled dropdowns
+     * @param {Object} asset - Asset object with name and symbol
+     * @param {boolean} selected - Whether this option should be selected
+     * @returns {HTMLDivElement} The created div element
+     */
+    createCustomAssetOption(asset, selected = false) {
+        const option = document.createElement('div');
+        option.className = `custom-select-option ${selected ? 'selected' : ''}`;
+        option.dataset.value = asset.symbol;
+        option.textContent = this.formatAssetDisplayName(asset);
+        return option;
+    }
+
+    /**
+     * Populates a select element with asset options
+     * @param {HTMLSelectElement} selectElement - The select element to populate
+     * @param {Array} assets - Array of asset objects
+     * @param {string} defaultSymbol - Symbol of the asset to select by default
+     */
+    populateAssetSelect(selectElement, assets, defaultSymbol = null) {
+        // Clear existing options
+        selectElement.innerHTML = '';
+
+        // Add assets as options
+        assets.forEach(asset => {
+            const option = this.createAssetOption(asset, asset.symbol === defaultSymbol);
+            selectElement.appendChild(option);
+        });
+    }
+
+    /**
+     * Populates a custom dropdown container with asset options
+     * @param {HTMLElement} container - The container element for custom options
+     * @param {Array} assets - Array of asset objects
+     * @param {string} defaultSymbol - Symbol of the asset to select by default
+     */
+    populateCustomAssetDropdown(container, assets, defaultSymbol = null) {
+        // Clear existing options
+        container.innerHTML = '';
+
+        // Add assets as custom options
+        assets.forEach(asset => {
+            const option = this.createCustomAssetOption(asset, asset.symbol === defaultSymbol);
+            container.appendChild(option);
+        });
+    }
+
+    /**
+     * Sorts assets for consistent dropdown ordering (BTC first, then alphabetically)
+     * @param {Array} assets - Array of asset objects
+     * @returns {Array} Sorted array of assets
+     */
+    sortAssetsForDropdown(assets) {
+        return [...assets].sort((a, b) => {
+            // BTC always first
+            if (a.symbol === 'BTC') return -1;
+            if (b.symbol === 'BTC') return 1;
+            return a.name.localeCompare(b.name);
+        });
+    }
+
+    // ============ END UTILITY FUNCTIONS ============
+
     async initTranslation() {
         // Wait for translation service to be available
         while (!window.translationService) {
@@ -2311,34 +2398,12 @@ class BitcoinGame {
             return;
         }
 
-        fromSelect.innerHTML = '';
-        toSelect.innerHTML = '';
+        // Sort assets consistently
+        const sortedAssets = this.sortAssetsForDropdown(this.assets);
 
-        // Sort assets to put Bitcoin first
-        const sortedAssets = [...this.assets].sort((a, b) => {
-            if (a.symbol === 'BTC') return -1;
-            if (b.symbol === 'BTC') return 1;
-            return a.name.localeCompare(b.name);
-        });
-
-        // Populate both dropdowns with all assets initially
-        sortedAssets.forEach(asset => {
-            const option1 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-            const option2 = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-            // Set BTC as default for From Asset
-            if (asset.symbol === 'BTC') {
-                option1.selected = true;
-            }
-
-            // Set AMZN as default for To Asset
-            if (asset.symbol === 'AMZN') {
-                option2.selected = true;
-            }
-
-            fromSelect.appendChild(option1);
-            toSelect.appendChild(option2);
-        });
+        // Populate both dropdowns using utility functions
+        this.populateAssetSelect(fromSelect, sortedAssets, 'BTC');
+        this.populateAssetSelect(toSelect, sortedAssets, 'AMZN');
 
         // Populate custom dropdowns for mobile
         this.populateCustomDropdowns(sortedAssets);
@@ -2358,25 +2423,9 @@ class BitcoinGame {
 
         if (!fromCustomOptions || !toCustomOptions) return;
 
-        // Clear existing options
-        fromCustomOptions.innerHTML = '';
-        toCustomOptions.innerHTML = '';
-
-        // Populate custom dropdowns
-        sortedAssets.forEach((asset, index) => {
-            const fromOption = document.createElement('div');
-            fromOption.className = `custom-select-option ${index === 0 ? 'selected' : ''}`;
-            fromOption.dataset.value = asset.symbol;
-            fromOption.textContent = `${asset.name} (${asset.symbol})`;
-
-            const toOption = document.createElement('div');
-            toOption.className = 'custom-select-option';
-            toOption.dataset.value = asset.symbol;
-            toOption.textContent = `${asset.name} (${asset.symbol})`;
-
-            fromCustomOptions.appendChild(fromOption);
-            toCustomOptions.appendChild(toOption);
-        });
+        // Populate custom dropdowns using utility functions
+        this.populateCustomAssetDropdown(fromCustomOptions, sortedAssets, 'BTC');
+        this.populateCustomAssetDropdown(toCustomOptions, sortedAssets, 'AMZN');
 
         // Update trigger text for first option
         const fromTriggerText = document.querySelector('#fromAssetCustom .custom-select-text');
@@ -2821,12 +2870,7 @@ class BitcoinGame {
         sortedAssets.forEach(asset => {
             // Also exclude whatever is selected in To Asset (can't trade same to same)
             if (asset.symbol !== selectedToAsset) {
-                const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-                // Keep the current selection if it's still valid
-                if (asset.symbol === currentFromAsset) {
-                    option.selected = true;
-                }
+                const option = this.createAssetOption(asset, asset.symbol === currentFromAsset);
 
                 fromSelect.appendChild(option);
             }
@@ -2841,16 +2885,14 @@ class BitcoinGame {
                 // User owns BTC, show it
                 const btcAsset = this.assets.find(a => a.symbol === 'BTC');
                 if (btcAsset) {
-                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
-                    option.selected = true;
+                    const option = this.createAssetOption(btcAsset, true);
                     fromSelect.appendChild(option);
                 }
             } else if (!this.holdings || this.holdings.length === 0) {
                 // New user or holdings not loaded yet - show BTC as default
                 const btcAsset = this.assets.find(a => a.symbol === 'BTC');
                 if (btcAsset) {
-                    const option = new Option(`${btcAsset.name} (${btcAsset.symbol})`, btcAsset.symbol);
-                    option.selected = true;
+                    const option = this.createAssetOption(btcAsset, true);
                     fromSelect.appendChild(option);
                 }
             }
@@ -2891,12 +2933,7 @@ class BitcoinGame {
 
         // Populate To Asset dropdown
         sortedAssets.forEach(asset => {
-            const option = new Option(`${asset.name} (${asset.symbol})`, asset.symbol);
-
-            // Keep the current selection if it's still valid
-            if (asset.symbol === currentToAsset) {
-                option.selected = true;
-            }
+            const option = this.createAssetOption(asset, asset.symbol === currentToAsset);
 
             toSelect.appendChild(option);
         });
