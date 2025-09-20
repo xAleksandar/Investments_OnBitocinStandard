@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "build": "echo 'Build complete'",
     "setup-db": "node scripts/setup-database.js",
     "update-db": "node scripts/add-suggestions-table.js",
     "update-db:kiro": "node scripts/add-kiro-enhancements.js",
