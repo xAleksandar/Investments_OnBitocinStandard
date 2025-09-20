@@ -1062,11 +1062,16 @@ class BitcoinGame {
             if (!link) return;
 
             const href = link.getAttribute('href');
+            console.log('Clicked link with href:', href);
 
             // Handle Back to Education link
             if (href === '#education') {
                 e.preventDefault();
+                e.stopPropagation();
+                console.log('Navigating to education page');
                 window.location.hash = 'education';
+                // Force navigation if hash doesn't change
+                this.navigate();
                 return;
             }
 
