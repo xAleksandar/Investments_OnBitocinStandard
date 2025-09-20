@@ -89,21 +89,6 @@ export const translations = {
         bitcoin: 'Bitcoin',
         usd: 'USD',
         performanceMetrics: 'Performance Metrics',
-        categories: {
-            crypto: 'Cryptocurrency',
-            stock: 'Stocks',
-            commodity: 'Commodities',
-            bond: 'Bonds',
-            reit: 'Real Estate',
-            international: 'International Markets',
-            popularAssets: 'Popular Assets',
-            technologyStocks: 'Technology Stocks',
-            traditionalStocks: 'Traditional Stocks',
-            bonds: 'Bonds',
-            internationalMarkets: 'International Markets',
-            realEstate: 'Real Estate',
-            commodities: 'Commodities'
-        },
         assetDescriptions: {
             CPER: {
                 title: 'United States Copper Index Fund (CPER)',
@@ -320,6 +305,21 @@ export const translations = {
         },
 
         categories: {
+            // Asset category translations for dropdown optgroups
+            crypto: 'Cryptocurrency',
+            stock: 'Stocks',
+            commodity: 'Commodities',
+            bond: 'Bonds',
+            reit: 'Real Estate',
+            international: 'International Markets',
+            popularAssets: 'Popular Assets',
+            technologyStocks: 'Technology Stocks',
+            traditionalStocks: 'Traditional Stocks',
+            bonds: 'Bonds',
+            internationalMarkets: 'International Markets',
+            realEstate: 'Real Estate',
+            commodities: 'Commodities',
+            // Asset type categories
             'Commodity': 'Commodity',
             'Stock ETF': 'Stock ETF',
             'Technology Stock': 'Technology Stock',
