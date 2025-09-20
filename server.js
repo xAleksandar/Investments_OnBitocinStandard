@@ -33,6 +33,14 @@ app.get('/api/debug', async (req, res) => {
   const { Client } = require('pg');
   const client = new Client({
     connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
+    // Fallback to individual credentials if no connection string
+    ...((!process.env.POSTGRES_URL && !process.env.PRISMA_DATABASE_URL) && {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+    })
   });
   
   try {
@@ -47,6 +55,14 @@ app.get('/api/debug', async (req, res) => {
       connection_type: 'fresh_client',
       env: {
         connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
+        // Fallback to individual credentials if no connection string
+        ...((!process.env.POSTGRES_URL && !process.env.PRISMA_DATABASE_URL) && {
+          host: process.env.DB_HOST,
+          port: process.env.DB_PORT || 5432,
+          database: process.env.DB_NAME,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+        })
       }
     });
   } catch (error) {

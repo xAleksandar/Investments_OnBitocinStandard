@@ -4,7 +4,6 @@ require('dotenv').config();
 // Use connection string if available (Vercel Postgres), otherwise fall back to individual credentials
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   // Fallback to individual credentials if no connection string
   ...((!process.env.POSTGRES_URL && !process.env.PRISMA_DATABASE_URL) && {
     host: process.env.DB_HOST,
