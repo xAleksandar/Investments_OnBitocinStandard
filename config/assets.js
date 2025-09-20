@@ -23,6 +23,7 @@ const ASSET_METADATA = {
   'XAU': { name: 'Gold', type: 'commodity', category: 'Precious Metals' },
   'XAG': { name: 'Silver', type: 'commodity', category: 'Precious Metals' },
   'WTI': { name: 'Crude Oil WTI', type: 'commodity', category: 'Energy' },
+  'CPER': { name: 'United States Copper Index Fund', type: 'commodity', category: 'Industrial Metals' },
 
   // Additional stocks that might be in database
   'META': { name: 'Meta Platforms Inc.', type: 'stock', category: 'Technology' },
@@ -65,14 +66,15 @@ const ASSET_CATEGORIES = {
   'Healthcare': ['JNJ', 'PFE', 'UNH', 'MRNA'],
   'Consumer Goods': ['KO', 'PEP', 'NKE', 'MCD'],
   'Precious Metals': ['XAU', 'XAG'],
-  'Energy': ['WTI']
+  'Energy': ['WTI'],
+  'Industrial Metals': ['CPER']
 };
 
 // Asset types for filtering
 const ASSET_TYPES = {
   crypto: ['BTC'],
   stock: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX', 'AMD', 'INTC', 'CRM', 'ADBE', 'PYPL', 'UBER', 'SPOT', 'ZOOM', 'JPM', 'BAC', 'WFC', 'GS', 'V', 'MA', 'JNJ', 'PFE', 'UNH', 'MRNA', 'KO', 'PEP', 'NKE', 'MCD'],
-  commodity: ['XAU', 'XAG', 'WTI']
+  commodity: ['XAU', 'XAG', 'WTI', 'CPER']
 };
 
 /**

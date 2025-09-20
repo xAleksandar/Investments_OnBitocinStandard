@@ -3,6 +3,7 @@ const pool = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const crypto = require('crypto');
 const PortfolioImageGenerator = require('../services/PortfolioImageGenerator');
+const PriceCache = require('../services/PriceCache');
 const router = express.Router();
 
 // Portfolio baseline: always compare against 1 BTC (100M satoshis)
@@ -81,30 +82,24 @@ class SetForgetPortfolio {
       // Always use 1 BTC (100M sats) as baseline for all portfolio comparisons
       const initialBtcAmount = PORTFOLIO_BASELINE_SATS;
 
-      // Get current asset prices (always include BTC for calculations)
+      // Get current asset prices using lazy-loading cache (always include BTC for calculations)
       const assetSymbols = allocations.map(a => a.asset_symbol);
       if (!assetSymbols.includes('BTC')) {
         assetSymbols.push('BTC');
       }
-      const assetPrices = await client.query(
-        'SELECT symbol, current_price_usd FROM assets WHERE symbol = ANY($1)',
-        [assetSymbols]
-      );
 
-      const priceMap = {};
-      assetPrices.rows.forEach(row => {
-        priceMap[row.symbol] = parseFloat(row.current_price_usd);
-      });
+      console.log(`Fetching prices for portfolio assets: ${assetSymbols.join(', ')}`);
+      const priceMap = await PriceCache.getPrices(assetSymbols);
 
       const btcPrice = priceMap['BTC'];
       if (!btcPrice) {
         throw new Error('BTC price not available');
       }
 
-      // Validate all assets exist
+      // Validate all assets have prices
       for (const allocation of allocations) {
         if (!priceMap[allocation.asset_symbol]) {
-          throw new Error(`Asset not found: ${allocation.asset_symbol}`);
+          throw new Error(`Price not available for: ${allocation.asset_symbol}`);
         }
       }
 
@@ -234,20 +229,13 @@ class SetForgetPortfolio {
   // Calculate current portfolio performance
   async calculateCurrentPerformance() {
     try {
-      // Get current asset prices (always include BTC for calculations)
+      // Get current asset prices using lazy-loading cache (always include BTC for calculations)
       const assetSymbols = this.allocations.map(a => a.asset_symbol);
       if (!assetSymbols.includes('BTC')) {
         assetSymbols.push('BTC');
       }
-      const assetPrices = await pool.query(
-        'SELECT symbol, current_price_usd FROM assets WHERE symbol = ANY($1)',
-        [assetSymbols]
-      );
 
-      const priceMap = {};
-      assetPrices.rows.forEach(row => {
-        priceMap[row.symbol] = parseFloat(row.current_price_usd);
-      });
+      const priceMap = await PriceCache.getPrices(assetSymbols);
 
       const currentBtcPrice = priceMap['BTC'];
       if (!currentBtcPrice) {
