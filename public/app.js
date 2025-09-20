@@ -4188,6 +4188,117 @@ class BitcoinGame {
         return `${asset.name} (${asset.symbol})`;
     }
 
+    generateCategorizedAssetOptions(availableAssets) {
+        // Define asset categories with emojis and hardcoded display names - matches assets page exactly
+        const assetCategories = {
+            'popularAssets': {
+                emoji: '🔥',
+                translationKey: 'assets.categories.popularAssets',
+                assets: [
+                    { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
+                    { symbol: 'SPY', displayName: 'S&P 500 (SPY)' },
+                    { symbol: 'AAPL', displayName: 'Apple (AAPL)' },
+                    { symbol: 'TSLA', displayName: 'Tesla (TSLA)' },
+                    { symbol: 'META', displayName: 'Meta (META)' }
+                ]
+            },
+            'technologyStocks': {
+                emoji: '💻',
+                translationKey: 'assets.categories.technologyStocks',
+                assets: [
+                    { symbol: 'AAPL', displayName: 'Apple (AAPL)' },
+                    { symbol: 'MSFT', displayName: 'Microsoft (MSFT)' },
+                    { symbol: 'GOOGL', displayName: 'Google (GOOGL)' },
+                    { symbol: 'META', displayName: 'Meta (META)' },
+                    { symbol: 'NVDA', displayName: 'NVIDIA (NVDA)' },
+                    { symbol: 'TSLA', displayName: 'Tesla (TSLA)' },
+                    { symbol: 'AMZN', displayName: 'Amazon (AMZN)' }
+                ]
+            },
+            'traditionalStocks': {
+                emoji: '🏢',
+                translationKey: 'assets.categories.traditionalStocks',
+                assets: [
+                    { symbol: 'BRK-B', displayName: 'Berkshire Hathaway (BRK-B)' },
+                    { symbol: 'JNJ', displayName: 'Johnson & Johnson (JNJ)' },
+                    { symbol: 'V', displayName: 'Visa (V)' },
+                    { symbol: 'WMT', displayName: 'Walmart (WMT)' }
+                ]
+            },
+            'bonds': {
+                emoji: '📜',
+                translationKey: 'assets.categories.bonds',
+                assets: [
+                    { symbol: 'TLT', displayName: '20+ Year Treasury (TLT)', translateKey: 'assets.assetNames.twentyYearTreasuryTLT' },
+                    { symbol: 'HYG', displayName: 'High Yield Corporate (HYG)', translateKey: 'assets.assetNames.highYieldCorporateHYG' }
+                ]
+            },
+            'internationalMarkets': {
+                emoji: '🌍',
+                translationKey: 'assets.categories.internationalMarkets',
+                assets: [
+                    { symbol: 'EWU', displayName: 'UK Market (EWU)', translateKey: 'assets.assetNames.ukMarketEWU' },
+                    { symbol: 'EWG', displayName: 'Germany ETF (EWG)', translateKey: 'assets.assetNames.germanyETFEWG' },
+                    { symbol: 'EWJ', displayName: 'Japan ETF (EWJ)', translateKey: 'assets.assetNames.japanETFEWJ' },
+                    { symbol: 'VXUS', displayName: 'International Stocks (VXUS)', translateKey: 'assets.assetNames.internationalStocksVXUS' },
+                    { symbol: 'EFA', displayName: 'Developed Markets (EFA)', translateKey: 'assets.assetNames.developedMarketsEFA' }
+                ]
+            },
+            'realEstate': {
+                emoji: '🏠',
+                translationKey: 'assets.categories.realEstate',
+                assets: [
+                    { symbol: 'VNQ', displayName: 'Vanguard REIT (VNQ)', translateKey: 'assets.assetNames.vanguardREITVNQ' },
+                    { symbol: 'VNO', displayName: 'Vornado Realty (VNO)' },
+                    { symbol: 'PLD', displayName: 'Prologis (PLD)' },
+                    { symbol: 'EQIX', displayName: 'Equinix (EQIX)' }
+                ]
+            },
+            'commodities': {
+                emoji: '🏭',
+                translationKey: 'assets.categories.commodities',
+                assets: [
+                    { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
+                    { symbol: 'XAG', displayName: 'Silver (XAG)', translateKey: 'assets.assetNames.silverXAG' },
+                    { symbol: 'WTI', displayName: 'Crude Oil (WTI)', translateKey: 'assets.assetNames.crudeOilWTI' },
+                    { symbol: 'CPER', displayName: 'Copper (CPER)', translateKey: 'assets.assetNames.copperCPER' },
+                    { symbol: 'WEAT', displayName: 'Wheat (WEAT)', translateKey: 'assets.assetNames.wheatWEAT' },
+                    { symbol: 'UNG', displayName: 'Natural Gas (UNG)', translateKey: 'assets.assetNames.naturalGasUNG' },
+                    { symbol: 'URA', displayName: 'Uranium (URA)', translateKey: 'assets.assetNames.uraniumURA' },
+                    { symbol: 'DBA', displayName: 'Agriculture (DBA)', translateKey: 'assets.assetNames.agricultureDBA' }
+                ]
+            }
+        };
+
+        let optionsHtml = '';
+
+        // Generate optgroups for each category
+        Object.entries(assetCategories).forEach(([categoryKey, categoryInfo]) => {
+            // Filter available assets that belong to this category
+            const categoryAssets = categoryInfo.assets.filter(assetDef =>
+                availableAssets.some(asset => asset.symbol === assetDef.symbol)
+            );
+
+            if (categoryAssets.length > 0) {
+                // Use exact same structure as assets page - just emoji in label with data-translate
+                optionsHtml += `<optgroup label="${categoryInfo.emoji}" data-translate="${categoryInfo.translationKey}">`;
+
+                categoryAssets.forEach(assetDef => {
+                    // Use hardcoded display names with translation keys where available
+                    if (assetDef.translateKey) {
+                        optionsHtml += `<option value="${assetDef.symbol}" data-translate="${assetDef.translateKey}">${assetDef.displayName}</option>`;
+                    } else {
+                        optionsHtml += `<option value="${assetDef.symbol}">${assetDef.displayName}</option>`;
+                    }
+                });
+
+                optionsHtml += '</optgroup>';
+            }
+        });
+
+        return optionsHtml;
+    }
+
     addAllocationInput() {
         const container = document.getElementById('allocationInputs');
         if (!container) return;
@@ -4211,7 +4322,7 @@ class BitcoinGame {
         div.innerHTML = `
             <select class="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 asset-select">
                 <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${this.generateCategorizedAssetOptions(availableAssets)}
             </select>
             <div class="relative w-20">
                 <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 percentage-input"
@@ -4222,6 +4333,13 @@ class BitcoinGame {
         `;
 
         container.appendChild(div);
+
+        // Update translations for the newly added content
+        if (window.translationService && window.translationService.updatePageTranslations) {
+            setTimeout(() => {
+                window.translationService.updatePageTranslations();
+            }, 10);
+        }
 
         // Add event listeners
         const assetSelect = div.querySelector('.asset-select');
@@ -4318,10 +4436,10 @@ class BitcoinGame {
             const currentValue = select.value;
             const currentAsset = this.assets.find(asset => asset.symbol === currentValue);
 
-            // Rebuild options
+            // Rebuild options with categorized structure
             select.innerHTML = `
                 <option value="">${this.getTranslatedText('portfolio.selectAsset', 'Select Asset')}</option>
-                ${availableAssets.map(asset => `<option value="${asset.symbol}">${this.getTranslatedAssetName(asset)}</option>`).join('')}
+                ${this.generateCategorizedAssetOptions(availableAssets)}
                 ${currentValue && currentAsset ? `<option value="${currentValue}" selected style="display:none;">${this.getTranslatedAssetName(currentAsset)}</option>` : ''}
             `;
 
@@ -4330,6 +4448,13 @@ class BitcoinGame {
                 select.value = currentValue;
             }
         });
+
+        // Update translations for the regenerated content
+        if (window.translationService && window.translationService.updatePageTranslations) {
+            setTimeout(() => {
+                window.translationService.updatePageTranslations();
+            }, 10);
+        }
     }
 
     updateAllocationTotal() {
