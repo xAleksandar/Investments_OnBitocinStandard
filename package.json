@@ -10,7 +10,9 @@
     "setup-db": "node scripts/setup-database.js",
     "update-db": "node scripts/add-suggestions-table.js",
     "update-db:kiro": "node scripts/add-kiro-enhancements.js",
-    "update-db:portfolio-sharing": "node scripts/add-portfolio-sharing-enhancements.js"
+    "update-db:portfolio-sharing": "node scripts/add-portfolio-sharing-enhancements.js",
+    "update-db:expanded-assets": "node scripts/add-expanded-assets.js",
+    "update-db:purchase-tracking": "node scripts/add-purchase-tracking.js"
   },
   "dependencies": {
     "axios": "^1.6.0",

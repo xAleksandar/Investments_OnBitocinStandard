@@ -6,59 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bitcoin Investment Game - A gamified investment platform where users start with 1 virtual Bitcoin and attempt to outperform holding BTC by trading it for stocks and commodities. All values are measured in satoshis instead of fiat currency, providing a Bitcoin-centric perspective on investing.
 
-## Prerequisites
-
-### PostgreSQL Setup
-```bash
-# Install PostgreSQL
-sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib
-
-# Start PostgreSQL service
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-
-# Create database user (matches .env config)
-sudo -u postgres createuser -d plamenandonov
-
-# Configure PostgreSQL for local development (trust authentication)
-sudo sed -i "s/local   all             all                                     peer/local   all             all                                     trust/" /etc/postgresql/16/main/pg_hba.conf
-sudo sed -i "s/host    all             all             127.0.0.1\/32            scram-sha-256/host    all             all             127.0.0.1\/32            trust/" /etc/postgresql/16/main/pg_hba.conf
-sudo systemctl restart postgresql
-```
-
-## Development Commands
+## Technical Commands for AI Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Set up environment file (first time only)
-cp .env.example .env
-# Edit .env with your settings
-
-# Initialize database (run once after PostgreSQL setup)
-npm run setup-db
-
-# Update database with new features (run after git pull when prompted)
-npm run update-db
-
-# Update database for portfolio sharing enhancements (if needed)
-npm run update-db:portfolio-sharing
-
-# Run development server with auto-reload (port 3000)
-npm run dev
-
-# Magic links appear in server console (email not configured)
-# Look for: "Magic link for [email]: http://localhost:3000/auth/verify?token=..."
-
-# To run server in background and monitor logs (Claude Code):
-# 1. Run with run_in_background: true - returns bash_id
-# 2. Monitor logs with BashOutput(bash_id: "xxxxx")
-
-# Run production server
-npm start
-
-# Database management scripts
+# Database management scripts (for troubleshooting)
 node scripts/wipe-database.js        # Clear all data
 node scripts/rebuild-from-trades.js  # Rebuild portfolio from trade history
 node scripts/rebuild-holdings.js     # Recalculate holdings
@@ -258,4 +209,4 @@ Don't assume you need a new list or variable or whatever, check if it exists fir
 They are git ignored for a reason, no version control there.
 
 # Alert for problems
-If while browsing the codebase while working on something if you see a problem alert the user so he knows what you haven oticed that could be a problem - dublicated code, even if not related to your current task, raise awareness of bad code structure, ways to inprove, logical bugs and more. Dont jump on fixing whe noticing, just alert the user, fix after confirmation as something might be intended or decided upon.
+If while browsing the codebase while working on something if you see a problem alert the user so he knows what you have noticed that could be a problem - duplicated code, even if not related to your current task, raise awareness of bad code structure, ways to improve, logical bugs and more. Dont jump on fixing whe noticing, just alert the user, fix after confirmation as something might be intended or decided upon.
