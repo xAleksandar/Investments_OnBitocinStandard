@@ -771,6 +771,71 @@
         .flag-bg {
             background: linear-gradient(to bottom, white 33%, #00966e 33%, #00966e 66%, #d62612 66%);
         }
+
+        /* Mobile Navigation Styles */
+        .hamburger-line {
+            transform-origin: center;
+        }
+
+        #mobileMenuBtn.active .hamburger-line:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        #mobileMenuBtn.active .hamburger-line:nth-child(2) {
+            opacity: 0;
+        }
+
+        #mobileMenuBtn.active .hamburger-line:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -6px);
+        }
+
+        #mobileMenu {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        #mobileMenu.closing {
+            animation: fadeOut 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+
+        .mobile-nav-link {
+            transition: all 0.2s ease;
+        }
+
+        .mobile-nav-link:hover {
+            transform: translateX(8px);
+        }
+
+        .mobile-lang-option {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .mobile-lang-option:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .mobile-lang-option.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -788,32 +853,92 @@
                 </div>
             </div>
             <div class="flex items-center space-x-4">
-                <!-- Language Switcher -->
-                <div class="language-switcher" id="languageSwitcher">
-                    <div class="language-switcher-trigger" id="languageTrigger">
-                        <div class="language-flag flag-en" id="currentFlag"></div>
-                        <span id="currentLanguage">EN</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                    <div class="language-switcher-dropdown" id="languageDropdown">
-                        <div class="language-option" data-lang="en">
-                            <div class="language-flag flag-en"></div>
-                            <span>English</span>
+                <!-- Hamburger Menu Button (Mobile Only) -->
+                <button id="mobileMenuBtn" class="md:hidden flex flex-col justify-center items-center w-8 h-8 space-y-1">
+                    <span class="hamburger-line block w-6 h-0.5 bg-white transition-all duration-300"></span>
+                    <span class="hamburger-line block w-6 h-0.5 bg-white transition-all duration-300"></span>
+                    <span class="hamburger-line block w-6 h-0.5 bg-white transition-all duration-300"></span>
+                </button>
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <!-- Language Switcher -->
+                    <div class="language-switcher" id="languageSwitcher">
+                        <div class="language-switcher-trigger" id="languageTrigger">
+                            <div class="language-flag flag-en" id="currentFlag"></div>
+                            <span id="currentLanguage">EN</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
                         </div>
-                        <div class="language-option" data-lang="bg">
-                            <div class="language-flag flag-bg"></div>
-                            <span>Български</span>
+                        <div class="language-switcher-dropdown" id="languageDropdown">
+                            <div class="language-option" data-lang="en">
+                                <div class="language-flag flag-en"></div>
+                                <span>English</span>
+                            </div>
+                            <div class="language-option" data-lang="bg">
+                                <div class="language-flag flag-bg"></div>
+                                <span>Български</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="navAuth">
+                        <button id="navLoginBtn" class="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700" data-translate="navigation.login">Login / Sign Up</button>
+                        <div id="navUserInfo" class="hidden flex items-center space-x-4">
+                            <span id="navUsername"></span>
+                            <button id="navLogoutBtn" class="bg-orange-600 px-3 py-1 rounded" data-translate="navigation.logout">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenu" class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+            <div class="bg-orange-500 w-full min-h-screen p-4">
+                <!-- Mobile Menu Header -->
+                <div class="flex justify-between items-center mb-8">
+                    <h1 class="text-xl font-bold" data-translate="home.title">Bitcoin Investment Game</h1>
+                    <button id="closeMobileMenu" class="text-white text-2xl">&times;</button>
+                </div>
+
+                <!-- Mobile Navigation Links -->
+                <div class="space-y-6">
+                    <a href="#home" class="block text-lg hover:text-orange-200 mobile-nav-link" data-translate="navigation.home">Home</a>
+                    <a href="#assets" class="block text-lg hover:text-orange-200 mobile-nav-link" data-translate="navigation.assets">Assets</a>
+                    <a href="#portfolio" class="block text-lg hover:text-orange-200 mobile-nav-link" data-translate="navigation.portfolio">Portfolio</a>
+                    <a href="#education" class="block text-lg hover:text-orange-200 mobile-nav-link" data-translate="navigation.education">Learn</a>
+                    <a href="#admin" id="mobileNavAdminLink" class="block text-lg hover:text-orange-200 mobile-nav-link hidden" data-translate="navigation.admin">Admin</a>
+                </div>
+
+                <!-- Mobile Language Switcher -->
+                <div class="mt-8 pt-6 border-t border-orange-400">
+                    <div class="mb-4">
+                        <span class="text-sm text-orange-200 block mb-2">Language / Език</span>
+                        <div class="space-y-2">
+                            <button class="mobile-lang-option flex items-center gap-3 w-full text-left py-2" data-lang="en">
+                                <div class="language-flag flag-en"></div>
+                                <span>English</span>
+                            </button>
+                            <button class="mobile-lang-option flex items-center gap-3 w-full text-left py-2" data-lang="bg">
+                                <div class="language-flag flag-bg"></div>
+                                <span>Български</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div id="navAuth">
-                    <button id="navLoginBtn" class="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700" data-translate="navigation.login">Login / Sign Up</button>
-                    <div id="navUserInfo" class="hidden flex items-center space-x-4">
-                        <span id="navUsername"></span>
-                        <button id="navLogoutBtn" class="bg-orange-600 px-3 py-1 rounded" data-translate="navigation.logout">Logout</button>
+                <!-- Mobile Auth Section -->
+                <div class="mt-6 pt-6 border-t border-orange-400">
+                    <div id="mobileNavAuth">
+                        <button id="mobileNavLoginBtn" class="w-full bg-orange-600 px-4 py-3 rounded hover:bg-orange-700 text-center" data-translate="navigation.login">Login / Sign Up</button>
+                        <div id="mobileNavUserInfo" class="hidden space-y-3">
+                            <div class="text-center">
+                                <span id="mobileNavUsername" class="text-lg"></span>
+                            </div>
+                            <button id="mobileNavLogoutBtn" class="w-full bg-orange-600 px-4 py-3 rounded hover:bg-orange-700 text-center" data-translate="navigation.logout">Logout</button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -100,6 +100,176 @@ class BitcoinGame {
             const lang = option.getAttribute('data-lang');
             option.classList.toggle('active', lang === currentLanguage);
         });
+
+        // Update mobile language switcher
+        this.updateMobileLanguageSwitcher();
+    }
+
+    setupMobileMenu() {
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
+        const mobileAuthButtons = document.querySelectorAll('#mobileNavLoginBtn, #mobileNavLogoutBtn');
+        const mobileLangOptions = document.querySelectorAll('.mobile-lang-option');
+
+        if (!mobileMenuBtn || !mobileMenu) return;
+
+        // Toggle mobile menu
+        mobileMenuBtn.addEventListener('click', () => {
+            this.toggleMobileMenu();
+        });
+
+        // Close mobile menu
+        closeMobileMenu?.addEventListener('click', () => {
+            this.closeMobileMenu();
+        });
+
+        // Close menu when clicking backdrop
+        mobileMenu.addEventListener('click', (e) => {
+            if (e.target === mobileMenu) {
+                this.closeMobileMenu();
+            }
+        });
+
+        // Close menu when clicking navigation links
+        mobileNavLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                this.closeMobileMenu();
+            });
+        });
+
+        // Handle mobile auth buttons
+        const mobileLoginBtn = document.getElementById('mobileNavLoginBtn');
+        const mobileLogoutBtn = document.getElementById('mobileNavLogoutBtn');
+
+        if (mobileLoginBtn) {
+            mobileLoginBtn.addEventListener('click', () => {
+                this.closeMobileMenu();
+                this.showLoginForm();
+            });
+        }
+
+        if (mobileLogoutBtn) {
+            mobileLogoutBtn.addEventListener('click', () => {
+                this.closeMobileMenu();
+                this.logout();
+            });
+        }
+
+        // Handle mobile language switching
+        mobileLangOptions.forEach(option => {
+            option.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const selectedLang = option.getAttribute('data-lang');
+
+                if (selectedLang !== window.translationService?.getCurrentLanguage()) {
+                    await window.translationService.setLanguage(selectedLang);
+                    this.updateMobileLanguageSwitcher();
+                    this.updateLanguageSwitcher(); // Also update desktop
+                }
+            });
+        });
+
+        // Close mobile menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) {
+                this.closeMobileMenu();
+            }
+        });
+    }
+
+    toggleMobileMenu() {
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+        if (!mobileMenu || !mobileMenuBtn) return;
+
+        const isOpen = !mobileMenu.classList.contains('hidden');
+
+        if (isOpen) {
+            this.closeMobileMenu();
+        } else {
+            this.openMobileMenu();
+        }
+    }
+
+    openMobileMenu() {
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+        if (!mobileMenu || !mobileMenuBtn) return;
+
+        mobileMenu.classList.remove('hidden');
+        mobileMenuBtn.classList.add('active');
+
+        // Sync auth state
+        this.syncMobileAuthState();
+        this.updateMobileLanguageSwitcher();
+
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+    }
+
+    closeMobileMenu() {
+        const mobileMenu = document.getElementById('mobileMenu');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+        if (!mobileMenu || !mobileMenuBtn) return;
+
+        mobileMenu.classList.add('closing');
+        mobileMenuBtn.classList.remove('active');
+
+        setTimeout(() => {
+            mobileMenu.classList.add('hidden');
+            mobileMenu.classList.remove('closing');
+        }, 300);
+
+        // Restore body scroll
+        document.body.style.overflow = '';
+    }
+
+    syncMobileAuthState() {
+        const mobileLoginBtn = document.getElementById('mobileNavLoginBtn');
+        const mobileUserInfo = document.getElementById('mobileNavUserInfo');
+        const mobileUsername = document.getElementById('mobileNavUsername');
+        const mobileAdminLink = document.getElementById('mobileNavAdminLink');
+
+        if (!mobileLoginBtn || !mobileUserInfo) return;
+
+        if (this.token && this.user.email) {
+            // User is logged in
+            mobileLoginBtn.classList.add('hidden');
+            mobileUserInfo.classList.remove('hidden');
+
+            if (mobileUsername) {
+                mobileUsername.textContent = this.user.username || this.user.email;
+            }
+
+            // Show admin link if user is admin
+            if (mobileAdminLink && this.user.is_admin) {
+                mobileAdminLink.classList.remove('hidden');
+            }
+        } else {
+            // User is not logged in
+            mobileLoginBtn.classList.remove('hidden');
+            mobileUserInfo.classList.add('hidden');
+
+            if (mobileAdminLink) {
+                mobileAdminLink.classList.add('hidden');
+            }
+        }
+    }
+
+    updateMobileLanguageSwitcher() {
+        const currentLanguage = window.translationService?.getCurrentLanguage() || 'en';
+        const mobileLangOptions = document.querySelectorAll('.mobile-lang-option');
+
+        // Update active option
+        mobileLangOptions.forEach(option => {
+            const lang = option.getAttribute('data-lang');
+            option.classList.toggle('active', lang === currentLanguage);
+        });
     }
 
     async rerenderCurrentPage() {
@@ -1601,9 +1771,15 @@ class BitcoinGame {
         if (this.isCurrentUserAdmin() && navAdminLink) {
             navAdminLink.classList.remove('hidden');
         }
+
+        // Sync mobile navigation auth state
+        this.syncMobileAuthState();
     }
 
     setupEventListeners() {
+        // Mobile Menu Toggle
+        this.setupMobileMenu();
+
         // Auth form - always available
         const authForm = document.getElementById('authForm');
         if (authForm) {
@@ -2942,6 +3118,9 @@ class BitcoinGame {
         // Update navigation
         document.getElementById('navLoginBtn').classList.remove('hidden');
         document.getElementById('navUserInfo').classList.add('hidden');
+
+        // Sync mobile navigation auth state
+        this.syncMobileAuthState();
 
         // Navigate to home
         window.location.hash = '#home';
