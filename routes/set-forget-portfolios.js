@@ -5,6 +5,9 @@ const crypto = require('crypto');
 const PortfolioImageGenerator = require('../services/PortfolioImageGenerator');
 const router = express.Router();
 
+// Portfolio baseline: always compare against 1 BTC (100M satoshis)
+const PORTFOLIO_BASELINE_SATS = 100000000;
+
 // Initialize image generator
 const imageGenerator = new PortfolioImageGenerator();
 
@@ -14,7 +17,6 @@ class SetForgetPortfolio {
     this.id = data.id;
     this.user_id = data.user_id;
     this.name = data.name;
-    this.initial_btc_amount = data.initial_btc_amount;
     this.share_token = data.share_token;
     this.locked_until = data.locked_until;
     this.created_at = data.created_at;
@@ -76,7 +78,8 @@ class SetForgetPortfolio {
       }
 
       // This is a theoretical portfolio - no actual BTC balance check needed
-      const initialBtcAmount = parseInt(portfolioData.initial_btc_amount);
+      // Always use 1 BTC (100M sats) as baseline for all portfolio comparisons
+      const initialBtcAmount = PORTFOLIO_BASELINE_SATS;
 
       // Get current asset prices (always include BTC for calculations)
       const assetSymbols = allocations.map(a => a.asset_symbol);
@@ -112,10 +115,10 @@ class SetForgetPortfolio {
       const trackingStartDate = new Date(); // Just for reference, no actual locking
 
       const portfolioResult = await client.query(`
-        INSERT INTO set_forget_portfolios (user_id, name, initial_btc_amount, share_token, locked_until)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO set_forget_portfolios (user_id, name, share_token, locked_until)
+        VALUES ($1, $2, $3, $4)
         RETURNING *
-      `, [userId, portfolioData.name, initialBtcAmount, shareToken, trackingStartDate]);
+      `, [userId, portfolioData.name, shareToken, trackingStartDate]);
 
       const portfolio = portfolioResult.rows[0];
 
@@ -285,7 +288,7 @@ class SetForgetPortfolio {
         allocationPerformance.push({
           asset_symbol: allocation.asset_symbol,
           allocation_percentage: allocation.allocation_percentage,
-          initial_btc_amount: parseInt(allocation.btc_amount),
+          initial_btc_amount: Math.floor(PORTFOLIO_BASELINE_SATS * allocation.allocation_percentage / 100),
           current_value_sats: currentValueInSats,
           initial_price_usd: parseFloat(allocation.purchase_price_usd),
           current_price_usd: currentPrice,
@@ -294,7 +297,7 @@ class SetForgetPortfolio {
         });
       }
 
-      const initialBtcAmount = parseInt(this.initial_btc_amount);
+      const initialBtcAmount = PORTFOLIO_BASELINE_SATS;
       const totalPerformancePercent = ((currentValueSats / initialBtcAmount) - 1) * 100;
 
       // Calculate days since creation (tracking period)
@@ -325,14 +328,16 @@ class SetForgetPortfolio {
 // Create a new Set & Forget portfolio
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { name, initial_btc_amount, allocations } = req.body;
+    const { name, allocations } = req.body;
 
     // Validate required fields
-    if (!name || !initial_btc_amount || !allocations) {
+    if (!name || !allocations) {
       return res.status(400).json({
-        error: 'Missing required fields: name, initial_btc_amount, allocations'
+        error: 'Missing required fields: name, allocations'
       });
     }
+
+    // Always use 1 BTC (100M sats) as baseline for portfolio comparisons
 
     // Validate name length
     if (name.length < 1 || name.length > 255) {
@@ -341,17 +346,9 @@ router.post('/', authenticateToken, async (req, res) => {
       });
     }
 
-    // Validate initial BTC amount
-    const btcAmount = parseInt(initial_btc_amount);
-    if (isNaN(btcAmount) || btcAmount <= 0) {
-      return res.status(400).json({
-        error: 'Initial BTC amount must be a positive number in satoshis'
-      });
-    }
-
     const portfolio = await SetForgetPortfolio.create(
       req.user.userId,
-      { name, initial_btc_amount: btcAmount },
+      { name },
       allocations
     );
 

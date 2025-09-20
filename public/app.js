@@ -7,6 +7,9 @@ class BitcoinGame {
         this.currentPage = 'home';
         this.priceRefreshInterval = null;
 
+        // Portfolio baseline: always compare against 1 BTC (100M satoshis)
+        this.PORTFOLIO_BASELINE_SATS = 100000000;
+
         this.initTooltips();
         this.initTranslation();
         this.init();
@@ -328,7 +331,7 @@ class BitcoinGame {
             'XAU': 'gold',
             'XAG': 'silver',
             'WTI': 'crudeOil',
-            'CPER': 'copper',
+            'COPPER': 'copper',
             'WEAT': 'wheat',
             'UNG': 'naturalGas',
             'URA': 'uranium',
@@ -1365,7 +1368,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA/BITSTAMP:BTCUSD',
             'DBA': 'AMEX:DBA/BITSTAMP:BTCUSD',
-            'CPER': 'AMEX:CPER/BITSTAMP:BTCUSD',
+            'COPPER': 'COMEX:HG1!/BITSTAMP:BTCUSD',
             'WEAT': 'AMEX:WEAT/BITSTAMP:BTCUSD',
             'UNG': 'AMEX:UNG/BITSTAMP:BTCUSD'
         };
@@ -1410,7 +1413,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'CPER': 'AMEX:CPER',
+            'COPPER': 'COMEX:HG1!',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -1634,10 +1637,10 @@ class BitcoinGame {
                 category: 'Commodity',
                 tags: ['Energy Source', 'Economic Indicator']
             },
-            'CPER': {
-                title: 'United States Copper Index Fund (CPER)',
-                description: 'CPER provides exposure to copper prices through futures contracts, allowing investors to participate in copper\'s performance without physical storage. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. This ETF makes copper investing accessible to retail investors, yet even this economically critical metal has declined significantly when priced in Bitcoin.',
-                category: 'Commodity ETF',
+            'COPPER': {
+                title: 'Copper Futures (COPPER)',
+                description: 'Copper futures provide direct exposure to copper prices, allowing investors to participate in this vital industrial metal\'s performance. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. As one of the most economically sensitive commodities, copper prices reflect global growth expectations, yet even this critical industrial metal has declined significantly when priced in Bitcoin.',
+                category: 'Commodity',
                 tags: ['Industrial Metal', 'Economic Indicator']
             },
             'WEAT': {
@@ -2721,7 +2724,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'CPER': 'AMEX:CPER',
+            'COPPER': 'COMEX:HG1!',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -4075,7 +4078,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div>
                             <span class="text-gray-600">Initial:</span>
-                            <div class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</div>
+                            <div class="font-medium">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</div>
                         </div>
                         <div>
                             <span class="text-gray-600">Current:</span>
@@ -4261,7 +4264,7 @@ class BitcoinGame {
                     { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
                     { symbol: 'XAG', displayName: 'Silver (XAG)', translateKey: 'assets.assetNames.silverXAG' },
                     { symbol: 'WTI', displayName: 'Crude Oil (WTI)', translateKey: 'assets.assetNames.crudeOilWTI' },
-                    { symbol: 'CPER', displayName: 'Copper (CPER)', translateKey: 'assets.assetNames.copperCPER' },
+                    { symbol: 'COPPER', displayName: 'Copper (COPPER)', translateKey: 'assets.assetNames.copper' },
                     { symbol: 'WEAT', displayName: 'Wheat (WEAT)', translateKey: 'assets.assetNames.wheatWEAT' },
                     { symbol: 'UNG', displayName: 'Natural Gas (UNG)', translateKey: 'assets.assetNames.naturalGasUNG' },
                     { symbol: 'URA', displayName: 'Uranium (URA)', translateKey: 'assets.assetNames.uraniumURA' },
@@ -4657,7 +4660,6 @@ class BitcoinGame {
                 },
                 body: JSON.stringify({
                     name,
-                    initial_btc_amount: amount,
                     allocations: apiAllocations
                 })
             });
@@ -4754,7 +4756,7 @@ class BitcoinGame {
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
                                 <span>${this.getTranslatedText('portfolio.initialValue', 'Initial Value')}:</span>
-                                <span class="font-medium">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</span>
+                                <span class="font-medium">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</span>
                             </div>
                             <div class="flex justify-between">
                                 <span>${this.getTranslatedText('portfolio.currentValue', 'Current Value')}:</span>
@@ -4781,7 +4783,7 @@ class BitcoinGame {
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
                                         <div>
-                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                                            <div>${this.getTranslatedText('portfolio.initial', 'Initial')}: ${this.formatSatoshis(Math.floor(this.PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100))} BTC</div>
                                             <div>${this.getTranslatedText('portfolio.current', 'Current')}: ${this.formatSatoshis(alloc.current_value_sats)} BTC</div>
                                         </div>
                                         <div>
@@ -5352,7 +5354,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <div class="bg-white rounded-lg p-6 shadow-sm">
                             <h3 class="text-lg font-semibold mb-2">Initial Investment</h3>
-                            <p class="text-2xl font-bold">${this.formatSatoshis(portfolio.initial_btc_amount)} BTC</p>
+                            <p class="text-2xl font-bold">${this.formatSatoshis(this.PORTFOLIO_BASELINE_SATS)} BTC</p>
                             <p class="text-sm text-gray-500 mt-1">BTC Price at Creation: $${this.getBtcPriceAtCreation(portfolio).toLocaleString()}</p>
                         </div>
                         <div class="bg-white rounded-lg p-6 shadow-sm">
@@ -5451,7 +5453,7 @@ class BitcoinGame {
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <div>
                             <div class="text-gray-600">Initial</div>
-                            <div class="font-medium">${this.formatSatoshis(alloc.initial_btc_amount)} BTC</div>
+                            <div class="font-medium">${this.formatSatoshis(Math.floor(this.PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100))} BTC</div>
                             <div class="text-gray-500">$${Number(alloc.initial_price_usd).toLocaleString()}</div>
                         </div>
                         <div>

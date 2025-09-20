@@ -76,41 +76,7 @@ router.get('/prices', async (req, res) => {
     ];
     let stockPrices = {};
 
-    // Fallback prices if API fails
-    const fallbackStockPrices = {
-      // Original stocks
-      'AAPL': 175.50,
-      'TSLA': 248.30,
-      'MSFT': 378.20,
-      'GOOGL': 138.45,
-      'AMZN': 145.80,
-      'NVDA': 485.60,
-      'SPY': 450.00,
-      'VNQ': 95.00,
-      // New stocks
-      'META': 325.00,
-      'BRK-B': 420.00,
-      'JNJ': 165.00,
-      'V': 265.00,
-      'WMT': 165.00,
-      // Bond ETFs
-      'TLT': 92.00,
-      'HYG': 79.50,
-      // International ETFs
-      'VXUS': 58.00,
-      'EFA': 78.50,
-      'EWU': 35.00,
-      // REITs
-      'VNO': 28.50,
-      'PLD': 130.00,
-      'EQIX': 750.00,
-      // Commodity ETFs
-      'URA': 25.50,
-      'DBA': 20.00,
-      'CPER': 28.00,
-      'WEAT': 7.50,
-      'UNG': 9.50
-    };
+    // No fallback prices - only use real fetched prices
 
     // Fetch real stock prices from Yahoo Finance
     try {
@@ -127,30 +93,23 @@ router.get('/prices', async (req, res) => {
           console.log(`${symbol}: Fetched real price: $${price}`);
           return { symbol, price };
         } catch (error) {
-          console.log(`${symbol}: Failed to fetch, using fallback price`);
-          return { symbol, price: fallbackStockPrices[symbol] };
+          console.log(`${symbol}: Failed to fetch, skipping`);
+          return null;
         }
       });
 
       const results = await Promise.all(stockPromises);
-      results.forEach(({ symbol, price }) => {
-        stockPrices[symbol] = price;
+      results.forEach(result => {
+        if (result && result.symbol && result.price) {
+          stockPrices[result.symbol] = result.price;
+        }
       });
     } catch (error) {
-      console.log('Failed to fetch stock prices, using fallback prices');
-      stockPrices = fallbackStockPrices;
+      console.log('Failed to fetch stock prices, skipping failed assets');
     }
 
-    // Get commodity and international index prices - fallbacks first
-    let commodityPrices = {
-      // Original commodities
-      'XAU': 2700,  // Gold per troy ounce - default fallback
-      'XAG': 32,    // Silver per troy ounce - default fallback
-      'WTI': 75,    // Oil per barrel - default fallback
-      // International indices (approximate fallback values)
-      '^GDAXI': 16000, // DAX points
-      '^N225': 33000  // Nikkei 225 points
-    };
+    // Get commodity and international index prices - no fallbacks, only real prices
+    let commodityPrices = {};
 
     // Try to fetch gold and silver prices from Yahoo Finance
     try {
@@ -165,7 +124,7 @@ router.get('/prices', async (req, res) => {
       lastValidPrices.gold = goldPrice;
       console.log(`Gold: Fetched real price: $${goldPrice.toFixed(2)}/oz`);
     } catch (error) {
-      console.log('Gold: Failed to fetch from Yahoo, using fallback price');
+      console.log('Gold: Failed to fetch from Yahoo, skipping');
     }
 
     try {
@@ -180,7 +139,7 @@ router.get('/prices', async (req, res) => {
       lastValidPrices.silver = silverPrice;
       console.log(`Silver: Fetched real price: $${silverPrice.toFixed(2)}/oz`);
     } catch (error) {
-      console.log('Silver: Failed to fetch from Yahoo, using fallback price');
+      console.log('Silver: Failed to fetch from Yahoo, skipping');
     }
 
     // Try to fetch oil price from Yahoo Finance
@@ -194,8 +153,9 @@ router.get('/prices', async (req, res) => {
       commodityPrices.WTI = oilPrice;
       console.log(`WTI Oil: Fetched real price: $${oilPrice}`);
     } catch (error) {
-      console.log('WTI Oil: Failed to fetch, using fallback price');
+      console.log('WTI Oil: Failed to fetch, skipping');
     }
+
 
     // Try to fetch remaining international indices
     const internationalIndices = [
@@ -214,7 +174,7 @@ router.get('/prices', async (req, res) => {
         commodityPrices[index.key] = price;
         console.log(`${index.name}: Fetched real price: ${price}`);
       } catch (error) {
-        console.log(`${index.name}: Failed to fetch, using fallback price`);
+        console.log(`${index.name}: Failed to fetch, skipping`);
       }
     }
 
