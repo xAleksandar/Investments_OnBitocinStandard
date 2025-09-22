@@ -31,35 +31,6 @@ router.post('/', authenticateToken, async (req, res) => {
     // Start transaction
     await prisma.$transaction(async (tx) => {
       
-      // First, update prices to ensure we have current data
-      try {
-        const axios = require('axios');
-        const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
-        const btcPrice = btcResponse.data.bitcoin.usd;
-        
-        // Update BTC price
-        await tx.asset.update({
-          where: { symbol: 'BTC' },
-          data: { 
-            currentPriceUsd: btcPrice,
-            lastUpdated: new Date()
-          }
-        });
-        
-        // Update WTI price if needed
-        if (fromAsset === 'WTI' || toAsset === 'WTI') {
-          await tx.asset.update({
-            where: { symbol: 'WTI' },
-            data: { 
-              currentPriceUsd: 75,
-              lastUpdated: new Date()
-            }
-          });
-        }
-      } catch (priceError) {
-        console.log('Price update error:', priceError.message);
-      }
-      
       // Get current prices
       const assets = await tx.asset.findMany({
         where: {
@@ -88,6 +59,7 @@ router.post('/', authenticateToken, async (req, res) => {
           assetSymbol: fromAsset
         }
       });
+    });
     
     console.log('User holding:', holding.rows);
     console.log('Required amount:', amount, 'Available:', holding.rows[0]?.amount);
