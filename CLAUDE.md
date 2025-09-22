@@ -15,6 +15,14 @@ node scripts/rebuild-from-trades.js  # Rebuild portfolio from trade history
 node scripts/rebuild-holdings.js     # Recalculate holdings
 node scripts/fix-portfolio.js        # Fix portfolio inconsistencies
 node scripts/debug-portfolio.js      # Debug portfolio data
+
+# Prisma database management
+npx prisma migrate dev --name <name> # Create and apply new migration
+npx prisma migrate deploy            # Apply pending migrations (production)
+npx prisma migrate status            # Check migration status
+npx prisma generate                  # Generate Prisma client
+npx prisma studio                    # Open database browser
+npx prisma db push                   # Sync schema without migrations (dev only)
 ```
 
 ## Architecture
@@ -28,16 +36,28 @@ node scripts/debug-portfolio.js      # Debug portfolio data
   - `/api/trades` - Trade execution and history
   - `/api/assets` - Asset prices and market data
 - Static frontend served from `/public`
-- PostgreSQL connection pooling via `config/database.js`
+- Database connection via Prisma ORM (`config/database.js`)
 
-### Database Schema
+### Database Schema & Prisma
 
-Key tables created in `scripts/setup-database.js`:
-- **users**: User accounts with email-based auth
-- **holdings**: Current asset positions per user
-- **trades**: Complete trade history with BTC costs
-- **magic_links**: Temporary auth tokens
-- **purchases**: Asset purchase tracking with 24-hour lock
+**Prisma Setup** (September 2025):
+- Database schema managed by Prisma ORM with PostgreSQL
+- Schema defined in `prisma/schema.prisma`
+- Migration system for version control of database changes
+- Type-safe database client generated from schema
+
+**Database Tables** (managed via Prisma migrations):
+- **users**: User accounts with email-based auth (`is_admin` flag for admin access)
+- **holdings**: Current asset positions per user (aggregated view)
+- **trades**: Complete trade history with BTC costs (Fixed: proper Prisma queries)
+- **purchases**: Individual asset purchases with 24-hour lock tracking
+- **magic_links**: Temporary auth tokens for magic link authentication
+- **suggestions**: User feedback system with admin replies and rate limiting
+- **assets**: Asset price cache with automatic updates
+- **achievements**: Gamification system for user milestones
+- **set_forget_portfolios**: Long-term portfolio allocation tracking
+- **set_forget_allocations**: Individual allocations within portfolios
+- **user_achievements**: Junction table for user achievement progress
 
 ### Trading Logic
 
@@ -100,6 +120,13 @@ Required in `.env`:
 3. Update frontend UI to display new asset
 
 ### Database Migrations
+**Prisma Migration System** (September 2025):
+- Schema changes tracked in versioned migration files (`prisma/migrations/`)
+- Baseline migration created: `20250922182608_init` (represents current production schema)
+- Future schema changes: `npx prisma migrate dev --name <description>`
+- Production deployments: `npx prisma migrate deploy`
+
+**Legacy Database Scripts** (for emergency troubleshooting only):
 - Manual SQL scripts in `scripts/` directory
 - Run setup script to create initial schema
 - Use rebuild scripts to fix data inconsistencies
@@ -181,11 +208,43 @@ Fixed Gold (XAU) price conversion from per-gram to per-troy-ounce
 - Multiply by 31.1035 to convert to troy ounces
 - Corrected stored amounts in database
 
+### 6. Prisma ORM Integration & Trade History Fix
+Migrated from raw SQL to Prisma ORM for better type safety and maintainability
+- **Database Migration System**: Implemented Prisma migrations for version control
+- **Fixed Trade History Bug**: Resolved "Invalid Date -NaN undefined" errors in recent trades
+- **Backend API Fix**: `/api/trades/history` endpoint now uses proper Prisma queries instead of broken `pool.query()` calls
+- **BigInt Serialization**: Fixed JSON serialization of BigInt values from database
+- **Frontend Error Handling**: Added robust validation and error handling for trade data display
+- **Type Safety**: All database queries now use type-safe Prisma client
+
+#### Technical Details:
+- Backend: Replaced raw SQL with `prisma.trade.findMany()` queries
+- Frontend: Enhanced validation in `displayTradeHistory()` function
+- Data Transformation: Convert BigInt to Number for JSON serialization
+- Error Fallbacks: Graceful handling of missing/invalid trade data
+
+#### For New Team Members:
+```bash
+git pull
+npx prisma generate  # Generate Prisma client
+npx prisma migrate deploy  # Apply any pending migrations
+```
+
 # Kiro - tasks list
 I might have created for you a task list in @.kiro/specs/bitcoin-game-enhancements/ - there are 3 files - design.md, which explains the design, requirements.md - how its going to work and tasks.md - a trackable list of where are we at - completed tasks are market with [x], not completed as [ ] - do not change this syntax, do not add to it or amend it in anyway, just mark as done what is done and only if you are marking something as done and want to add additional comments to it then you can amend slightly this point with the most important data, but unless asked for it do not amend any of these documents in this directory. When you are asked to complete a task and you have
 
-# Updating database with scripts
-Other developers are developing this project, so when we do database updates we need to have updates with update-db scripts, as if we run directly the sql commands we will have database mismatch.
+# Database Updates and Team Synchronization
+**Prisma Migration Approach** (Current - September 2025):
+When making database schema changes, use Prisma migrations to ensure team synchronization:
+1. Modify `prisma/schema.prisma`
+2. Run `npx prisma migrate dev --name <descriptive_name>`
+3. Commit both schema changes and migration files
+4. Team members run `npx prisma migrate deploy` on git pull
+
+**Legacy Approach** (For emergency troubleshooting only):
+- Manual update-db scripts were used previously
+- Direct SQL commands cause database mismatches between team members
+- Only use legacy scripts for data fixes, not schema changes
 
 # DRY and KISS
 Keep It Simple Stupid - dont overcomplicate the code and architecture
