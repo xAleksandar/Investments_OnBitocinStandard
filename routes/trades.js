@@ -279,12 +279,30 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get trade history
 router.get('/history', authenticateToken, async (req, res) => {
   try {
-    const trades = await pool.query(
-      'SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
-      [req.user.userId]
-    );
-    
-    res.json(trades.rows);
+    const trades = await prisma.trade.findMany({
+      where: {
+        userId: req.user.userId
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 50
+    });
+
+    // Transform to match frontend expectations (snake_case field names)
+    // Convert BigInt to Number for JSON serialization
+    const transformedTrades = trades.map(trade => ({
+      id: trade.id,
+      user_id: trade.userId,
+      from_asset: trade.fromAsset,
+      to_asset: trade.toAsset,
+      from_amount: Number(trade.fromAmount),
+      to_amount: Number(trade.toAmount),
+      btc_price_usd: trade.btcPriceUsd ? Number(trade.btcPriceUsd) : null,
+      asset_price_usd: trade.assetPriceUsd ? Number(trade.assetPriceUsd) : null,
+      created_at: trade.createdAt
+    }));
+    res.json(transformedTrades);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch trade history' });
