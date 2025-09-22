@@ -1,35 +1,84 @@
 # Dependencies
 node_modules/
-.kiro/
-.claude
-
-# Environment variables
-.env
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Logs
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Database
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+.env.test
+.env.production
+
+# Database files
 *.sqlite
 *.sqlite3
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
 
 # Database backups
 backups/
+
+# Temporary folders
+tmp/
+temp/
+.temp/
+*.tmp
+nul
+
+# Logs
+logs
+*.log
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing artifacts
+playwright-report/
+test-results/
+coverage/
+*.lcov
+.nyc_output
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Cache directories
+.cache
+.parcel-cache
+
+# Build outputs
+dist/
+build/
+
+# Task management (personal)
+.kiro/
+
+# Claude Code personal settings (keep docs but ignore personal config)
+.claude/settings.local.json
