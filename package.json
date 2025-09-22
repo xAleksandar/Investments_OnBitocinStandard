@@ -1,12 +1,15 @@
 {
-  "name": "bitcoin-investment-game",
+  "name": "measured-in-bitcoin",
   "version": "1.0.0",
-  "description": "Investment game where everything is measured in Bitcoin/satoshis",
+  "description": "Educational platform demonstrating Bitcoin as a unit of account and deflationary monetary perspective",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
     "build": "npx prisma generate && echo 'Build complete'",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
     "setup-db": "node scripts/setup-database.js",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
@@ -32,6 +35,9 @@
     "prisma": "^6.16.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@playwright/mcp": "^0.0.39",
+    "@playwright/test": "^1.55.0",
+    "nodemon": "^3.0.1",
+    "playwright": "^1.55.0"
   }
 }
