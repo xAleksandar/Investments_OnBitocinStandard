@@ -19,6 +19,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Safely serialize BigInt values in all JSON responses
+// Converts BigInt to string to avoid JSON.stringify errors
+const bigIntReplacer = (key, value) => (typeof value === 'bigint' ? value.toString() : value);
+const originalJson = express.response.json;
+express.response.json = function (body) {
+  try {
+    const sanitized = JSON.parse(JSON.stringify(body, bigIntReplacer));
+    return originalJson.call(this, sanitized);
+  } catch (e) {
+    // Fallback if body isn't plain-serializable
+    return originalJson.call(this, body);
+  }
+};
+
 // Force refresh connection pools
 app.get('/api/refresh-pools', async (req, res) => {
   try {

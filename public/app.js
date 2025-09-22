@@ -2223,10 +2223,27 @@ class BitcoinGame {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const trades = await response.json();
+
+            // Check if response contains an error
+            if (trades.error) {
+                throw new Error(trades.error);
+            }
+
+            // Debug: console.log('Received trades data:', trades);
             this.displayTradeHistory(trades);
         } catch (error) {
             console.error('Failed to load trade history:', error);
+
+            // Display error message in the trade history section
+            const historyDiv = document.getElementById('tradeHistory');
+            if (historyDiv) {
+                historyDiv.innerHTML = `<p class="text-red-500">Failed to load trade history: ${error.message}</p>`;
+            }
         }
     }
 
@@ -2364,6 +2381,7 @@ class BitcoinGame {
     }
 
     displayTradeHistory(trades) {
+        console.warn('Displaying trades:', trades);
         const historyDiv = document.getElementById('tradeHistory');
 
         if (trades.length === 0) {
@@ -2384,13 +2402,13 @@ class BitcoinGame {
             </thead>
             <tbody>
                 ${trades.map(trade => {
-            const fromAmount = trade.from_asset === 'BTC'
-                ? (trade.from_amount / 100000000).toFixed(8) + ' BTC'
-                : (trade.from_amount / 100000000).toFixed(8) + ' ' + trade.from_asset;
+            const fromAmount = trade.fromAsset === 'BTC'
+                ? (trade.fromAmount / 100000000).toFixed(8) + ' BTC'
+                : (trade.fromAmount / 100000000).toFixed(8) + ' ' + trade.fromAsset;
 
-            const toAmount = trade.to_asset === 'BTC'
-                ? (trade.to_amount / 100000000).toFixed(8) + ' BTC'
-                : (trade.to_amount / 100000000).toFixed(8) + ' ' + trade.to_asset;
+            const toAmount = trade.toAsset === 'BTC'
+                ? (trade.toAmount / 100000000).toFixed(8) + ' BTC'
+                : (trade.toAmount / 100000000).toFixed(8) + ' ' + trade.toAsset;
 
             return `
                         <tr class="border-b">
@@ -2673,7 +2691,7 @@ class BitcoinGame {
         try {
             console.log('Sending HTTP request...');
 
-            const response = await fetch('/api/trades', {
+            const response = await fetch('/api/trades/execute', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2682,7 +2700,10 @@ class BitcoinGame {
                 body: JSON.stringify({
                     fromAsset,
                     toAsset,
-                    amount: tradeAmount
+                    // For BTC trades, send sats and unit 'sat' to avoid double conversion
+                    // For non-BTC trades, send raw asset amount with unit 'asset'
+                    amount: fromAsset === 'BTC' ? tradeAmount : amount,
+                    unit: fromAsset === 'BTC' ? 'sat' : 'asset'
                 })
             });
 
