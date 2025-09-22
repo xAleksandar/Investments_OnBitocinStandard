@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const router = express.Router();
 
 // Cache for last valid prices - will be loaded from database on startup
@@ -13,12 +13,19 @@ let lastValidPrices = {
 // Load last valid prices from database on startup
 async function loadLastValidPrices() {
   try {
-    const pricesResult = await pool.query(
-      "SELECT symbol, current_price_usd FROM assets WHERE symbol IN ('BTC', 'XAU', 'XAG') AND current_price_usd IS NOT NULL"
-    );
+    const pricesResult = await prisma.asset.findMany({
+      where: {
+        symbol: { in: ['BTC', 'XAU', 'XAG'] },
+        currentPriceUsd: { not: null }
+      },
+      select: {
+        symbol: true,
+        currentPriceUsd: true
+      }
+    });
 
-    pricesResult.rows.forEach(row => {
-      const price = parseFloat(row.current_price_usd);
+    pricesResult.forEach(row => {
+      const price = parseFloat(row.currentPriceUsd);
       if (row.symbol === 'BTC' && price > 10000 && price < 500000) {
         lastValidPrices.btc = price;
       } else if (row.symbol === 'XAU' && price > 1000 && price < 5000) {
@@ -186,10 +193,18 @@ router.get('/prices', async (req, res) => {
 
     // Update database
     for (const [symbol, priceUsd] of Object.entries(prices)) {
-      await pool.query(
-        'UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2',
-        [priceUsd, symbol]
-      );
+      await prisma.asset.upsert({
+        where: { symbol },
+        update: {
+          currentPriceUsd: priceUsd,
+          lastUpdated: new Date()
+        },
+        create: {
+          symbol,
+          currentPriceUsd: priceUsd,
+          lastUpdated: new Date()
+        }
+      });
     }
 
     // Calculate prices in satoshis
@@ -393,8 +408,15 @@ router.get('/performance/:symbol/:period', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const { enrichAssetData } = require('../config/assets');
-    const result = await pool.query('SELECT symbol, current_price_usd, last_updated FROM assets ORDER BY symbol');
-    const enrichedAssets = enrichAssetData(result.rows);
+    const result = await prisma.asset.findMany({
+      select: {
+        symbol: true,
+        currentPriceUsd: true,
+        lastUpdated: true
+      },
+      orderBy: { symbol: 'asc' }
+    });
+    const enrichedAssets = enrichAssetData(result);
 
     // Sort by type then symbol for consistent ordering
     enrichedAssets.sort((a, b) => {

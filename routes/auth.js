@@ -1,7 +1,7 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const router = express.Router();
 
 // Check if user exists
@@ -9,8 +9,11 @@ router.post('/check-user', async (req, res) => {
   const { email } = req.body;
 
   try {
-    const user = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    res.json({ exists: user.rows.length > 0 });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true }
+    });
+    res.json({ exists: !!user });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -27,33 +30,43 @@ router.post('/request-link', async (req, res) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Check if user exists
-    let user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    let user = await prisma.user.findUnique({
+      where: { email }
+    });
 
-    if (user.rows.length === 0 && username) {
+    if (!user && username) {
       // Create new user
-      const newUser = await pool.query(
-        'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
-        [username, email]
-      );
+      const newUser = await prisma.user.create({
+        data: {
+          username,
+          email
+        }
+      });
 
       // Give them 1 BTC (100,000,000 satoshis)
-      await pool.query(
-        'INSERT INTO holdings (user_id, asset_symbol, amount) VALUES ($1, $2, $3)',
-        [newUser.rows[0].id, 'BTC', 100000000]
-      );
+      await prisma.holding.create({
+        data: {
+          userId: newUser.id,
+          assetSymbol: 'BTC',
+          amount: BigInt(100000000)
+        }
+      });
 
       user = newUser;
     }
 
-    if (user.rows.length === 0) {
+    if (!user) {
       return res.status(400).json({ error: 'User not found. Please provide username for registration.' });
     }
 
     // Store magic link
-    await pool.query(
-      'INSERT INTO magic_links (email, token, expires_at) VALUES ($1, $2, $3)',
-      [email, token, expiresAt]
-    );
+    await prisma.magicLink.create({
+      data: {
+        email,
+        token,
+        expiresAt
+      }
+    });
 
     // Generate magic link URL based on environment
     const baseUrl = process.env.APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
@@ -69,6 +82,17 @@ router.post('/request-link', async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
+    // Handle duplicate username error
+    if (error.code === '23505' && error.constraint === 'users_username_key') {
+      return res.status(400).json({ error: 'This username is already taken. Please choose a different username.' });
+    }
+
+    // Handle duplicate email error
+    if (error.code === '23505' && error.constraint === 'users_email_key') {
+      return res.status(400).json({ error: 'An account with this email already exists.' });
+    }
+
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -78,30 +102,40 @@ router.get('/verify', async (req, res) => {
   const { token } = req.query;
 
   try {
-    const link = await pool.query(
-      'SELECT * FROM magic_links WHERE token = $1 AND expires_at > NOW() AND used = false',
-      [token]
-    );
+    const link = await prisma.magicLink.findFirst({
+      where: {
+        token,
+        expiresAt: { gt: new Date() },
+        used: false
+      }
+    });
 
-    if (link.rows.length === 0) {
+    if (!link) {
       return res.status(400).json({ error: 'Invalid or expired token' });
     }
 
     // Mark token as used
-    await pool.query('UPDATE magic_links SET used = true WHERE token = $1', [token]);
+    await prisma.magicLink.update({
+      where: { id: link.id },
+      data: { used: true }
+    });
 
     // Get user
-    const user = await pool.query('SELECT * FROM users WHERE email = $1', [link.rows[0].email]);
+    const user = await prisma.user.findUnique({
+      where: { email: link.email }
+    });
 
-    // Check admin status for JWT token
-    const { isUserAdminByData } = require('../utils/adminCheck');
-    const isAdmin = await isUserAdminByData(user.rows[0]);
+    // Check admin status for JWT token (dual verification)
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(email => email.trim()).filter(email => email);
+    const isAdminByEmail = adminEmails.includes(user.email);
+    const isAdminByDB = user.isAdmin === true;
+    const isAdmin = isAdminByEmail || isAdminByDB;
 
     // Generate JWT with admin status
     const jwtToken = jwt.sign(
       {
-        userId: user.rows[0].id,
-        email: user.rows[0].email,
+        userId: user.id,
+        email: user.email,
         isAdmin: isAdmin
       },
       process.env.JWT_SECRET,
@@ -110,7 +144,7 @@ router.get('/verify', async (req, res) => {
 
     // Include admin status in user object for frontend
     const userWithAdmin = {
-      ...user.rows[0],
+      ...user,
       isAdmin: isAdmin
     };
 

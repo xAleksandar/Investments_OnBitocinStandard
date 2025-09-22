@@ -1,5 +1,5 @@
 const express = require('express');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const router = express.Router();
 
@@ -28,48 +28,37 @@ router.post('/', authenticateToken, async (req, res) => {
   console.log('Minimum trade check passed, proceeding...');
   
   try {
-    await pool.query('BEGIN');
+    // Start transaction
+    await prisma.$transaction(async (tx) => {
+      
+      // Get current prices
+      const assets = await tx.asset.findMany({
+        where: {
+          symbol: { in: [fromAsset, toAsset] }
+        }
+      });
+      console.log('Found assets:', assets);
+      
+      const assetPrices = {};
+      assets.forEach(asset => {
+        assetPrices[asset.symbol] = asset.currentPriceUsd;
+      });
     
-    // First, update prices to ensure we have current data
-    try {
-      const axios = require('axios');
-      const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
-      const btcPrice = btcResponse.data.bitcoin.usd;
+      console.log('Asset prices:', assetPrices);
       
-      // Update BTC price
-      await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [btcPrice, 'BTC']);
+      const btcPrice = assetPrices['BTC'];
       
-      // Update WTI price if needed
-      if (fromAsset === 'WTI' || toAsset === 'WTI') {
-        await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [75, 'WTI']);
+      if (!btcPrice || !assetPrices[fromAsset] || !assetPrices[toAsset]) {
+        throw new Error('Asset prices not available');
       }
-    } catch (priceError) {
-      console.log('Price update error:', priceError.message);
-    }
-    
-    // Get current prices
-    const assets = await pool.query('SELECT * FROM assets WHERE symbol = $1 OR symbol = $2', [fromAsset, toAsset]);
-    console.log('Found assets:', assets.rows);
-    
-    const assetPrices = {};
-    assets.rows.forEach(asset => {
-      assetPrices[asset.symbol] = asset.current_price_usd;
-    });
-    
-    console.log('Asset prices:', assetPrices);
-    
-    const btcPrice = assetPrices['BTC'];
-    
-    if (!btcPrice || !assetPrices[fromAsset] || !assetPrices[toAsset]) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ error: 'Asset prices not available' });
-    }
-    
-    // Check user has enough of fromAsset
-    const holding = await pool.query(
-      'SELECT * FROM holdings WHERE user_id = $1 AND asset_symbol = $2',
-      [req.user.userId, fromAsset]
-    );
+      
+      // Check user has enough of fromAsset
+      const holding = await tx.holding.findFirst({
+        where: {
+          userId: req.user.userId,
+          assetSymbol: fromAsset
+        }
+      });
     
     console.log('User holding:', holding.rows);
     console.log('Required amount:', amount, 'Available:', holding.rows[0]?.amount);
@@ -248,7 +237,7 @@ router.post('/', authenticateToken, async (req, res) => {
         lockedUntil: lockUntil
       }
     });
-    
+    });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('FULL TRADE ERROR:', error);
@@ -261,12 +250,30 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get trade history
 router.get('/history', authenticateToken, async (req, res) => {
   try {
-    const trades = await pool.query(
-      'SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
-      [req.user.userId]
-    );
-    
-    res.json(trades.rows);
+    const trades = await prisma.trade.findMany({
+      where: {
+        userId: req.user.userId
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 50
+    });
+
+    // Transform to match frontend expectations (snake_case field names)
+    // Convert BigInt to Number for JSON serialization
+    const transformedTrades = trades.map(trade => ({
+      id: trade.id,
+      user_id: trade.userId,
+      from_asset: trade.fromAsset,
+      to_asset: trade.toAsset,
+      from_amount: Number(trade.fromAmount),
+      to_amount: Number(trade.toAmount),
+      btc_price_usd: trade.btcPriceUsd ? Number(trade.btcPriceUsd) : null,
+      asset_price_usd: trade.assetPriceUsd ? Number(trade.assetPriceUsd) : null,
+      created_at: trade.createdAt
+    }));
+    res.json(transformedTrades);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch trade history' });

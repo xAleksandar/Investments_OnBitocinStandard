@@ -5,9 +5,10 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolio');
-const tradeRoutes = require('./routes/trades');
+const tradeRoutes = require('./routes/trades-prisma');
 const assetRoutes = require('./routes/assets');
 const suggestionsRoutes = require('./routes/suggestions');
+const debugRoutes = require('./routes/debug');
 const setForgetPortfoliosRoutes = require('./routes/set-forget-portfolios');
 
 const app = express();
@@ -17,6 +18,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// Safely serialize BigInt values in all JSON responses
+// Converts BigInt to string to avoid JSON.stringify errors
+const bigIntReplacer = (key, value) => (typeof value === 'bigint' ? value.toString() : value);
+const originalJson = express.response.json;
+express.response.json = function (body) {
+  try {
+    const sanitized = JSON.parse(JSON.stringify(body, bigIntReplacer));
+    return originalJson.call(this, sanitized);
+  } catch (e) {
+    // Fallback if body isn't plain-serializable
+    return originalJson.call(this, body);
+  }
+};
 
 // Force refresh connection pools
 app.get('/api/refresh-pools', async (req, res) => {
@@ -79,6 +94,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
+app.use('/api/debug', debugRoutes);
 app.use('/api/set-forget-portfolios', setForgetPortfoliosRoutes);
 
 // Magic link redirect (for user-friendly URLs)

@@ -1,5 +1,5 @@
 const express = require('express');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
 const router = express.Router();
@@ -8,13 +8,20 @@ const router = express.Router();
 // Exception: If the most recent submission is closed, user can submit immediately
 const checkRateLimit = async (userId) => {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const recentSubmission = await pool.query(
-    'SELECT created_at, status FROM suggestions WHERE user_id = $1 AND created_at > $2 ORDER BY created_at DESC LIMIT 1',
-    [userId, oneHourAgo]
-  );
+  const recentSubmission = await prisma.suggestion.findFirst({
+    where: {
+      userId,
+      createdAt: { gt: oneHourAgo }
+    },
+    select: {
+      createdAt: true,
+      status: true
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 
-  if (recentSubmission.rows.length > 0) {
-    const submission = recentSubmission.rows[0];
+  if (recentSubmission) {
+    const submission = recentSubmission;
 
     // If the most recent submission is closed, allow immediate submission
     if (submission.status === 'closed') {
@@ -22,7 +29,7 @@ const checkRateLimit = async (userId) => {
     }
 
     // Otherwise, apply rate limiting for open submissions
-    const lastSubmission = new Date(submission.created_at);
+    const lastSubmission = new Date(submission.createdAt);
     const nextAllowedTime = new Date(lastSubmission.getTime() + 60 * 60 * 1000);
     const remainingMs = nextAllowedTime.getTime() - Date.now();
 
@@ -73,16 +80,26 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // Create suggestion
-    const result = await pool.query(
-      `INSERT INTO suggestions (user_id, type, title, description)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, type, title, description, status, created_at`,
-      [req.user.userId, type, title.trim(), description.trim()]
-    );
+    const result = await prisma.suggestion.create({
+      data: {
+        userId: req.user.userId,
+        type,
+        title: title.trim(),
+        description: description.trim()
+      },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        description: true,
+        status: true,
+        createdAt: true
+      }
+    });
 
     res.status(201).json({
       message: 'Suggestion submitted successfully!',
-      suggestion: result.rows[0]
+      suggestion: result
     });
 
   } catch (error) {
