@@ -5,9 +5,10 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const portfolioRoutes = require('./routes/portfolio');
-const tradeRoutes = require('./routes/trades');
+const tradeRoutes = require('./routes/trades-prisma');
 const assetRoutes = require('./routes/assets');
 const suggestionsRoutes = require('./routes/suggestions');
+const debugRoutes = require('./routes/debug');
 const setForgetPortfoliosRoutes = require('./routes/set-forget-portfolios');
 
 const app = express();
@@ -79,6 +80,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
+app.use('/api/debug', debugRoutes);
 app.use('/api/set-forget-portfolios', setForgetPortfoliosRoutes);
 
 // Magic link redirect (for user-friendly URLs)

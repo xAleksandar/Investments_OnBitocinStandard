@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+model User {
+  id                  Int                  @id @default(autoincrement())
+  username            String               @unique @db.VarChar(50)
+  email               String               @unique @db.VarChar(255)
+  isPublic            Boolean?             @default(false) @map("is_public")
+  createdAt           DateTime?            @default(now()) @map("created_at") @db.Timestamp(6)
+  isAdmin             Boolean?             @default(false) @map("is_admin")
+  holdings            Holding[]
+  purchases           Purchase[]
+  setForgetPortfolios SetForgetPortfolio[]
+  suggestions         Suggestion[]
+  trades              Trade[]
+  user_achievements   user_achievements[]
+
+  @@map("users")
+}
+
+model Asset {
+  symbol          String    @id @db.VarChar(10)
+  currentPriceUsd Decimal?  @map("current_price_usd") @db.Decimal(15, 8)
+  lastUpdated     DateTime? @default(now()) @map("last_updated") @db.Timestamp(6)
+
+  @@map("assets")
+}
+
+model Holding {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @map("user_id")
+  assetSymbol String    @map("asset_symbol") @db.VarChar(10)
+  amount      BigInt
+  lockedUntil DateTime? @map("locked_until") @db.Timestamp(6)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("holdings")
+}
+
+model Trade {
+  id            Int       @id @default(autoincrement())
+  userId        Int?      @map("user_id")
+  fromAsset     String    @map("from_asset") @db.VarChar(10)
+  toAsset       String    @map("to_asset") @db.VarChar(10)
+  fromAmount    BigInt    @map("from_amount")
+  toAmount      BigInt    @map("to_amount")
+  btcPriceUsd   Decimal?  @map("btc_price_usd") @db.Decimal(15, 2)
+  assetPriceUsd Decimal?  @map("asset_price_usd") @db.Decimal(15, 2)
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  user          User?     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("trades")
+}
+
+model Purchase {
+  id               Int       @id @default(autoincrement())
+  userId           Int?      @map("user_id")
+  assetSymbol      String    @map("asset_symbol") @db.VarChar(10)
+  amount           BigInt
+  btcSpent         BigInt    @map("btc_spent")
+  purchasePriceUsd Decimal?  @map("purchase_price_usd") @db.Decimal(15, 8)
+  btcPriceUsd      Decimal?  @map("btc_price_usd") @db.Decimal(15, 2)
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamp(6)
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  user             User?     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("purchases")
+}
+
+model MagicLink {
+  id        Int       @id @default(autoincrement())
+  email     String    @db.VarChar(255)
+  token     String    @unique @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(6)
+  used      Boolean?  @default(false)
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("magic_links")
+}
+
+model Suggestion {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @map("user_id")
+  type        String    @db.VarChar(20)
+  title       String    @db.VarChar(255)
+  description String
+  status      String?   @default("open") @db.VarChar(20)
+  adminReply  String?   @map("admin_reply")
+  repliedAt   DateTime? @map("replied_at") @db.Timestamp(6)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_suggestions_status")
+  @@index([userId], map: "idx_suggestions_user_id")
+  @@map("suggestions")
+}
+
+model Achievement {
+  id                Int                 @id @default(autoincrement())
+  code              String              @unique @db.VarChar(50)
+  name              String              @db.VarChar(255)
+  description       String
+  criteria          Json
+  icon              String?             @db.VarChar(100)
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  user_achievements user_achievements[]
+
+  @@index([code], map: "idx_achievements_code")
+  @@map("achievements")
+}
+
+model SetForgetPortfolio {
+  id                     Int                      @id @default(autoincrement())
+  userId                 Int?                     @map("user_id")
+  name                   String                   @db.VarChar(255)
+  share_token            String?                  @unique @db.VarChar(255)
+  locked_until           DateTime                 @db.Timestamp(6)
+  createdAt              DateTime?                @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt              DateTime?                @default(now()) @map("updated_at") @db.Timestamp(6)
+  lastImageGenerated     DateTime?                @map("last_image_generated") @db.Timestamp(6)
+  set_forget_allocations set_forget_allocations[]
+  user                   User?                    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([locked_until], map: "idx_set_forget_portfolios_locked_until")
+  @@index([share_token], map: "idx_set_forget_portfolios_share_token")
+  @@index([userId], map: "idx_set_forget_portfolios_user_id")
+  @@map("set_forget_portfolios")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model set_forget_allocations {
+  id                    Int                 @id @default(autoincrement())
+  portfolio_id          Int?
+  asset_symbol          String              @db.VarChar(10)
+  allocation_percentage Decimal             @db.Decimal(5, 2)
+  btc_amount            BigInt
+  asset_amount          BigInt
+  purchase_price_usd    Decimal?            @db.Decimal(15, 8)
+  btc_price_usd         Decimal?            @db.Decimal(15, 2)
+  created_at            DateTime?           @default(now()) @db.Timestamp(6)
+  set_forget_portfolios SetForgetPortfolio? @relation(fields: [portfolio_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([asset_symbol], map: "idx_set_forget_allocations_asset_symbol")
+  @@index([portfolio_id], map: "idx_set_forget_allocations_portfolio_id")
+}
+
+model user_achievements {
+  id             Int          @id @default(autoincrement())
+  user_id        Int?
+  achievement_id Int?
+  earned_at      DateTime?    @default(now()) @db.Timestamp(6)
+  achievements   Achievement? @relation(fields: [achievement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          User?        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, achievement_id])
+  @@index([achievement_id], map: "idx_user_achievements_achievement_id")
+  @@index([earned_at], map: "idx_user_achievements_earned_at")
+  @@index([user_id], map: "idx_user_achievements_user_id")
+}

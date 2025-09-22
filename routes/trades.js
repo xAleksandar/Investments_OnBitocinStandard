@@ -1,5 +1,5 @@
 const express = require('express');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const router = express.Router();
 
@@ -28,48 +28,66 @@ router.post('/', authenticateToken, async (req, res) => {
   console.log('Minimum trade check passed, proceeding...');
   
   try {
-    await pool.query('BEGIN');
-    
-    // First, update prices to ensure we have current data
-    try {
-      const axios = require('axios');
-      const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
-      const btcPrice = btcResponse.data.bitcoin.usd;
+    // Start transaction
+    await prisma.$transaction(async (tx) => {
       
-      // Update BTC price
-      await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [btcPrice, 'BTC']);
-      
-      // Update WTI price if needed
-      if (fromAsset === 'WTI' || toAsset === 'WTI') {
-        await pool.query('UPDATE assets SET current_price_usd = $1, last_updated = NOW() WHERE symbol = $2', [75, 'WTI']);
+      // First, update prices to ensure we have current data
+      try {
+        const axios = require('axios');
+        const btcResponse = await axios.get(`${process.env.COINGECKO_API_URL}/simple/price?ids=bitcoin&vs_currencies=usd`);
+        const btcPrice = btcResponse.data.bitcoin.usd;
+        
+        // Update BTC price
+        await tx.asset.update({
+          where: { symbol: 'BTC' },
+          data: { 
+            currentPriceUsd: btcPrice,
+            lastUpdated: new Date()
+          }
+        });
+        
+        // Update WTI price if needed
+        if (fromAsset === 'WTI' || toAsset === 'WTI') {
+          await tx.asset.update({
+            where: { symbol: 'WTI' },
+            data: { 
+              currentPriceUsd: 75,
+              lastUpdated: new Date()
+            }
+          });
+        }
+      } catch (priceError) {
+        console.log('Price update error:', priceError.message);
       }
-    } catch (priceError) {
-      console.log('Price update error:', priceError.message);
-    }
+      
+      // Get current prices
+      const assets = await tx.asset.findMany({
+        where: {
+          symbol: { in: [fromAsset, toAsset] }
+        }
+      });
+      console.log('Found assets:', assets);
+      
+      const assetPrices = {};
+      assets.forEach(asset => {
+        assetPrices[asset.symbol] = asset.currentPriceUsd;
+      });
     
-    // Get current prices
-    const assets = await pool.query('SELECT * FROM assets WHERE symbol = $1 OR symbol = $2', [fromAsset, toAsset]);
-    console.log('Found assets:', assets.rows);
-    
-    const assetPrices = {};
-    assets.rows.forEach(asset => {
-      assetPrices[asset.symbol] = asset.current_price_usd;
-    });
-    
-    console.log('Asset prices:', assetPrices);
-    
-    const btcPrice = assetPrices['BTC'];
-    
-    if (!btcPrice || !assetPrices[fromAsset] || !assetPrices[toAsset]) {
-      await pool.query('ROLLBACK');
-      return res.status(400).json({ error: 'Asset prices not available' });
-    }
-    
-    // Check user has enough of fromAsset
-    const holding = await pool.query(
-      'SELECT * FROM holdings WHERE user_id = $1 AND asset_symbol = $2',
-      [req.user.userId, fromAsset]
-    );
+      console.log('Asset prices:', assetPrices);
+      
+      const btcPrice = assetPrices['BTC'];
+      
+      if (!btcPrice || !assetPrices[fromAsset] || !assetPrices[toAsset]) {
+        throw new Error('Asset prices not available');
+      }
+      
+      // Check user has enough of fromAsset
+      const holding = await tx.holding.findFirst({
+        where: {
+          userId: req.user.userId,
+          assetSymbol: fromAsset
+        }
+      });
     
     console.log('User holding:', holding.rows);
     console.log('Required amount:', amount, 'Available:', holding.rows[0]?.amount);
