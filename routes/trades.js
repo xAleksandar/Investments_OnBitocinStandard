@@ -59,7 +59,6 @@ router.post('/', authenticateToken, async (req, res) => {
           assetSymbol: fromAsset
         }
       });
-    });
     
     console.log('User holding:', holding.rows);
     console.log('Required amount:', amount, 'Available:', holding.rows[0]?.amount);
@@ -238,7 +237,7 @@ router.post('/', authenticateToken, async (req, res) => {
         lockedUntil: lockUntil
       }
     });
-    
+    });
   } catch (error) {
     await pool.query('ROLLBACK');
     console.error('FULL TRADE ERROR:', error);
