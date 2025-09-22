@@ -1,6 +1,6 @@
-# Bitcoin Investment Game 🎯
+# Measured in Bitcoin 📊
 
-A gamified investment platform where users start with 1 virtual Bitcoin and attempt to outperform holding BTC by trading it for stocks and commodities. All values are measured in satoshis instead of fiat currency, providing a Bitcoin-centric perspective on investing.
+An educational platform that teaches users about Bitcoin as a unit of account and alternative measure of wealth. Experience how asset values change when measured in satoshis instead of dollars, demonstrating the fundamental difference between inflationary (dollar) and deflationary (Bitcoin) monetary systems.
 
 ## ⚡ Quick Start
 
@@ -70,22 +70,22 @@ node scripts/fix-portfolio.js        # Fix portfolio inconsistencies
 node scripts/debug-portfolio.js      # Debug portfolio data
 ```
 
-## 🎮 How It Works
+## 🎓 How It Works
 
-### Core Concept
-- Start with **1 Bitcoin** (100M satoshis)
-- Trade BTC for stocks, commodities, and other assets
-- All prices displayed in **satoshis** instead of USD
-- Goal: Outperform simply holding Bitcoin
+### Core Educational Concept
+- Begin with **1 Bitcoin** (100M satoshis) as your unit of account
+- Convert satoshis to stocks, commodities, and other assets to understand relative value
+- All prices displayed in **satoshis** instead of USD to experience deflationary perspective
+- **Key Learning**: Observe how asset values typically **decrease** when measured in Bitcoin (deflation) vs **increase** when measured in dollars (inflation)
 
-### Key Features
-- **24-hour Lock**: Assets cannot be sold back to BTC for 24 hours after purchase
-- **Real-time Pricing**: Integration with CoinGecko API for live prices
+### Educational Features
+- **24-hour Reflection Period**: Assets cannot be converted back to BTC for 24 hours, encouraging thoughtful decision-making
+- **Real-time Pricing**: Integration with CoinGecko API for live price comparisons
 - **Magic Link Auth**: Email-based authentication (no passwords)
-- **Achievements System**: Unlock achievements for various trading milestones
-- **Set & Forget Portfolios**: Create diversified portfolios with automatic rebalancing
-- **Portfolio Sharing**: Generate and share portfolio performance images
-- **Suggestions System**: Submit feedback and bug reports
+- **Learning Milestones**: Unlock achievements for exploring different monetary concepts
+- **Portfolio Allocation Tool**: Create diversified portfolios to understand asset correlations in Bitcoin terms
+- **Performance Visualization**: Generate and share charts showing value changes in both USD and BTC
+- **Community Feedback**: Submit observations and questions about monetary theory
 
 ### Available Assets
 **Basic Set (12 assets)**:
@@ -164,8 +164,8 @@ EMAIL_PASS=
 1. **Start the server**: `npm run dev`
 2. **Open browser**: Navigate to `http://localhost:3000`
 3. **Create account**: Enter email, check console for magic link
-4. **Start trading**: You begin with 1 Bitcoin (100M satoshis)
-5. **Monitor performance**: Track your portfolio vs holding Bitcoin
+4. **Begin learning**: You start with 1 Bitcoin (100M satoshis) as your unit of account
+5. **Explore value changes**: Observe how different assets appreciate/depreciate when measured in Bitcoin vs dollars
 
 ### Magic Links in Development
 Since email isn't configured in development, magic links appear in the server console:
