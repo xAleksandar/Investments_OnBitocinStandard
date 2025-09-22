@@ -418,7 +418,7 @@ class BitcoinGame {
             'XAU': 'gold',
             'XAG': 'silver',
             'WTI': 'crudeOil',
-            'COPPER': 'copper',
+            'CPER': 'copperCPER',
             'WEAT': 'wheat',
             'UNG': 'naturalGas',
             'URA': 'uranium',
@@ -1473,7 +1473,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA/BITSTAMP:BTCUSD',
             'DBA': 'AMEX:DBA/BITSTAMP:BTCUSD',
-            'COPPER': 'COMEX:HG1!/BITSTAMP:BTCUSD',
+            'CPER': 'AMEX:CPER/BITSTAMP:BTCUSD',
             'WEAT': 'AMEX:WEAT/BITSTAMP:BTCUSD',
             'UNG': 'AMEX:UNG/BITSTAMP:BTCUSD'
         };
@@ -1518,7 +1518,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'COPPER': 'COMEX:HG1!',
+            'CPER': 'AMEX:CPER',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -1742,8 +1742,8 @@ class BitcoinGame {
                 category: 'Commodity',
                 tags: ['Energy Source', 'Economic Indicator']
             },
-            'COPPER': {
-                title: 'Copper Futures (COPPER)',
+            'CPER': {
+                title: 'United States Copper Index Fund (CPER)',
                 description: 'Copper futures provide direct exposure to copper prices, allowing investors to participate in this vital industrial metal\'s performance. Copper is known as "Dr. Copper" for its ability to predict economic health due to its widespread use in construction, electronics, and industrial applications. As one of the most economically sensitive commodities, copper prices reflect global growth expectations, yet even this critical industrial metal has declined significantly when priced in Bitcoin.',
                 category: 'Commodity',
                 tags: ['Industrial Metal', 'Economic Indicator']
@@ -2791,7 +2791,7 @@ class BitcoinGame {
             // Commodity ETFs
             'URA': 'AMEX:URA',
             'DBA': 'AMEX:DBA',
-            'COPPER': 'COMEX:HG1!',
+            'CPER': 'AMEX:CPER',
             'WEAT': 'AMEX:WEAT',
             'UNG': 'AMEX:UNG'
         };
@@ -4319,7 +4319,7 @@ class BitcoinGame {
                     { symbol: 'XAU', displayName: 'Gold (XAU)', translateKey: 'assets.assetNames.goldXAU' },
                     { symbol: 'XAG', displayName: 'Silver (XAG)', translateKey: 'assets.assetNames.silverXAG' },
                     { symbol: 'WTI', displayName: 'Crude Oil (WTI)', translateKey: 'assets.assetNames.crudeOilWTI' },
-                    { symbol: 'COPPER', displayName: 'Copper (COPPER)', translateKey: 'assets.assetNames.copper' },
+                    { symbol: 'CPER', displayName: 'Copper (CPER)', translateKey: 'assets.assetNames.copperCPER' },
                     { symbol: 'WEAT', displayName: 'Wheat (WEAT)', translateKey: 'assets.assetNames.wheatWEAT' },
                     { symbol: 'UNG', displayName: 'Natural Gas (UNG)', translateKey: 'assets.assetNames.naturalGasUNG' },
                     { symbol: 'URA', displayName: 'Uranium (URA)', translateKey: 'assets.assetNames.uraniumURA' },
