@@ -1,267 +1,462 @@
-// Main Application Orchestrator - Streamlined BitcoinApp Class
-// Replaces the monolithic 5,583-line BitcoinGame class
-// Focuses only on coordination, initialization, and service management
+import { ApiClient } from './services/api-client.js';
+import { AuthService } from './services/auth-service.js';
+import { PortfolioService } from './services/portfolio-service.js';
+import { PriceService } from './services/price-service.js';
+import { NotificationService } from './services/notification-service.js';
+
+import { Router } from './routing/router.js';
+
+import { HomePage } from './pages/home-page.js';
+import { PortfolioPage } from './pages/portfolio-page.js';
+import { EducationPage } from './pages/education-page.js';
+import { AdminPage } from './pages/admin-page.js';
+import { AssetDetailPage } from './pages/asset-detail-page.js';
+
+import { Button } from './components/ui/button.js';
+import { Modal } from './components/ui/modal.js';
+import { Notification } from './components/ui/notification.js';
+import { LoadingSpinner } from './components/ui/loading-spinner.js';
+import { Tooltip } from './components/ui/tooltip.js';
+
+import { MainNav } from './components/navigation/main-nav.js';
+import { MobileMenu } from './components/navigation/mobile-menu.js';
+import { UserMenu } from './components/navigation/user-menu.js';
+import { LanguageSwitcher } from './components/navigation/language-switcher.js';
 
 class BitcoinApp {
     constructor() {
-        // Core services - will be initialized in init()
-        this.router = null;
-        this.apiClient = null;
-        this.authService = null;
-        this.portfolioService = null;
-        this.priceService = null;
-        this.notificationService = null;
-
-        // Application state
-        this.currentPage = null;
-        this.user = null;
         this.isInitialized = false;
+        this.services = {};
+        this.pages = {};
+        this.components = {};
+        this.router = null;
 
-        // Bind methods for event handlers
-        this.handleRouteChange = this.handleRouteChange.bind(this);
-        this.handlePriceUpdate = this.handlePriceUpdate.bind(this);
-        this.handleAuthChange = this.handleAuthChange.bind(this);
+        this.priceUpdateInterval = null;
+        this.backgroundServices = new Set();
+        this.eventListeners = new Map();
+
+        this.appConfig = {
+            priceUpdateInterval: 30000,
+            retryAttempts: 3,
+            retryDelay: 1000,
+            enableServiceWorker: true,
+            enableOfflineMode: false
+        };
     }
 
-    /**
-     * Initialize the application
-     * Sets up all services and starts the application
-     */
     async init() {
+        if (this.isInitialized) return;
+
         try {
-            console.log('Initializing Bitcoin Education App...');
+            this.showLoadingState();
 
-            // Initialize services in dependency order
-            await this.initServices();
-            await this.initAuthentication();
-            await this.initRouter();
-            await this.initGlobalComponents();
-            await this.startBackgroundServices();
+            await this.initializeServices();
+            await this.initializeComponents();
+            await this.initializePages();
+            await this.initializeRouter();
+            await this.initializeGlobalFeatures();
 
+            await this.startApplication();
+
+            this.setupGlobalErrorHandling();
+            this.setupEventCoordination();
+
+            this.hideLoadingState();
             this.isInitialized = true;
-            console.log('Application initialized successfully');
 
-            // Navigate to initial route
-            this.router.navigate(window.location.hash || '#home');
+            console.log('✅ Bitcoin App initialized successfully');
+            this.services.notificationService?.show('Application loaded successfully', 'success');
 
         } catch (error) {
-            console.error('Failed to initialize application:', error);
+            console.error('❌ Failed to initialize Bitcoin App:', error);
             this.handleInitializationError(error);
         }
     }
 
-    /**
-     * Initialize all core services
-     */
-    async initServices() {
-        // Initialize services that will be injected from external modules
-        // These will be loaded dynamically as the modules are created
-        console.log('Services initialization placeholder - will connect to modular services');
+    async initializeServices() {
+        console.log('🔧 Initializing services...');
+
+        const apiClient = new ApiClient();
+        const authService = new AuthService({ apiClient });
+        const portfolioService = new PortfolioService({ apiClient, authService });
+        const priceService = new PriceService({ apiClient });
+        const notificationService = new NotificationService();
+
+        await notificationService.init();
+        await authService.init();
+        await priceService.init();
+        await portfolioService.init();
+
+        this.services = {
+            apiClient,
+            authService,
+            portfolioService,
+            priceService,
+            notificationService
+        };
+
+        this.injectServiceDependencies();
+        console.log('✅ Services initialized');
     }
 
-    /**
-     * Initialize authentication and user state
-     */
-    async initAuthentication() {
-        console.log('Authentication initialization placeholder');
-        // Will connect to AuthService once created
+    injectServiceDependencies() {
+        this.services.authService.setServices({
+            notificationService: this.services.notificationService
+        });
+
+        this.services.portfolioService.setServices({
+            priceService: this.services.priceService,
+            notificationService: this.services.notificationService
+        });
+
+        this.services.priceService.setServices({
+            notificationService: this.services.notificationService
+        });
     }
 
-    /**
-     * Initialize routing system
-     */
-    async initRouter() {
-        console.log('Router initialization placeholder');
-        // Will connect to Router service once created
-    }
+    async initializeComponents() {
+        console.log('🧩 Initializing UI components...');
 
-    /**
-     * Initialize global UI components
-     */
-    async initGlobalComponents() {
-        console.log('Global components initialization placeholder');
-        // Will initialize navigation, notifications, etc.
-    }
+        const components = [
+            ['modal', Modal],
+            ['tooltip', Tooltip],
+            ['button', Button],
+            ['loading', LoadingSpinner]
+        ];
 
-    /**
-     * Start background services like price updates
-     */
-    async startBackgroundServices() {
-        console.log('Background services initialization placeholder');
-        // Will start price monitoring, etc.
-    }
+        this.components = { notification: this.services.notificationService };
 
-    /**
-     * Handle route changes and page navigation
-     */
-    async handleRouteChange(route, params = {}) {
-        if (!this.isInitialized) {
-            console.warn('Application not yet initialized, queueing route change');
-            return;
-        }
-
-        try {
-            // Clean up current page
-            if (this.currentPage && typeof this.currentPage.destroy === 'function') {
-                this.currentPage.destroy();
+        for (const [name, Component] of components) {
+            const instance = new Component();
+            await instance.init();
+            this.components[name] = instance;
+            if (name === 'modal' || name === 'tooltip') {
+                this.services[`${name}Service`] = instance;
             }
+        }
 
-            // Navigate to new page
-            await this.showPage(route, params);
+        console.log('✅ UI components initialized');
+    }
 
+    async initializePages() {
+        console.log('📄 Initializing pages...');
+
+        const pageClasses = [
+            ['home', HomePage],
+            ['portfolio', PortfolioPage],
+            ['education', EducationPage],
+            ['admin', AdminPage],
+            ['assetDetail', AssetDetailPage]
+        ];
+
+        this.pages = {};
+        const currentUser = await this.services.authService.getCurrentUser();
+
+        for (const [name, PageClass] of pageClasses) {
+            if (name === 'admin' && (!currentUser || !this.isAdminUser(currentUser))) continue;
+            const page = new PageClass(this.services);
+            await page.init();
+            this.pages[name] = page;
+        }
+
+        console.log('✅ Pages initialized');
+    }
+
+    async initializeRouter() {
+        console.log('🗺️ Initializing router...');
+
+        this.router = new Router(this.services.authService, this.services.notificationService);
+
+        this.router.registerPageHandlers({
+            home: this.pages.home,
+            portfolio: this.pages.portfolio,
+            education: this.pages.education,
+            admin: this.pages.admin,
+            assetDetail: this.pages.assetDetail
+        });
+
+        console.log('✅ Router initialized');
+    }
+
+    async initializeGlobalFeatures() {
+        console.log('🌐 Initializing global features...');
+
+        const features = [
+            ['mainNav', MainNav],
+            ['mobileMenu', MobileMenu],
+            ['userMenu', UserMenu],
+            ['languageSwitcher', LanguageSwitcher]
+        ];
+
+        for (const [name, FeatureClass] of features) {
+            const feature = new FeatureClass(this.services);
+            await feature.init();
+            this.components[name] = feature;
+        }
+
+        console.log('✅ Global features initialized');
+    }
+
+    async startApplication() {
+        console.log('🚀 Starting application...');
+
+        await this.checkAuthenticationStatus();
+        await this.startBackgroundServices();
+        await this.loadInitialData();
+
+        this.setupPeriodicTasks();
+
+        console.log('✅ Application started');
+    }
+
+    async checkAuthenticationStatus() {
+        try {
+            const isAuthenticated = await this.services.authService.isAuthenticated();
+            const currentUser = await this.services.authService.getCurrentUser();
+
+            if (isAuthenticated && currentUser) {
+                console.log(`👤 User authenticated: ${currentUser.email}`);
+                this.components.userMenu?.updateUserInfo(currentUser);
+                this.components.mainNav?.updateAuthState(true);
+            } else {
+                console.log('👤 User not authenticated');
+                this.components.mainNav?.updateAuthState(false);
+            }
         } catch (error) {
-            console.error('Error handling route change:', error);
-            this.handleNavigationError(error, route);
+            console.error('Failed to check authentication status:', error);
         }
     }
 
-    /**
-     * Show a specific page
-     */
-    async showPage(pageName, params = {}) {
-        console.log(`Navigating to page: ${pageName}`);
+    async startBackgroundServices() {
+        console.log('⚡ Starting background services...');
 
-        // This will be implemented to load and show page components
-        // For now, delegate to legacy BitcoinGame if it exists
-        if (window.game && typeof window.game.showPage === 'function') {
-            return window.game.showPage(pageName);
+        this.backgroundServices.add('priceService');
+        await this.services.priceService.startPriceUpdates();
+
+        if (await this.services.authService.isAuthenticated()) {
+            this.backgroundServices.add('portfolioService');
+            this.services.portfolioService.startPeriodicUpdates();
         }
 
-        console.log(`Page ${pageName} will be handled by new page components`);
+        console.log('✅ Background services started');
     }
 
-    /**
-     * Handle price updates from price service
-     */
-    handlePriceUpdate(prices) {
-        if (this.currentPage && typeof this.currentPage.updatePrices === 'function') {
-            this.currentPage.updatePrices(prices);
+    async loadInitialData() {
+        try {
+            await this.services.priceService.loadInitialPrices();
+
+            if (await this.services.authService.isAuthenticated()) {
+                await this.services.portfolioService.loadUserPortfolio();
+            }
+        } catch (error) {
+            console.error('Failed to load initial data:', error);
+            this.services.notificationService?.show('Failed to load some data. Please refresh the page.', 'warning');
         }
-
-        // Broadcast to global components that might need price updates
-        this.broadcastGlobalUpdate('prices', prices);
     }
 
-    /**
-     * Handle authentication state changes
-     */
-    handleAuthChange(user) {
-        this.user = user;
+    setupPeriodicTasks() {
+        this.priceUpdateInterval = setInterval(async () => {
+            try {
+                await this.services.priceService.updatePrices();
+            } catch (error) {
+                console.error('Price update failed:', error);
+            }
+        }, this.appConfig.priceUpdateInterval);
+    }
 
-        // Update global UI state
-        this.updateAuthenticationUI(user);
+    setupGlobalErrorHandling() {
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+            this.handleGlobalError(event.error);
+        });
 
-        // Notify current page of auth change
-        if (this.currentPage && typeof this.currentPage.updateAuth === 'function') {
-            this.currentPage.updateAuth(user);
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            this.handleGlobalError(event.reason);
+        });
+
+        document.addEventListener('serviceError', (event) => {
+            console.error('Service error:', event.detail);
+            this.handleServiceError(event.detail);
+        });
+    }
+
+    setupEventCoordination() {
+        const events = [
+            ['authStateChanged', this.handleAuthStateChange],
+            ['portfolioUpdated', this.handlePortfolioUpdate],
+            ['pricesUpdated', this.handlePricesUpdate],
+            ['routeChanged', this.handleRouteChange],
+            ['userAction', this.handleUserAction]
+        ];
+
+        events.forEach(([event, handler]) => {
+            document.addEventListener(event, handler.bind(this));
+        });
+    }
+
+    handleAuthStateChange(event) {
+        const { isAuthenticated, user } = event.detail;
+        this.components.userMenu?.updateUserInfo(isAuthenticated ? user : null);
+        this.components.mainNav?.updateAuthState(isAuthenticated);
+
+        if (isAuthenticated) {
+            this.services.portfolioService.loadUserPortfolio();
+            this.services.portfolioService.startPeriodicUpdates();
+        } else {
+            this.services.portfolioService.clearPortfolio();
+            this.services.portfolioService.stopPeriodicUpdates();
         }
-
-        this.broadcastGlobalUpdate('auth', user);
     }
 
-    /**
-     * Update global UI elements for authentication
-     */
-    updateAuthenticationUI(user) {
-        // Will update navigation, user menu, etc.
-        console.log('Updating authentication UI for user:', user?.email || 'anonymous');
+    handlePortfolioUpdate(event) {
+        const { portfolio } = event.detail;
+        this.pages.portfolio?.updatePortfolioDisplay(portfolio);
+        this.pages.home?.updatePortfolioSummary(portfolio);
     }
 
-    /**
-     * Broadcast updates to global components
-     */
-    broadcastGlobalUpdate(type, data) {
-        const event = new CustomEvent(`app:${type}`, { detail: data });
-        document.dispatchEvent(event);
+    handlePricesUpdate(event) {
+        const { prices } = event.detail;
+        Object.values(this.pages).forEach(page => page.updatePrices?.(prices));
     }
 
-    /**
-     * Handle initialization errors
-     */
+    handleRouteChange(event) {
+        const { route } = event.detail;
+        this.components.mainNav?.updateActiveRoute(route);
+    }
+
+    async handleUserAction(event) {
+        const { action, data } = event.detail;
+        const actions = {
+            trade: () => this.services.portfolioService.executeTrade(data),
+            convert: () => this.services.portfolioService.convertAsset(data),
+            export: () => this.services.portfolioService.exportPortfolio(data)
+        };
+
+        if (actions[action]) {
+            try {
+                await actions[action]();
+                this.services.notificationService?.show(`${action} completed successfully`, 'success');
+            } catch (error) {
+                console.error(`${action} failed:`, error);
+                this.services.notificationService?.show(`${action} failed. Please try again.`, 'error');
+            }
+        }
+    }
+
+    handleGlobalError(error) {
+        if (error.name === 'NetworkError' || error.message.includes('fetch')) {
+            this.services.notificationService?.show('Network error. Please check your connection.', 'error');
+        } else if (error.name === 'AuthenticationError') {
+            this.services.authService?.logout();
+            this.services.notificationService?.show('Session expired. Please log in again.', 'warning');
+        } else {
+            this.services.notificationService?.show('An unexpected error occurred.', 'error');
+        }
+    }
+
+    handleServiceError(errorDetail) {
+        const { service, error, action } = errorDetail;
+
+        console.error(`Service ${service} error during ${action}:`, error);
+
+        if (this.backgroundServices.has(service)) {
+            this.services.notificationService?.show(
+                `Background service issue detected. Some features may be limited.`,
+                'warning'
+            );
+        }
+    }
+
     handleInitializationError(error) {
-        console.error('Application initialization failed:', error);
-
-        // Show user-friendly error message
-        const errorHtml = `
-            <div class="error-container">
-                <h2>Application Error</h2>
-                <p>Failed to initialize the application. Please refresh the page.</p>
-                <button onclick="window.location.reload()" class="btn btn-primary">
-                    Refresh Page
-                </button>
+        document.body.innerHTML = `
+            <div class="initialization-error">
+                <div class="error-container">
+                    <h1>⚠️ Application Error</h1>
+                    <p>Failed to initialize the application. Please refresh the page to try again.</p>
+                    <button onclick="window.location.reload()" class="retry-btn">
+                        Refresh Page
+                    </button>
+                    <details>
+                        <summary>Error Details</summary>
+                        <pre>${error.message}\n${error.stack}</pre>
+                    </details>
+                </div>
             </div>
         `;
-
-        document.body.innerHTML = errorHtml;
     }
 
-    /**
-     * Handle navigation errors
-     */
-    handleNavigationError(error, route) {
-        console.error(`Navigation error for route ${route}:`, error);
+    isAdminUser(user) {
+        return user && (user.role === 'admin' || user.isAdmin);
+    }
 
-        // Try to navigate to home page as fallback
-        if (route !== 'home') {
-            this.handleRouteChange('home');
+    showLoadingState() {
+        const loadingElement = document.getElementById('app-loading');
+        if (loadingElement) {
+            loadingElement.style.display = 'flex';
         }
     }
 
-    /**
-     * Cleanup method for application shutdown
-     */
+    hideLoadingState() {
+        const loadingElement = document.getElementById('app-loading');
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+
+        const appElement = document.getElementById('app');
+        if (appElement) {
+            appElement.style.display = 'block';
+        }
+    }
+
+    async cleanup() {
+        console.log('🧹 Cleaning up application...');
+
+        if (this.priceUpdateInterval) {
+            clearInterval(this.priceUpdateInterval);
+        }
+
+        if (this.services.priceService) {
+            this.services.priceService.stopPriceUpdates();
+        }
+
+        if (this.services.portfolioService) {
+            this.services.portfolioService.stopPeriodicUpdates();
+        }
+
+        Object.values(this.pages).forEach(page => {
+            if (page.destroy) {
+                page.destroy();
+            }
+        });
+
+        Object.values(this.components).forEach(component => {
+            if (component.destroy) {
+                component.destroy();
+            }
+        });
+
+        this.eventListeners.clear();
+        this.backgroundServices.clear();
+
+        console.log('✅ Application cleanup completed');
+    }
+
     destroy() {
-        if (this.currentPage && typeof this.currentPage.destroy === 'function') {
-            this.currentPage.destroy();
-        }
-
-        // Stop background services
-        if (this.priceService && typeof this.priceService.stop === 'function') {
-            this.priceService.stop();
-        }
-
+        this.cleanup();
         this.isInitialized = false;
-        console.log('Application destroyed');
-    }
-
-    /**
-     * Get current application state
-     */
-    getState() {
-        return {
-            isInitialized: this.isInitialized,
-            currentPage: this.currentPage?.constructor?.name || null,
-            user: this.user,
-            route: window.location.hash
-        };
     }
 }
 
-// Initialize and expose the application globally
-let app = null;
+window.addEventListener('DOMContentLoaded', async () => {
+    window.bitcoinApp = new BitcoinApp();
+    await window.bitcoinApp.init();
+});
 
-function initBitcoinApp() {
-    if (app) {
-        console.warn('Application already initialized');
-        return app;
+window.addEventListener('beforeunload', () => {
+    if (window.bitcoinApp) {
+        window.bitcoinApp.cleanup();
     }
+});
 
-    app = new BitcoinApp();
-
-    // Expose globally for debugging and compatibility
-    window.bitcoinApp = app;
-
-    return app;
-}
-
-// Auto-initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBitcoinApp);
-} else {
-    initBitcoinApp();
-}
-
-// Export for module usage
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { BitcoinApp, initBitcoinApp };
-}
+export { BitcoinApp };
