@@ -81,6 +81,14 @@ Required in `.env`:
 
 ## Development Workflow Principles
 
+### Task Management and Planning
+**Automatic Todo List Creation**: Claude MUST automatically create todo lists for complex tasks using the TodoWrite tool:
+- **When to create**: Any task requiring 3+ distinct steps, multi-file changes, or systematic operations
+- **Examples**: Feature implementation, bug fixes with multiple components, database migrations, refactoring
+- **Task tracking**: Mark tasks as `in_progress` before starting work, `completed` immediately after finishing
+- **Progress visibility**: Update status in real-time to show user progress throughout implementation
+- **Planning benefits**: Break down complex work into manageable, trackable steps
+
 ### Database Changes
 **Prisma Migration Approach**:
 1. Modify `prisma/schema.prisma`
