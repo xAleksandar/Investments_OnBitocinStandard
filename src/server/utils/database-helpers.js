@@ -3,7 +3,7 @@
  */
 
 const { Prisma } = require('@prisma/client');
-const prisma = require('../config/database');
+const prisma = require('../../config/database');
 const {
     DATABASE_LIMITS,
     BUSINESS_RULES,
