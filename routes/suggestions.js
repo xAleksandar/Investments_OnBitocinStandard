@@ -111,16 +111,15 @@ router.post('/', authenticateToken, async (req, res) => {
 // Get user's own suggestions
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, type, title, description, status, admin_reply, replied_at, created_at
-       FROM suggestions
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
-      [req.user.userId]
-    );
+    const result = await prisma.$queryRaw`
+      SELECT id, type, title, description, status, admin_reply, replied_at, created_at
+      FROM suggestions
+      WHERE user_id = ${req.user.userId}
+      ORDER BY created_at DESC
+    `;
 
     res.json({
-      suggestions: result.rows
+      suggestions: result
     });
 
   } catch (error) {
@@ -132,16 +131,16 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get all suggestions (public view for now - will be admin only later)
 router.get('/all', async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT s.id, s.type, s.title, s.description, s.status, s.admin_reply, s.replied_at, s.created_at,
-              u.username
-       FROM suggestions s
-       JOIN users u ON s.user_id = u.id
-       ORDER BY s.created_at DESC`
-    );
+    const result = await prisma.$queryRaw`
+      SELECT s.id, s.type, s.title, s.description, s.status, s.admin_reply, s.replied_at, s.created_at,
+             u.username
+      FROM suggestions s
+      JOIN users u ON s.user_id = u.id
+      ORDER BY s.created_at DESC
+    `;
 
     res.json({
-      suggestions: result.rows
+      suggestions: result
     });
 
   } catch (error) {
@@ -185,15 +184,15 @@ router.put('/:id', async (req, res) => {
     query += ` WHERE id = $${paramCount} RETURNING *`;
     params.push(id);
 
-    const result = await pool.query(query, params);
+    const result = await prisma.$queryRawUnsafe(query, ...params);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'Suggestion not found' });
     }
 
     res.json({
       message: 'Suggestion updated successfully',
-      suggestion: result.rows[0]
+      suggestion: result[0]
     });
 
   } catch (error) {
@@ -219,7 +218,9 @@ router.get('/rate-limit', authenticateToken, async (req, res) => {
 router.get('/admin/suggestions', requireAdmin, async (req, res) => {
   try {
     const { page = 1, limit = 20, status, type, search } = req.query;
-    const offset = (page - 1) * limit;
+    const limitInt = parseInt(limit);
+    const pageInt = parseInt(page);
+    const offset = (pageInt - 1) * limitInt;
 
     // Build dynamic query
     let whereClause = '1=1';
@@ -254,9 +255,9 @@ router.get('/admin/suggestions', requireAdmin, async (req, res) => {
       ORDER BY s.created_at DESC
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
     `;
-    params.push(limit, offset);
+    params.push(limitInt, offset);
 
-    const result = await pool.query(query, params);
+    const result = await prisma.$queryRawUnsafe(query, ...params);
 
     // Get total count for pagination
     const countQuery = `
@@ -265,15 +266,15 @@ router.get('/admin/suggestions', requireAdmin, async (req, res) => {
       JOIN users u ON s.user_id = u.id
       WHERE ${whereClause}
     `;
-    const countResult = await pool.query(countQuery, params.slice(0, -2)); // Remove limit and offset
+    const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, -2)); // Remove limit and offset
 
     res.json({
-      suggestions: result.rows,
+      suggestions: result,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countResult.rows[0].total),
-        totalPages: Math.ceil(countResult.rows[0].total / limit)
+        page: pageInt,
+        limit: limitInt,
+        total: parseInt(countResult[0].total),
+        totalPages: Math.ceil(countResult[0].total / limitInt)
       }
     });
 
@@ -298,13 +299,13 @@ router.put('/admin/suggestions/:id/reply', requireAdmin, async (req, res) => {
     }
 
     // Get existing reply to append to it (preserve conversation history)
-    const existingReply = await pool.query('SELECT admin_reply FROM suggestions WHERE id = $1', [id]);
+    const existingReply = await prisma.$queryRaw`SELECT admin_reply FROM suggestions WHERE id = ${id}`;
 
-    if (existingReply.rows.length === 0) {
+    if (existingReply.length === 0) {
       return res.status(404).json({ error: 'Suggestion not found' });
     }
 
-    const currentReply = existingReply.rows[0].admin_reply;
+    const currentReply = existingReply[0].admin_reply;
     const timestamp = new Date().toLocaleString('en-US', {
       timeZone: 'UTC',
       year: 'numeric',
@@ -333,15 +334,15 @@ router.put('/admin/suggestions/:id/reply', requireAdmin, async (req, res) => {
     updateQuery += ` WHERE id = $2 RETURNING *`;
     params.push(id);
 
-    const result = await pool.query(updateQuery, params);
+    const result = await prisma.$queryRawUnsafe(updateQuery, ...params);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'Suggestion not found' });
     }
 
     res.json({
       message: closeAfterReply ? 'Reply added and suggestion closed' : 'Reply added successfully',
-      suggestion: result.rows[0]
+      suggestion: result[0]
     });
 
   } catch (error) {
@@ -360,18 +361,18 @@ router.put('/admin/suggestions/:id/status', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Status must be either "open" or "closed"' });
     }
 
-    const result = await pool.query(
+    const result = await prisma.$queryRawUnsafe(
       'UPDATE suggestions SET status = $1 WHERE id = $2 RETURNING *',
-      [status, id]
+      status, id
     );
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'Suggestion not found' });
     }
 
     res.json({
       message: `Suggestion marked as ${status}`,
-      suggestion: result.rows[0]
+      suggestion: result[0]
     });
 
   } catch (error) {
@@ -384,44 +385,44 @@ router.put('/admin/suggestions/:id/status', requireAdmin, async (req, res) => {
 router.get('/admin/stats', requireAdmin, async (req, res) => {
   try {
     // Get counts by status
-    const statusStats = await pool.query(`
+    const statusStats = await prisma.$queryRaw`
       SELECT status, COUNT(*) as count
       FROM suggestions
       GROUP BY status
-    `);
+    `;
 
     // Get counts by type
-    const typeStats = await pool.query(`
+    const typeStats = await prisma.$queryRaw`
       SELECT type, COUNT(*) as count
       FROM suggestions
       GROUP BY type
-    `);
+    `;
 
     // Get recent activity (last 7 days)
-    const recentActivity = await pool.query(`
+    const recentActivity = await prisma.$queryRaw`
       SELECT COUNT(*) as count
       FROM suggestions
       WHERE created_at >= NOW() - INTERVAL '7 days'
-    `);
+    `;
 
     // Get average response time for closed suggestions with replies
-    const avgResponseTime = await pool.query(`
+    const avgResponseTime = await prisma.$queryRaw`
       SELECT AVG(EXTRACT(EPOCH FROM (replied_at - created_at))/3600) as avg_hours
       FROM suggestions
       WHERE status = 'closed' AND admin_reply IS NOT NULL AND replied_at IS NOT NULL
-    `);
+    `;
 
     const stats = {
-      status: statusStats.rows.reduce((acc, row) => {
+      status: statusStats.reduce((acc, row) => {
         acc[row.status] = parseInt(row.count);
         return acc;
       }, { open: 0, closed: 0 }),
-      type: typeStats.rows.reduce((acc, row) => {
+      type: typeStats.reduce((acc, row) => {
         acc[row.type] = parseInt(row.count);
         return acc;
       }, { suggestion: 0, bug: 0 }),
-      recentActivity: parseInt(recentActivity.rows[0].count),
-      avgResponseTimeHours: avgResponseTime.rows[0].avg_hours ? parseFloat(avgResponseTime.rows[0].avg_hours).toFixed(1) : null
+      recentActivity: parseInt(recentActivity[0].count),
+      avgResponseTimeHours: avgResponseTime[0].avg_hours ? parseFloat(avgResponseTime[0].avg_hours).toFixed(1) : null
     };
 
     res.json(stats);
@@ -437,18 +438,18 @@ router.post('/admin/users/:id/promote', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
+    const result = await prisma.$queryRawUnsafe(
       'UPDATE users SET is_admin = true WHERE id = $1 RETURNING id, username, email, is_admin',
-      [id]
+      id
     );
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     res.json({
       message: 'User promoted to admin successfully',
-      user: result.rows[0]
+      user: result[0]
     });
 
   } catch (error) {
