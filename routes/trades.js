@@ -1,7 +1,13 @@
 const express = require('express');
 const prisma = require('../config/database');
 const authenticateToken = require('../middleware/auth');
+const { Pool } = require('pg');
 const router = express.Router();
+
+// Temporary pool for complex transactions - TODO: Convert to Prisma transactions
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL
+});
 
 // Execute a trade
 router.post('/', authenticateToken, async (req, res) => {
