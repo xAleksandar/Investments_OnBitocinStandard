@@ -1,125 +1,151 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const morgan = require('morgan');
 require('dotenv').config();
 
-const authRoutes = require('./src/server/routes/auth');
-const portfolioRoutes = require('./src/server/routes/portfolio');
-const tradeRoutes = require('./src/server/routes/trades-prisma');
-const assetRoutes = require('./src/server/routes/assets');
-const suggestionsRoutes = require('./src/server/routes/suggestions');
-const debugRoutes = require('./src/server/routes/debug');
-const setForgetPortfoliosRoutes = require('./src/server/routes/set-forget-portfolios');
+const { errorHandler, notFoundHandler } = require('./src/server/utils/error-handlers');
+const { setupMiddleware } = require('./src/server/middleware/setup');
+const { setupRoutes } = require('./src/server/routes');
+const dbManager = require('./src/config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+async function createServer() {
+  console.log(`🚀 Starting server in ${NODE_ENV} mode...`);
 
-// Safely serialize BigInt values in all JSON responses
-// Converts BigInt to string to avoid JSON.stringify errors
-const bigIntReplacer = (key, value) => (typeof value === 'bigint' ? value.toString() : value);
-const originalJson = express.response.json;
-express.response.json = function (body) {
-  try {
-    const sanitized = JSON.parse(JSON.stringify(body, bigIntReplacer));
-    return originalJson.call(this, sanitized);
-  } catch (e) {
-    // Fallback if body isn't plain-serializable
-    return originalJson.call(this, body);
-  }
-};
+  // Security middleware
+  app.use(helmet({
+    contentSecurityPolicy: NODE_ENV === 'production',
+    crossOriginEmbedderPolicy: false
+  }));
 
-// Force refresh connection pools
-app.get('/api/refresh-pools', async (req, res) => {
-  try {
-    // This will force all route modules to reconnect
-    delete require.cache[require.resolve('./config/database.js')];
-    res.json({ message: 'Connection pools refreshed' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Debug endpoint with fresh connection
-app.get('/api/debug', async (req, res) => {
-  const { Client } = require('pg');
-  const client = new Client({
-    connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
-    // Fallback to individual credentials if no connection string
-    ...((!process.env.POSTGRES_URL && !process.env.PRISMA_DATABASE_URL) && {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-    })
-  });
-  
-  try {
-    await client.connect();
-    const result = await client.query('SELECT COUNT(*) as trade_count FROM trades');
-    const dbInfo = await client.query('SELECT current_database(), current_user');
-    
-    res.json({
-      database: dbInfo.rows[0].current_database,
-      user: dbInfo.rows[0].current_user,
-      trade_count: result.rows[0].trade_count,
-      connection_type: 'fresh_client',
-      env: {
-        connectionString: process.env.POSTGRES_URL || process.env.PRISMA_DATABASE_URL,
-        // Fallback to individual credentials if no connection string
-        ...((!process.env.POSTGRES_URL && !process.env.PRISMA_DATABASE_URL) && {
-          host: process.env.DB_HOST,
-          port: process.env.DB_PORT || 5432,
-          database: process.env.DB_NAME,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-        })
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  } finally {
-    await client.end();
-  }
-});
-
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/portfolio', portfolioRoutes);
-app.use('/api/trades', tradeRoutes);
-app.use('/api/assets', assetRoutes);
-app.use('/api/suggestions', suggestionsRoutes);
-app.use('/api/debug', debugRoutes);
-app.use('/api/set-forget-portfolios', setForgetPortfoliosRoutes);
-
-// Magic link redirect (for user-friendly URLs)
-app.get('/auth/verify', (req, res) => {
-  const token = req.query.token;
-  res.redirect(`/?token=${token}`);
-});
-
-// Alternative API route for magic link verification (backup)
-app.get('/api/auth/verify-redirect', (req, res) => {
-  const token = req.query.token;
-  res.redirect(`/?token=${token}`);
-});
-
-// Serve frontend - catch-all for non-API, non-static routes
-app.get('*', (req, res) => {
-  // Only serve index.html for non-static file requests
-  if (!req.path.includes('.')) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  // Request logging
+  if (NODE_ENV === 'development') {
+    app.use(morgan('combined'));
   } else {
-    // Let static middleware handle file requests (should have been caught already)
-    res.status(404).send('File not found');
+    app.use(morgan('short'));
   }
-});
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+  // Basic middleware
+  app.use(cors({
+    origin: NODE_ENV === 'production' ? process.env.FRONTEND_URL : true,
+    credentials: true
+  }));
+
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Custom middleware setup
+  setupMiddleware(app);
+
+  // Static files
+  app.use(express.static('public', {
+    maxAge: NODE_ENV === 'production' ? '1y' : 0
+  }));
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: NODE_ENV
+    });
+  });
+
+  // API routes
+  setupRoutes(app);
+
+  // Frontend fallback - serve index.html for non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.includes('.') && !req.path.startsWith('/api/')) {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    } else {
+      res.status(404).json({ error: 'Not found' });
+    }
+  });
+
+  // Error handling middleware (must be last)
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+}
+
+async function startServer() {
+  try {
+    // Initialize database connection
+    await dbManager.connect();
+    console.log('✅ Database connected successfully');
+
+    // Create and configure the Express app
+    await createServer();
+
+    // Start the server
+    const server = app.listen(PORT, () => {
+      console.log(`✅ Server running on http://localhost:${PORT}`);
+      console.log(`📊 Environment: ${NODE_ENV}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+    });
+
+    // Graceful shutdown handling
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
+
+      server.close(async (err) => {
+        if (err) {
+          console.error('❌ Error during server shutdown:', err);
+          process.exit(1);
+        }
+
+        console.log('🚪 HTTP server closed');
+
+        try {
+          await dbManager.disconnect();
+          console.log('🗄️ Database disconnected');
+          console.log('✅ Graceful shutdown completed');
+          process.exit(0);
+        } catch (dbError) {
+          console.error('❌ Error disconnecting database:', dbError);
+          process.exit(1);
+        }
+      });
+
+      // Force shutdown after 10 seconds
+      setTimeout(() => {
+        console.error('❌ Graceful shutdown timeout, forcing exit');
+        process.exit(1);
+      }, 10000);
+    };
+
+    // Handle shutdown signals
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    // Handle uncaught exceptions and unhandled rejections
+    process.on('uncaughtException', (error) => {
+      console.error('❌ Uncaught Exception:', error);
+      gracefulShutdown('uncaughtException');
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+      gracefulShutdown('unhandledRejection');
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, createServer, startServer };

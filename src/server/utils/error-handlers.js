@@ -305,6 +305,17 @@ function logOperation(operation, user = null, details = {}) {
     console.log('Operation logged:', JSON.stringify(logEntry));
 }
 
+/**
+ * Not found handler middleware for unmatched routes
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next function
+ */
+function notFoundHandler(req, res, next) {
+    const error = new NotFoundError(`Route not found: ${req.method} ${req.path}`);
+    next(error);
+}
+
 module.exports = {
     // Error classes
     ValidationError,
@@ -320,6 +331,7 @@ module.exports = {
     formatErrorResponse,
     sanitizeErrorMessage,
     errorHandler,
+    notFoundHandler,
     asyncHandler,
 
     // Response helpers

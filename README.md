@@ -122,10 +122,18 @@ node scripts/debug-portfolio.js      # Debug portfolio data
 ├── scripts/         # Database management scripts
 ├── services/        # Business logic services
 ├── utils/           # Utility functions
-├── public/          # Frontend files
-│   ├── app.js       # Main application logic
+├── public/          # Static frontend files
 │   ├── index.html   # Main page
-│   └── styles.css   # Custom styles
+│   ├── content/     # Educational content
+│   └── translations/ # Localization files
+├── src/
+│   ├── client/      # Modular frontend application
+│   │   ├── app.js   # Main application orchestrator
+│   │   ├── components/ # Reusable UI components
+│   │   ├── pages/   # Page-specific logic
+│   │   ├── services/ # Frontend services
+│   │   └── utils/   # Client utilities
+│   └── server/      # Backend services and controllers
 └── server.js        # Main server file
 ```
 

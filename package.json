@@ -4,19 +4,37 @@
   "description": "Educational platform demonstrating Bitcoin as a unit of account and deflationary monetary perspective",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon server.js --watch src/ --watch config/ --ext js,json",
+    "dev:frontend": "npx serve public -p 3001",
     "start": "node server.js",
-    "build": "npx prisma generate && echo 'Build complete'",
+    "start:prod": "NODE_ENV=production node server.js",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "npx prisma generate",
+    "build:frontend": "node scripts/build-frontend.js",
+    "build:prod": "NODE_ENV=production npm run build",
+    "test": "npm run test:e2e",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix",
+    "format": "prettier --write 'src/**/*.js' 'public/**/*.js'",
+    "setup": "npm install && npm run db:generate && npm run build",
     "setup-db": "node scripts/setup-database.js",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:migrate": "npx prisma migrate dev",
+    "db:migrate:deploy": "npx prisma migrate deploy",
     "db:studio": "npx prisma studio",
     "db:reset": "npx prisma migrate reset",
-    "db:introspect": "npx prisma db pull"
+    "db:introspect": "npx prisma db pull",
+    "db:seed": "node scripts/seed-database.js",
+    "logs": "pm2 logs",
+    "logs:error": "pm2 logs --err",
+    "deploy": "npm run build:prod && npm run db:migrate:deploy",
+    "health": "curl -f http://localhost:3000/health || exit 1",
+    "debug": "node --inspect server.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
@@ -29,7 +47,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
     "nodemailer": "^6.9.7",
     "pg": "^8.11.3",
     "prisma": "^6.16.2"
@@ -37,7 +58,28 @@
   "devDependencies": {
     "@playwright/mcp": "^0.0.39",
     "@playwright/test": "^1.55.0",
+    "eslint": "^8.57.0",
     "nodemon": "^3.0.1",
-    "playwright": "^1.55.0"
-  }
+    "playwright": "^1.55.0",
+    "prettier": "^3.1.0",
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/measured-in-bitcoin.git"
+  },
+  "keywords": [
+    "bitcoin",
+    "education",
+    "unit-of-account",
+    "cryptocurrency",
+    "finance",
+    "portfolio"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }

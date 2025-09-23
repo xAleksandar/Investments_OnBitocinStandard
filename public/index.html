@@ -837,6 +837,53 @@
             background-color: rgba(255, 255, 255, 0.2);
         }
     </style>
+<script>
+// Module loader for the new modular architecture
+(function() {
+  'use strict';
+
+  const moduleCache = new Map();
+  const loadingModules = new Map();
+
+  // Simple module loader for ES6 modules in development
+  window.loadModule = async function(modulePath) {
+    if (moduleCache.has(modulePath)) {
+      return moduleCache.get(modulePath);
+    }
+
+    if (loadingModules.has(modulePath)) {
+      return loadingModules.get(modulePath);
+    }
+
+    const loadPromise = new Promise(async (resolve, reject) => {
+      try {
+        console.log('📦 Loading module:', modulePath);
+
+        // Dynamic import for ES6 modules
+        const module = await import(modulePath);
+        moduleCache.set(modulePath, module);
+        resolve(module);
+      } catch (error) {
+        console.error('❌ Failed to load module:', modulePath, error);
+        reject(error);
+      }
+    });
+
+    loadingModules.set(modulePath, loadPromise);
+    const result = await loadPromise;
+    loadingModules.delete(modulePath);
+
+    return result;
+  };
+
+  // Polyfill for older browsers
+  if (!window.import) {
+    window.import = window.loadModule;
+  }
+
+  console.log('✅ Module loader initialized');
+})();
+</script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <!-- Navigation Bar -->
@@ -1840,6 +1887,6 @@
     <!-- Custom Tooltip -->
     <div id="customTooltip" class="custom-tooltip"></div>
 
-    <script src="/app.js"></script>
+    <script type="module" src="/src/client/app.js"></script>
 </body>
 </html>

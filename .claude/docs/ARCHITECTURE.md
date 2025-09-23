@@ -1,16 +1,90 @@
 # Architecture Overview
 
-## Measured in Bitcoin - Express.js + Prisma ORM Application
+## Measured in Bitcoin - Modular Express.js + Prisma ORM Application
 
 An educational platform that teaches users about Bitcoin as a unit of account and alternative measure of wealth. Users explore how asset values change when measured in satoshis instead of dollars, demonstrating the difference between inflationary (dollar) and deflationary (Bitcoin) monetary systems.
 
-## Core Backend Architecture (Node.js/Express + Prisma)
+## 🏗️ **NEW MODULAR ARCHITECTURE** (September 2025 Refactoring)
 
-**Express API Server** (`server.js`)
-- **Main Routes**: All API endpoints mounted at `/api/*`
-- **Static Serving**: Frontend served from `/public` directory
-- **Database**: Prisma ORM with PostgreSQL (`prisma/schema.prisma`)
-- **Authentication**: Magic link email authentication with JWT tokens
+**Major Migration Completed**: Transformed from 5,583-line monolithic `public/app.js` into clean modular architecture.
+
+### **Backend Architecture** (`src/server/`)
+
+**Production-Ready Express Server** (`server.js`)
+- **Modular Middleware**: Security (Helmet, CORS), logging (Morgan), rate limiting
+- **Graceful Shutdown**: Proper cleanup and database disconnection
+- **Health Monitoring**: `/health` endpoint for deployment monitoring
+- **Error Handling**: Standardized error responses and logging
+- **Database Manager**: Enhanced connection pooling with retry logic
+
+**Service Layer Architecture** (`src/server/services/`)
+- **auth-service.js**: Authentication logic and JWT management
+- **portfolio-service.js**: Portfolio calculations and business logic
+- **trade-service.js**: Trading operations and validation
+- **price-service.js**: Asset price fetching and caching
+- **image-generation-service.js**: Portfolio visualization
+- **price-cache-service.js**: Price data caching and fallbacks
+
+**Controller Layer** (`src/server/controllers/`)
+- **auth-controller.js**: Authentication endpoints
+- **portfolio-controller.js**: Portfolio management
+- **trade-controller.js**: Trading operations
+- **asset-controller.js**: Asset data and pricing
+- **admin-controller.js**: Administrative functions
+
+**Routes Organization** (`src/server/routes/`)
+- **index.js**: Route registration and setup
+- **auth.js**: Authentication routes
+- **portfolio.js**: Portfolio management routes
+- **trades-prisma.js**: Trading routes
+- **assets.js**: Asset and pricing routes
+- **suggestions.js**: User suggestions and admin routes
+
+### **Frontend Architecture** (`src/client/`)
+
+**Application Orchestrator** (`src/client/app.js` - 15KB vs 242KB monolith)
+- **Service Initialization**: Dependency injection and coordination
+- **Router Setup**: Hash-based routing system
+- **Global Error Handling**: Application-wide error catching
+- **Lifecycle Management**: Proper component initialization and cleanup
+
+**Service Layer** (`src/client/services/`)
+- **api-client.js**: Centralized API communication
+- **auth-service.js**: Frontend authentication state management
+- **portfolio-service.js**: Portfolio calculations and state
+- **price-service.js**: Real-time price updates
+- **notification-service.js**: User notifications
+
+**Page Components** (`src/client/pages/`)
+- **home-page.js**: Welcome and education overview
+- **portfolio-page.js**: Portfolio management interface
+- **education-page.js**: Educational content system
+- **admin-page.js**: Administrative interface
+- **asset-detail-page.js**: Individual asset pages
+
+**UI Components** (`src/client/components/`)
+- **ui/**: Basic components (button, modal, notification, tooltip)
+- **navigation/**: Navigation components (main-nav, mobile-menu, user-menu)
+- **portfolio/**: Portfolio-specific components (grid, cards, charts)
+- **education/**: Education components (content renderer, progress tracking)
+- **admin/**: Administrative components (user management, stats)
+
+**Utilities** (`src/client/utils/`)
+- **formatters.js**: Number and currency formatting
+- **validators.js**: Input validation
+- **dom-helpers.js**: DOM manipulation utilities
+- **constants.js**: Frontend constants
+
+### **Shared Architecture** (`src/shared/`)
+- **constants/**: Shared constants between client and server
+- **types/**: JSDoc type definitions
+- **utils/**: Shared utility functions
+- **calculations.js**: Portfolio calculation logic
+
+### **Configuration Management** (`src/config/`)
+- **application.js**: Comprehensive application settings with validation
+- **database.js**: Enhanced database connection management
+- **environment.js**: Environment variable handling
 
 ## Database Architecture (Prisma ORM)
 
@@ -317,4 +391,26 @@ EMAIL_PASS=your_app_password
 - **Auto-completion**: Full IntelliSense support for database schemas
 - **Runtime Error Prevention**: Catch schema mismatches before deployment
 
-This architecture supports a scalable, educational platform for learning about Bitcoin as a unit of account, with robust type safety, comprehensive value tracking, and advanced features like learning milestones and portfolio visualization.
+## 🚀 **Migration Success Summary** (September 2025)
+
+### **Before vs After**
+- **Before**: 5,583-line monolithic `public/app.js` (242KB)
+- **After**: 15KB modular application orchestrator + clean separation of concerns
+- **Result**: Maintainable, scalable architecture with production-ready patterns
+
+### **Key Architectural Improvements**
+- ✅ **Separation of Concerns**: Clear boundaries between client/server/shared code
+- ✅ **Service Layer Pattern**: Business logic isolated in dedicated services
+- ✅ **Controller Pattern**: HTTP handling separated from business logic
+- ✅ **Dependency Injection**: Services properly initialized and coordinated
+- ✅ **Error Handling**: Standardized error responses and logging
+- ✅ **Configuration Management**: Environment-specific settings with validation
+
+### **Development Workflow Enhancements**
+- ✅ **Modular Development**: Individual components can be developed/tested in isolation
+- ✅ **Code Reusability**: Shared utilities and components reduce duplication
+- ✅ **Maintainability**: Small, focused files easier to understand and modify
+- ✅ **Scalability**: Architecture supports future feature additions
+- ✅ **Production Ready**: Security, monitoring, and graceful shutdown patterns
+
+This refactored architecture supports a scalable, educational platform for learning about Bitcoin as a unit of account, with robust type safety, comprehensive value tracking, modular component architecture, and production-ready operational patterns.
