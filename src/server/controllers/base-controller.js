@@ -1,54 +1,34 @@
+const {
+    sendSuccess,
+    sendError,
+    logOperation,
+    ValidationError,
+    AuthenticationError,
+    AuthorizationError
+} = require('../utils/error-handlers');
+
+const { sanitizeInput } = require('../utils/validation-helpers');
+
 class BaseController {
     constructor() {
         // Controllers will inject their required services in constructors
     }
 
     /**
-     * Standard error handling for controllers
+     * Standard error handling for controllers using centralized error handler
      * @param {Error} error - The error object
      * @param {Response} res - Express response object
      * @param {string} context - Context for logging
      */
     handleError(error, res, context = '') {
-        console.error(`Controller error in ${context}:`, error);
-
-        // Handle known error types
-        if (error.message.includes('User not found')) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        if (error.message.includes('not found')) {
-            return res.status(404).json({ error: 'Resource not found' });
-        }
-
-        if (error.message.includes('already exists') || error.message.includes('Duplicate')) {
-            return res.status(409).json({ error: 'Resource already exists' });
-        }
-
-        if (error.message.includes('Invalid') || error.message.includes('required')) {
-            return res.status(400).json({ error: error.message });
-        }
-
-        if (error.message.includes('Unauthorized') || error.message.includes('token')) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        if (error.message.includes('Forbidden') || error.message.includes('admin')) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-
-        // Default server error
-        res.status(500).json({
-            error: 'Internal server error',
-            ...(process.env.NODE_ENV === 'development' && { details: error.message })
-        });
+        sendError(res, error, context);
     }
 
     /**
      * Validate required fields in request body
      * @param {Object} body - Request body
      * @param {string[]} requiredFields - Array of required field names
-     * @throws {Error} If validation fails
+     * @throws {ValidationError} If validation fails
      */
     validateRequiredFields(body, requiredFields) {
         const missing = requiredFields.filter(field =>
@@ -56,7 +36,7 @@ class BaseController {
         );
 
         if (missing.length > 0) {
-            throw new Error(`Missing required fields: ${missing.join(', ')}`);
+            throw new ValidationError(`Missing required fields: ${missing.join(', ')}`);
         }
     }
 
@@ -64,10 +44,11 @@ class BaseController {
      * Extract user info from authenticated request
      * @param {Request} req - Express request object
      * @returns {Object} User information from JWT
+     * @throws {AuthenticationError} If user is not authenticated
      */
     getUserFromRequest(req) {
         if (!req.user) {
-            throw new Error('User not authenticated');
+            throw new AuthenticationError('User not authenticated');
         }
         return req.user;
     }
@@ -75,63 +56,44 @@ class BaseController {
     /**
      * Check if user is admin
      * @param {Request} req - Express request object
-     * @throws {Error} If user is not admin
+     * @throws {AuthenticationError|AuthorizationError} If user is not admin
      */
     requireAdmin(req) {
         const user = this.getUserFromRequest(req);
         if (!user.isAdmin) {
-            throw new Error('Admin access required');
+            throw new AuthorizationError('Admin access required');
         }
     }
 
     /**
-     * Sanitize input data
+     * Sanitize input data using standardized helper
      * @param {any} data - Data to sanitize
      * @returns {any} Sanitized data
      */
     sanitizeInput(data) {
-        if (typeof data === 'string') {
-            return data.trim();
-        }
-
-        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-            const sanitized = {};
-            for (const [key, value] of Object.entries(data)) {
-                if (typeof value === 'string') {
-                    sanitized[key] = value.trim();
-                } else {
-                    sanitized[key] = value;
-                }
-            }
-            return sanitized;
-        }
-
-        return data;
+        return sanitizeInput(data);
     }
 
     /**
-     * Send successful response
+     * Send successful response using standardized handler
      * @param {Response} res - Express response object
      * @param {any} data - Data to send
      * @param {number} status - HTTP status code
+     * @param {string} message - Optional success message
      */
-    sendSuccess(res, data, status = 200) {
-        res.status(status).json(data);
+    sendSuccess(res, data, status = 200, message = null) {
+        sendSuccess(res, data, status, message);
     }
 
     /**
-     * Send successful response with message
-     * @param {Response} res - Express response object
-     * @param {string} message - Success message
-     * @param {any} data - Optional data to include
-     * @param {number} status - HTTP status code
+     * Log successful operation for audit purposes
+     * @param {string} operation - Operation performed
+     * @param {Object} req - Express request object (to get user info)
+     * @param {Object} details - Additional operation details
      */
-    sendSuccessMessage(res, message, data = null, status = 200) {
-        const response = { message };
-        if (data !== null) {
-            response.data = data;
-        }
-        res.status(status).json(response);
+    logOperation(operation, req = null, details = {}) {
+        const user = req && req.user ? req.user : null;
+        logOperation(operation, user, details);
     }
 
     /**
