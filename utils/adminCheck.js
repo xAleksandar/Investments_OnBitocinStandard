@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const prisma = require('../config/database');
 
 /**
  * Check if a user is an admin
@@ -19,13 +19,19 @@ async function isUserAdmin(email, userId = null) {
 
     // Second check: Database admin flag (only if not found in env)
     if (userId) {
-      const dbResult = await pool.query('SELECT is_admin FROM users WHERE id = $1', [userId]);
-      return dbResult.rows.length > 0 && dbResult.rows[0].is_admin === true;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+      });
+      return user && user.isAdmin === true;
     }
 
     // If no userId provided and not in env, check by email
-    const dbResult = await pool.query('SELECT is_admin FROM users WHERE email = $1', [email]);
-    return dbResult.rows.length > 0 && dbResult.rows[0].is_admin === true;
+    const user = await prisma.user.findUnique({
+      where: { email: email },
+      select: { isAdmin: true }
+    });
+    return user && user.isAdmin === true;
 
   } catch (error) {
     console.error('Error checking admin status:', error);
