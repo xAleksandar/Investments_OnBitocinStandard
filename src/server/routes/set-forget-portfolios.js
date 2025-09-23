@@ -1,16 +1,17 @@
 const express = require('express');
-const prisma = require('../config/database');
-const authenticateToken = require('../middleware/auth');
+const prisma = require('../../../config/database');
+const authenticateToken = require('../../../middleware/auth');
 const crypto = require('crypto');
-const PortfolioImageGenerator = require('../services/PortfolioImageGenerator');
-const PriceCache = require('../services/PriceCache');
+const ImageGenerationService = require('../services/image-generation-service');
+const PriceCacheService = require('../services/price-cache-service');
 const router = express.Router();
 
 // Portfolio baseline: always compare against 1 BTC (100M satoshis)
 const PORTFOLIO_BASELINE_SATS = 100000000;
 
-// Initialize image generator
-const imageGenerator = new PortfolioImageGenerator();
+// Initialize services
+const imageGenerator = new ImageGenerationService();
+const priceCache = new PriceCacheService();
 
 // Set & Forget Portfolio Model Class
 class SetForgetPortfolio {
@@ -87,7 +88,7 @@ class SetForgetPortfolio {
       }
 
       console.log(`Fetching prices for portfolio assets: ${assetSymbols.join(', ')}`);
-      const priceMap = await PriceCache.getPrices(assetSymbols);
+      const priceMap = await priceCache.getPrices(assetSymbols);
 
       const btcPrice = priceMap['BTC'];
       if (!btcPrice) {
@@ -257,7 +258,7 @@ class SetForgetPortfolio {
         assetSymbols.push('BTC');
       }
 
-      const priceMap = await PriceCache.getPrices(assetSymbols);
+      const priceMap = await priceCache.getPrices(assetSymbols);
 
       const currentBtcPrice = priceMap['BTC'];
       if (!currentBtcPrice) {

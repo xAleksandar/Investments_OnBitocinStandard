@@ -1,6 +1,6 @@
 const express = require('express');
-const prisma = require('../config/database');
-const authenticateToken = require('../middleware/auth');
+const prisma = require('../../../config/database');
+const authenticateToken = require('../../../middleware/auth');
 const { Pool } = require('pg');
 const router = express.Router();
 
