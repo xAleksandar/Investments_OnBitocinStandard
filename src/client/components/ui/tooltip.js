@@ -91,6 +91,10 @@ export class Tooltip {
     setupGlobalEventListeners() {
         // Listen for mouseenter on elements with tooltip attributes
         const mouseEnterHandler = (e) => {
+            // Check if e.target exists and has closest method
+            if (!e || !e.target || typeof e.target.closest !== 'function') {
+                return;
+            }
             const target = e.target.closest('[data-tooltip], [title]');
             if (target) {
                 const content = target.dataset.tooltip || target.title;
@@ -106,6 +110,10 @@ export class Tooltip {
         };
 
         const mouseLeaveHandler = (e) => {
+            // Check if e.target exists and has closest method
+            if (!e || !e.target || typeof e.target.closest !== 'function') {
+                return;
+            }
             const target = e.target.closest('[data-tooltip], [data-original-title]');
             if (target) {
                 this.hide();

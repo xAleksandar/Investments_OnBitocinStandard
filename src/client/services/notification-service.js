@@ -329,6 +329,16 @@ class NotificationService {
     }
 
     /**
+     * Alias for showNotification for backward compatibility
+     * @param {string} message - Notification message
+     * @param {string} type - Notification type
+     * @param {number} autoHideMs - Auto-hide timeout
+     */
+    show(message, type = 'success', autoHideMs = null) {
+        return this.showNotification(message, type, autoHideMs);
+    }
+
+    /**
      * Clean up resources
      */
     destroy() {
@@ -344,4 +354,5 @@ class NotificationService {
     }
 }
 
+export { NotificationService };
 export default NotificationService;

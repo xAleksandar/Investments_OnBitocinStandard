@@ -15,6 +15,28 @@ Measured in Bitcoin - An educational platform that teaches users about Bitcoin a
 - `npm run test:e2e:ui` - Run Playwright tests with interactive UI
 - `npm run test:e2e:headed` - Run Playwright tests in visible browser
 
+### Targeted Testing (Time-Efficient)
+**Run Specific Tests Only**: Avoid full test suites during debugging - target specific functionality:
+- `npx playwright test --grep "specific test name"` - Run tests matching pattern
+- `npx playwright test tests/specific-file.spec.js` - Run single test file
+- `npx playwright test --project=chromium` - Run tests in specific browser only
+- **Manual Testing**: Use browser dev tools and direct URL testing for quick validation
+- **Component Testing**: Test individual functions/components in isolation before full integration
+- **API Testing**: Use curl or Postman for quick endpoint validation without UI overhead
+
+### Rapid Debugging Test Pattern
+**Create Temporary Test Files for Debugging**:
+```javascript
+// tests/debug-issue.spec.js - DELETE after fixing
+test('Minimal reproduction', async ({ page }) => {
+    page.on('pageerror', e => console.log('ERROR:', e.message));
+    await page.goto('http://localhost:3000');
+    // Test ONLY what's broken
+});
+```
+**Run repeatedly**: `npx playwright test tests/debug-issue.spec.js --reporter=list`
+**Clean up after**: `rm tests/debug-*.spec.js`
+
 ### Database Management (Prisma ORM)
 - `npx prisma migrate dev --name <name>` - Create and apply new migration
 - `npx prisma migrate deploy` - Apply pending migrations (production)
@@ -32,6 +54,7 @@ Measured in Bitcoin - An educational platform that teaches users about Bitcoin a
 
 - **Architecture**: See `.claude/docs/ARCHITECTURE.md` for detailed Prisma ORM integration and database schema
 - **Testing**: See `.claude/docs/TESTING.md` for testing strategies, Prisma testing, and database validation
+- **Rapid Debugging**: See `.claude/docs/RAPID_DEBUGGING.md` for fast error-first debugging methodology
 - **QA Testing**: See `.claude/docs/QA_PROTOCOLS.md` for automated browser testing protocols and critical bug fix workflows
 - **File Structure**: See `.claude/docs/FILE_ORGANIZATION.md` for directory organization and Prisma integration
 - **Agent Testing**: See `.claude/docs/AGENT_TESTING_GUIDE.md` for agent testing protocols and financial validation requirements
@@ -77,6 +100,13 @@ Required in `.env`:
 - **Critical Workflow**: Always test before AND after bug fixes to confirm resolution
 - **Educational Focus**: Zero tolerance for errors in portfolio calculations, conversion logic, or satoshi precision
 
+**Agent Invocation Requirements**: When calling the playwright-qa-tester agent, MUST provide:
+- **Specific test commands**: `npm run test:e2e` (headless), `npm run test:e2e:ui` (interactive), or `npm run test:e2e:headed` (visible browser)
+- **Test focus areas**: Specify which features/functionality to validate (e.g., "routing fixes", "portfolio calculations", "authentication flow")
+- **Expected behaviors**: Describe what should work correctly after changes
+- **Known test files**: Reference specific test files in `tests/` directory if targeting particular functionality
+- **Server setup**: Mention if dev server needs to be running (`npm run dev` on port from .env)
+
 **See `.claude/docs/QA_PROTOCOLS.md` for complete QA testing protocols.**
 
 ## Development Workflow Principles
@@ -109,6 +139,43 @@ Required in `.env`:
 - **DRY and KISS**: Keep it simple, avoid repetition, reuse components and functions
 - **Don't assume**: Always check function names, database tables, and API endpoints
 - **Alert problems**: Report code issues even if unrelated to current task
+
+### Debugging Methodology
+
+**Rapid Error-First Debugging** (PREFERRED APPROACH):
+1. **Create Minimal Test Files**: Write the smallest possible Playwright test that exposes the issue
+   - `tests/debug-[issue].spec.js` - Temporary, focused test files
+   - Capture console logs and errors immediately
+   - Check specific DOM elements or app state
+
+2. **Get Errors First, Fix Second**:
+   - Use `page.on('pageerror')` to capture JavaScript errors
+   - Don't speculate - get the EXACT error message
+   - Fix one error at a time, re-run test after each fix
+   - New errors often appear after fixing the first - this is progress!
+
+3. **Use grep/bash Efficiently**:
+   ```bash
+   grep -n "export.*ClassName" src/**/*.js  # Find export patterns
+   tail -20 file.js                          # Check file endings for exports
+   for file in *.js; do echo $file; done     # Quick file iteration
+   ```
+
+4. **Batch Fix Similar Issues**:
+   - Create temporary shell scripts for repetitive fixes
+   - Fix all similar issues at once (e.g., missing exports)
+   - Clean up scripts after use
+
+5. **Test-Fix-Verify Cycle**:
+   - Run test → Get error → Fix error → Re-run test
+   - Continue until no errors
+   - THEN test actual functionality
+
+**Strategic Logging** (when needed):
+- **Minimal Logs Only**: Add only at critical decision points
+- **Execution Flow**: Log entering key functions, not every line
+- **Remove After Fixing**: Clean up ALL debug logs
+- **Use Descriptive Prefixes**: `🔍 Routing:`, `📄 Page load:`, `❌ Error:`
 
 ### Commit Guidelines
 - **Meaningful commits**: Separate unrelated changes into different commits

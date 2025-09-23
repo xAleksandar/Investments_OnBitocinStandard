@@ -217,6 +217,7 @@ export function replaceClasses(element, oldClasses, newClasses) {
  * @param {HTMLElement} element - Element to show
  */
 export function showElement(element) {
+    if (!element) return;
     removeClass(element, 'hidden');
 }
 
@@ -225,6 +226,7 @@ export function showElement(element) {
  * @param {HTMLElement} element - Element to hide
  */
 export function hideElement(element) {
+    if (!element) return;
     addClass(element, 'hidden');
 }
 

@@ -456,6 +456,96 @@ class PortfolioService {
     getPortfolioBaseline() {
         return this.PORTFOLIO_BASELINE_SATS;
     }
+
+    /**
+     * Methods for app.js integration
+     */
+    async startPeriodicUpdates(intervalMs = 60000) {
+        console.log('📊 Starting portfolio periodic updates...');
+        // Load initial portfolio
+        await this.loadUserPortfolio();
+
+        // Set up periodic refresh
+        this.updateInterval = setInterval(async () => {
+            try {
+                await this.loadPortfolio();
+            } catch (error) {
+                console.error('Portfolio update failed:', error);
+            }
+        }, intervalMs);
+    }
+
+    stopPeriodicUpdates() {
+        console.log('⏹️ Stopping portfolio updates');
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+    }
+
+    async loadUserPortfolio() {
+        console.log('👤 Loading user portfolio...');
+        try {
+            const portfolio = await this.loadPortfolio();
+            const trades = await this.loadTradeHistory();
+            console.log('✅ User portfolio loaded');
+            return { portfolio, trades };
+        } catch (error) {
+            console.error('Failed to load user portfolio:', error);
+            return null;
+        }
+    }
+
+    clearPortfolio() {
+        console.log('🧹 Clearing portfolio data');
+        this.holdings = [];
+        this.tradeHistory = [];
+        this.notifyPortfolioChange({
+            holdings: [],
+            totalValueSats: 0,
+            performance: { percentageChange: 0, isPositive: true }
+        });
+    }
+
+    /**
+     * Trade and conversion methods for user actions
+     */
+    async convertAsset(data) {
+        // Alias for executeTrade with specific conversion logic
+        return await this.executeTrade(data.fromAsset, data.toAsset, data.amount);
+    }
+
+    async exportPortfolio(format = 'json') {
+        console.log('📤 Exporting portfolio...');
+        const portfolio = {
+            holdings: this.holdings,
+            trades: this.tradeHistory,
+            exportDate: new Date().toISOString()
+        };
+
+        if (format === 'json') {
+            const blob = new Blob([JSON.stringify(portfolio, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `portfolio-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        return portfolio;
+    }
+
+    /**
+     * Cleanup method
+     */
+    destroy() {
+        this.stopPeriodicUpdates();
+        this.portfolioListeners = [];
+        this.holdings = [];
+        this.tradeHistory = [];
+    }
 }
 
+export { PortfolioService };
 export default PortfolioService;

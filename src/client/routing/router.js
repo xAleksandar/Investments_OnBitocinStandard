@@ -24,19 +24,22 @@ export class Router {
         // Navigation history
         this.history = [];
 
-        // Initialize router
-        this.init();
+        // Set up routes immediately (but don't start navigation yet)
+        this.setupDefaultRoutes();
     }
 
     /**
-     * Initialize router with default routes and event listeners
+     * Start router with event listeners and initial navigation
+     * Call this after pages are assigned
      */
-    init() {
-        this.setupDefaultRoutes();
+    start() {
+        console.log('🚀 Starting router with pages assigned');
+        console.log('🚀 Pages available:', this.pages);
         this.setupEventListeners();
 
         // Handle initial navigation
         const initialHash = window.location.hash || '#home';
+        console.log('🚀 Initial navigation to:', initialHash);
         this.navigate(initialHash);
     }
 
@@ -313,8 +316,17 @@ export class Router {
     executeRoute(route, routeInfo) {
         // Show the page
         const pageElement = getElementById(route.pageId);
+
         if (pageElement) {
             showElement(pageElement);
+
+            // Fallback to inline style if needed
+            const computedStyle = window.getComputedStyle(pageElement);
+            if (computedStyle.display === 'none') {
+                pageElement.style.display = 'block';
+            }
+        } else {
+            console.error('Page element not found:', route.pageId);
         }
 
         // Run beforeEnter hook
@@ -324,13 +336,18 @@ export class Router {
 
         // Execute route handler
         if (route.handler) {
+            console.log('🚀 Executing route handler for:', route.name);
             route.handler(routeInfo.params, routeInfo.query, routeInfo);
+        } else {
+            console.warn('⚠️ No handler for route:', route.name);
         }
 
         // Run afterEnter hook
         if (route.afterEnter) {
             route.afterEnter(routeInfo, this);
         }
+
+        console.log('✅ Route execution completed for:', route.name);
     }
 
     /**
@@ -343,13 +360,20 @@ export class Router {
             'mainApp',
             'loginForm',
             'adminPage',
-            'educationPage'
+            'educationPage',
+            'componentsPage'
         ];
 
         pageIds.forEach(pageId => {
             const element = getElementById(pageId);
             if (element) {
                 hideElement(element);
+
+                // Fallback to inline style if needed
+                const computedStyle = window.getComputedStyle(element);
+                if (computedStyle.display !== 'none') {
+                    element.style.display = 'none';
+                }
             }
         });
     }
@@ -434,7 +458,9 @@ export class Router {
      */
     handleHomePage() {
         console.log('Loading home page');
-        // Home page specific initialization would go here
+        if (this.pages && this.pages.home && this.pages.home.show) {
+            this.pages.home.show();
+        }
     }
 
     /**
@@ -443,12 +469,8 @@ export class Router {
      */
     handleAssetsPage(params) {
         console.log('Loading assets page with params:', params);
-        // Assets page initialization would be handled by page component
-
-        // If there's a preselected asset, handle it
-        if (params && params.asset) {
-            // This would be handled by the assets page component
-            console.log('Preselected asset:', params.asset);
+        if (this.pages && this.pages.assets && this.pages.assets.show) {
+            this.pages.assets.show(params);
         }
     }
 
@@ -457,7 +479,9 @@ export class Router {
      */
     handlePortfolioPage() {
         console.log('Loading portfolio page');
-        // Portfolio page initialization would be handled by portfolio service
+        if (this.pages && this.pages.portfolio && this.pages.portfolio.show) {
+            this.pages.portfolio.show();
+        }
     }
 
     /**
@@ -465,7 +489,9 @@ export class Router {
      */
     handleAdminPage() {
         console.log('Loading admin page');
-        // Admin page initialization would be handled by admin component
+        if (this.pages && this.pages.admin && this.pages.admin.show) {
+            this.pages.admin.show();
+        }
     }
 
     /**
@@ -473,7 +499,9 @@ export class Router {
      */
     handleComponentsPage() {
         console.log('Loading components showcase page');
-        // Components page initialization would be handled by components showcase component
+        if (this.pages && this.pages.components && this.pages.components.show) {
+            this.pages.components.show();
+        }
     }
 
     /**
@@ -482,7 +510,9 @@ export class Router {
      */
     handleEducationPage(params) {
         console.log('Loading education page with params:', params);
-        // Education page initialization would be handled by education component
+        if (this.pages && this.pages.education && this.pages.education.show) {
+            this.pages.education.show(params);
+        }
     }
 
     /**

@@ -47,6 +47,11 @@ async function createServer() {
     maxAge: NODE_ENV === 'production' ? '1y' : 0
   }));
 
+  // Serve modular client code
+  app.use('/src', express.static('src', {
+    maxAge: NODE_ENV === 'production' ? '1y' : 0
+  }));
+
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({

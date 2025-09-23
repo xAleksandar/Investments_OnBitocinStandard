@@ -337,6 +337,50 @@ class PriceService {
         // Would need historical price storage to implement
         return null;
     }
+
+    /**
+     * Alias methods for backward compatibility with app.js
+     */
+    async startPriceUpdates(intervalMs = null) {
+        console.log('🔄 Starting price updates...');
+        // Load initial prices first
+        await this.loadInitialPrices();
+        // Start auto-refresh
+        this.startPriceAutoRefresh(intervalMs);
+    }
+
+    stopPriceUpdates() {
+        console.log('⏹️ Stopping price updates');
+        this.stopPriceAutoRefresh();
+    }
+
+    async updatePrices() {
+        console.log('🔄 Updating prices...');
+        return await this.loadPrices();
+    }
+
+    async loadInitialPrices() {
+        console.log('📊 Loading initial prices...');
+        try {
+            const prices = await this.loadPrices();
+            console.log('✅ Initial prices loaded');
+            return prices;
+        } catch (error) {
+            console.error('Failed to load initial prices:', error);
+            // Use fallback prices if API fails
+            this.btcPrice = 115000; // Fallback BTC price
+            return null;
+        }
+    }
+
+    /**
+     * Cleanup method
+     */
+    destroy() {
+        this.stopPriceAutoRefresh();
+        this.priceListeners = [];
+    }
 }
 
+export { PriceService };
 export default PriceService;

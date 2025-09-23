@@ -223,7 +223,8 @@ function validateStringLength(value, rules) {
     return { isValid: true, error: null };
 }
 
-module.exports = {
+// Export for ES modules (client)
+export {
     VALIDATION_RULES,
     ERROR_MESSAGES,
     validateEmail,
@@ -232,3 +233,16 @@ module.exports = {
     validatePercentage,
     validateStringLength
 };
+
+// Also export for CommonJS (server)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        VALIDATION_RULES,
+        ERROR_MESSAGES,
+        validateEmail,
+        validateAmount,
+        validateAssetSymbol,
+        validatePercentage,
+        validateStringLength
+    };
+}

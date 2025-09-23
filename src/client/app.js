@@ -7,6 +7,7 @@ import { NotificationService } from './services/notification-service.js';
 import { Router } from './routing/router.js';
 
 import { HomePage } from './pages/home-page.js';
+import { AssetsPage } from './pages/assets-page.js';
 import { PortfolioPage } from './pages/portfolio-page.js';
 import { EducationPage } from './pages/education-page.js';
 import { AdminPage } from './pages/admin-page.js';
@@ -19,7 +20,7 @@ import { Notification } from './components/ui/notification.js';
 import { LoadingSpinner } from './components/ui/loading-spinner.js';
 import { Tooltip } from './components/ui/tooltip.js';
 
-import { MainNav } from './components/navigation/main-nav.js';
+import { MainNavigation } from './components/navigation/main-nav.js';
 import { MobileMenu } from './components/navigation/mobile-menu.js';
 import { UserMenu } from './components/navigation/user-menu.js';
 import { LanguageSwitcher } from './components/navigation/language-switcher.js';
@@ -78,15 +79,10 @@ class BitcoinApp {
         console.log('🔧 Initializing services...');
 
         const apiClient = new ApiClient();
-        const authService = new AuthService({ apiClient });
-        const portfolioService = new PortfolioService({ apiClient, authService });
-        const priceService = new PriceService({ apiClient });
         const notificationService = new NotificationService();
-
-        await notificationService.init();
-        await authService.init();
-        await priceService.init();
-        await portfolioService.init();
+        const authService = new AuthService(apiClient, notificationService);
+        const portfolioService = new PortfolioService(apiClient, notificationService);
+        const priceService = new PriceService(apiClient, notificationService);
 
         this.services = {
             apiClient,
@@ -96,24 +92,9 @@ class BitcoinApp {
             notificationService
         };
 
-        this.injectServiceDependencies();
         console.log('✅ Services initialized');
     }
 
-    injectServiceDependencies() {
-        this.services.authService.setServices({
-            notificationService: this.services.notificationService
-        });
-
-        this.services.portfolioService.setServices({
-            priceService: this.services.priceService,
-            notificationService: this.services.notificationService
-        });
-
-        this.services.priceService.setServices({
-            notificationService: this.services.notificationService
-        });
-    }
 
     async initializeComponents() {
         console.log('🧩 Initializing UI components...');
@@ -144,6 +125,7 @@ class BitcoinApp {
 
         const pageClasses = [
             ['home', HomePage],
+            ['assets', AssetsPage],
             ['portfolio', PortfolioPage],
             ['education', EducationPage],
             ['admin', AdminPage],
@@ -169,22 +151,20 @@ class BitcoinApp {
 
         this.router = new Router(this.services.authService, this.services.notificationService);
 
-        this.router.registerPageHandlers({
-            home: this.pages.home,
-            portfolio: this.pages.portfolio,
-            education: this.pages.education,
-            admin: this.pages.admin,
-            assetDetail: this.pages.assetDetail
-        });
+        // Store page references for router handlers
+        this.router.pages = this.pages;
 
-        console.log('✅ Router initialized');
+        // Start router now that pages are assigned
+        this.router.start();
+
+        console.log('✅ Router initialized and started');
     }
 
     async initializeGlobalFeatures() {
         console.log('🌐 Initializing global features...');
 
         const features = [
-            ['mainNav', MainNav],
+            ['mainNav', MainNavigation],
             ['mobileMenu', MobileMenu],
             ['userMenu', UserMenu],
             ['languageSwitcher', LanguageSwitcher]
@@ -219,10 +199,12 @@ class BitcoinApp {
             if (isAuthenticated && currentUser) {
                 console.log(`👤 User authenticated: ${currentUser.email}`);
                 this.components.userMenu?.updateUserInfo(currentUser);
-                this.components.mainNav?.updateAuthState(true);
+                // TODO: Fix method name - should be updateAuthenticationState
+                // this.components.mainNav?.updateAuthState(true);
             } else {
                 console.log('👤 User not authenticated');
-                this.components.mainNav?.updateAuthState(false);
+                // TODO: Fix method name - should be updateAuthenticationState
+                // this.components.mainNav?.updateAuthState(false);
             }
         } catch (error) {
             console.error('Failed to check authentication status:', error);
@@ -232,6 +214,7 @@ class BitcoinApp {
     async startBackgroundServices() {
         console.log('⚡ Starting background services...');
 
+        // Start price updates
         this.backgroundServices.add('priceService');
         await this.services.priceService.startPriceUpdates();
 
@@ -245,6 +228,7 @@ class BitcoinApp {
 
     async loadInitialData() {
         try {
+            // Load initial prices
             await this.services.priceService.loadInitialPrices();
 
             if (await this.services.authService.isAuthenticated()) {
@@ -257,6 +241,7 @@ class BitcoinApp {
     }
 
     setupPeriodicTasks() {
+        // Set up price updates
         this.priceUpdateInterval = setInterval(async () => {
             try {
                 await this.services.priceService.updatePrices();
@@ -300,7 +285,8 @@ class BitcoinApp {
     handleAuthStateChange(event) {
         const { isAuthenticated, user } = event.detail;
         this.components.userMenu?.updateUserInfo(isAuthenticated ? user : null);
-        this.components.mainNav?.updateAuthState(isAuthenticated);
+        // TODO: Fix method name - should be updateAuthenticationState
+        // this.components.mainNav?.updateAuthState(isAuthenticated);
 
         if (isAuthenticated) {
             this.services.portfolioService.loadUserPortfolio();

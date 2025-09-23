@@ -281,3 +281,47 @@ export function formatCompactNumber(num) {
 
     return value.toFixed(2);
 }
+
+/**
+ * Format satoshis with appropriate precision
+ * @param {number|string} sats - Satoshi amount
+ * @param {boolean} includeUnit - Whether to include "sats" suffix
+ * @returns {string} Formatted satoshi amount
+ */
+export function formatSats(sats, includeUnit = true) {
+    if (!sats || isNaN(sats)) return includeUnit ? '0 sats' : '0';
+
+    const amount = Number(sats);
+    const formatted = amount.toLocaleString('en-US');
+
+    return includeUnit ? `${formatted} sats` : formatted;
+}
+
+// Aliases for backward compatibility
+export const formatCurrency = formatUsdForUI;
+export const formatNumber = formatNumberForUI;
+export const formatDate = formatDateForUI;
+export const formatPercentage = formatPercentageWithStyle;
+
+// Export all formatters as a single object for backward compatibility
+export const formatters = {
+    formatAssetDisplayName,
+    formatSatoshisForUI,
+    formatPercentageWithStyle,
+    formatPriceMultiplier,
+    formatTradeAmount,
+    formatUsdForUI,
+    formatHoldingDisplay,
+    formatDateForUI,
+    formatLockStatus,
+    formatPerformanceTooltip,
+    formatNumberForUI,
+    formatTimeRemaining,
+    formatCompactNumber,
+    formatSats,
+    // Aliases
+    formatCurrency,
+    formatNumber,
+    formatDate,
+    formatPercentage
+};

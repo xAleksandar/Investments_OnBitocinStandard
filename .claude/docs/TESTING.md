@@ -7,11 +7,15 @@ Comprehensive testing approach for Bitcoin investment game covering database int
 ## Playwright Browser Tests
 
 ### Core Test Coverage
-- **Location**: `e2e-tests/` directory (if created)
-- **Commands**:
-  - `npm run test:e2e` - Headless browser tests
-  - `npm run test:e2e:ui` - Interactive UI mode
-  - `npm run test:e2e:headed` - Visible browser testing
+- **Location**: `tests/` directory
+- **Commands** (Chrome-only by default for efficiency):
+  - `npm run test:e2e` - Headless browser tests (Chrome only)
+  - `npm run test:e2e:ui` - Interactive UI mode (Chrome only)
+  - `npm run test:e2e:headed` - Visible browser testing (Chrome only)
+- **Targeted Testing**:
+  - `npx playwright test --grep "test name"` - Run specific tests
+  - `npx playwright test tests/file.spec.js` - Run single test file
+  - `npx playwright test --project=firefox` - Cross-browser when needed
 
 ### Critical Test Areas for Bitcoin Investment Game
 - **Authentication Flow**: Magic link request → email verification → JWT validation
@@ -96,19 +100,97 @@ npx prisma studio  # Visual query performance analysis
 
 **🚨 CRITICAL WORKFLOW**: Always test before AND after bug fixes
 
+### Rapid Debugging Methodology (Highly Efficient Approach)
+
+**Core Principle**: Get error messages FIRST, then fix systematically
+
+#### 1. Create Minimal Diagnostic Tests
+```javascript
+// Create targeted test files for specific issues
+// tests/debug-routing.spec.js - Focus ONLY on the problem
+test('Check routing to different pages', async ({ page }) => {
+    const consoleLogs = [];
+    page.on('console', msg => consoleLogs.push(msg.text()));
+
+    await page.goto('http://localhost:3000');
+    // Capture specific state
+    const homeVisible = await page.locator('#homePage').isVisible();
+    const assetsVisible = await page.locator('#assetsPage').isVisible();
+
+    console.log('Homepage visible:', homeVisible);
+    console.log('Assets page visible:', assetsVisible);
+    console.log('Console logs:', consoleLogs);
+});
+```
+
+#### 2. Error-First Debugging
+```javascript
+// tests/check-console-errors.spec.js - Get ALL errors immediately
+test('Check for JavaScript errors', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('http://localhost:3000');
+
+    if (errors.length > 0) {
+        console.log('❌ JavaScript Errors Found:');
+        errors.forEach(e => console.log(e));
+    }
+
+    // Check app initialization
+    const appStatus = await page.evaluate(() => window.bitcoinApp ? 'exists' : 'missing');
+    console.log('App status:', appStatus);
+});
+```
+
+#### 3. Strategic Console Logging
+- Add logs at critical points ONLY
+- Focus on execution flow, not speculation
+- Remove logs after fixing
+
+```javascript
+// Add strategic debugging
+console.log('🔍 Executing route:', route.name, 'pageId:', route.pageId);
+console.log('📄 Page element found:', !!pageElement);
+```
+
+#### 4. Batch Fixing with Scripts
+```bash
+#!/bin/bash
+# fix-exports.sh - Fix multiple similar issues at once
+for file in src/client/services/*.js; do
+    if ! grep -q "export { " "$file"; then
+        className=$(grep "^class " "$file" | awk '{print $2}')
+        echo "export { $className };" >> "$file"
+    fi
+done
+```
+
+#### 5. Rapid Test-Fix-Verify Cycle
+1. **Create minimal test** → Run → Get error
+2. **Fix ONLY that error** → Re-run test
+3. **New error appears** → Fix it → Re-run
+4. **Repeat until working** → Clean up test files
+
+### Efficient Testing Strategy
+**Default Approach**: Use Chrome-only testing for speed during development
+- Run targeted tests first: `npx playwright test --grep "specific feature"`
+- Use single file tests: `npx playwright test tests/relevant-test.spec.js`
+- Only run cross-browser tests before major releases or deployments
+
 ### Pre-Fix Testing Protocol
-1. **Document Bug**: Use playwright-qa-tester to identify and document the specific issue
-2. **Reproduction Steps**: Create detailed steps to reproduce the bug
-3. **Expected vs Actual**: Document what should happen vs what actually happens
-4. **Screenshots/Evidence**: Capture visual proof of the issue
+1. **Create Minimal Test**: Write smallest possible test that reproduces the issue
+2. **Capture Error Messages**: Get the EXACT error, not symptoms
+3. **Use grep/find Efficiently**: `grep -n "pattern" src/**/*.js` to locate issues quickly
+4. **Document Pattern**: If multiple files have same issue, prepare batch fix
 
 ### Post-Fix Testing Protocol
-1. **Re-run Tests**: ALWAYS re-run playwright-qa-tester after fixing
-2. **Verify Resolution**: Confirm the specific bug is resolved
-3. **Regression Testing**: Ensure fix didn't break other functionality
-4. **Documentation**: Update any relevant documentation if the fix changed behavior
+1. **Re-run Minimal Test**: Verify specific error is gone
+2. **Check for New Errors**: Often fixing one reveals another
+3. **Run Broader Tests**: Only after minimal test passes
+4. **Clean Up**: Remove debug logs and test files
 
-**⚠️ Never consider a bug fix complete without agent confirmation of resolution**
+**⚠️ Never consider a bug fix complete without test confirmation**
 
 ## User Interface Testing
 
