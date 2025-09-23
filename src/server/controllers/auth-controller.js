@@ -17,6 +17,10 @@ class AuthController extends BaseController {
             const { email } = this.sanitizeInput(req.body);
 
             const exists = await this.authService.checkUserExists(email);
+
+            // Log successful operation
+            this.logOperation('auth.checkUser', req, { email, exists });
+
             this.sendSuccess(res, { exists });
         } catch (error) {
             this.handleError(error, res, 'checkUser');
@@ -44,6 +48,9 @@ class AuthController extends BaseController {
             }
 
             const result = await this.authService.requestMagicLink(email, username);
+
+            // Log successful operation
+            this.logOperation('auth.requestMagicLink', req, { email, hasUsername: !!username, isNewUser: result.isNewUser });
 
             // In production, we would send the email here
             // For development, we return the magic link URL
