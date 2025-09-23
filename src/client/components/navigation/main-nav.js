@@ -48,6 +48,13 @@ export class MainNavigation {
                 adminOnly: false
             },
             {
+                id: 'navComponents',
+                href: '#components',
+                text: 'navigation.components',
+                requiresAuth: false,
+                adminOnly: false
+            },
+            {
                 id: 'navAdmin',
                 href: '#admin',
                 text: 'navigation.admin',
@@ -258,7 +265,7 @@ export class MainNavigation {
      * Hide all pages
      */
     hideAllPages() {
-        const pageIds = ['homePage', 'assetsPage', 'mainApp', 'adminPage', 'educationPage'];
+        const pageIds = ['homePage', 'assetsPage', 'mainApp', 'adminPage', 'educationPage', 'componentsPage'];
         pageIds.forEach(pageId => {
             const element = getElementById(pageId);
             if (element) {

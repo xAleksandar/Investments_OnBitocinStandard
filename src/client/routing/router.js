@@ -78,6 +78,14 @@ export class Router {
             handler: () => this.handleAdminPage()
         });
 
+        // Components showcase page
+        this.addRoute('components', {
+            path: '#components',
+            pageId: 'componentsPage',
+            requiresAuth: false,
+            handler: () => this.handleComponentsPage()
+        });
+
         // Education pages
         this.addRoute('education', {
             path: '#education',
@@ -458,6 +466,14 @@ export class Router {
     handleAdminPage() {
         console.log('Loading admin page');
         // Admin page initialization would be handled by admin component
+    }
+
+    /**
+     * Handle components showcase page navigation
+     */
+    handleComponentsPage() {
+        console.log('Loading components showcase page');
+        // Components page initialization would be handled by components showcase component
     }
 
     /**

@@ -11,6 +11,7 @@ import { PortfolioPage } from './pages/portfolio-page.js';
 import { EducationPage } from './pages/education-page.js';
 import { AdminPage } from './pages/admin-page.js';
 import { AssetDetailPage } from './pages/asset-detail-page.js';
+import { ComponentsShowcasePage } from './pages/components-showcase-page.js';
 
 import { Button } from './components/ui/button.js';
 import { Modal } from './components/ui/modal.js';
@@ -146,7 +147,8 @@ class BitcoinApp {
             ['portfolio', PortfolioPage],
             ['education', EducationPage],
             ['admin', AdminPage],
-            ['assetDetail', AssetDetailPage]
+            ['assetDetail', AssetDetailPage],
+            ['components', ComponentsShowcasePage]
         ];
 
         this.pages = {};
