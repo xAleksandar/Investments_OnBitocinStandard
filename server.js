@@ -3,13 +3,13 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth');
-const portfolioRoutes = require('./routes/portfolio');
-const tradeRoutes = require('./routes/trades-prisma');
-const assetRoutes = require('./routes/assets');
-const suggestionsRoutes = require('./routes/suggestions');
-const debugRoutes = require('./routes/debug');
-const setForgetPortfoliosRoutes = require('./routes/set-forget-portfolios');
+const authRoutes = require('./src/server/routes/auth');
+const portfolioRoutes = require('./src/server/routes/portfolio');
+const tradeRoutes = require('./src/server/routes/trades-prisma');
+const assetRoutes = require('./src/server/routes/assets');
+const suggestionsRoutes = require('./src/server/routes/suggestions');
+const debugRoutes = require('./src/server/routes/debug');
+const setForgetPortfoliosRoutes = require('./src/server/routes/set-forget-portfolios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
