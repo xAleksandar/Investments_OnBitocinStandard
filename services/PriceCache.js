@@ -1,5 +1,5 @@
 const axios = require('axios');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 
 /**
  * Lazy-loading price cache service
@@ -67,16 +67,27 @@ class PriceCache {
    */
   async getCachedPrice(symbol) {
     try {
-      const result = await pool.query(`
-        SELECT current_price_usd, last_updated
-        FROM assets
-        WHERE symbol = $1
-        AND last_updated > NOW() - INTERVAL '${this.cacheTTL} minutes'
-        AND current_price_usd IS NOT NULL
-      `, [symbol]);
+      const cacheExpiry = new Date();
+      cacheExpiry.setMinutes(cacheExpiry.getMinutes() - this.cacheTTL);
 
-      if (result.rows.length > 0) {
-        const price = parseFloat(result.rows[0].current_price_usd);
+      const result = await prisma.asset.findFirst({
+        where: {
+          symbol: symbol,
+          lastUpdated: {
+            gt: cacheExpiry
+          },
+          currentPriceUsd: {
+            not: null
+          }
+        },
+        select: {
+          currentPriceUsd: true,
+          lastUpdated: true
+        }
+      });
+
+      if (result && result.currentPriceUsd) {
+        const price = parseFloat(result.currentPriceUsd);
         console.log(`Cache hit for ${symbol}: $${price}`);
         return price;
       }
@@ -172,14 +183,18 @@ class PriceCache {
    */
   async cachePrice(symbol, price) {
     try {
-      await pool.query(`
-        INSERT INTO assets (symbol, current_price_usd, last_updated)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (symbol)
-        DO UPDATE SET
-          current_price_usd = EXCLUDED.current_price_usd,
-          last_updated = EXCLUDED.last_updated
-      `, [symbol, price]);
+      await prisma.asset.upsert({
+        where: { symbol: symbol },
+        update: {
+          currentPriceUsd: price,
+          lastUpdated: new Date()
+        },
+        create: {
+          symbol: symbol,
+          currentPriceUsd: price,
+          lastUpdated: new Date()
+        }
+      });
 
       console.log(`Cached ${symbol} price: $${price}`);
     } catch (error) {
