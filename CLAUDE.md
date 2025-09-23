@@ -101,6 +101,12 @@ Required in `.env`:
 - **Team coordination**: Document required actions in commit messages
 - **Task tracking**: Reference Kiro task completion when applicable
 
+### Task Completion Validation
+- **Mandatory Validation**: Before marking any development task as complete, use the `task-completion-validator` agent to verify the implementation
+- **Quality Assurance**: The validator checks requirements fulfillment, code quality, testing coverage, and project-specific standards
+- **Critical for Finance**: Especially important for portfolio calculations, satoshi conversions, and database changes where errors undermine educational integrity
+- **When to Validate**: After implementing features, fixing bugs, adding migrations, or making significant code changes
+
 ### Educational Platform Rules
 - **Test before AND after fixes**: Always re-run tests to confirm bug resolution
 - **Zero tolerance**: Value calculations must be 100% accurate for educational integrity
