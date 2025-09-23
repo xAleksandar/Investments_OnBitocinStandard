@@ -89,6 +89,13 @@ Required in `.env`:
 - **Progress visibility**: Update status in real-time to show user progress throughout implementation
 - **Planning benefits**: Break down complex work into manageable, trackable steps
 
+**Task List Modification Rules**:
+- **ONLY change** `[ ]` to `[x]` when marking tasks complete
+- **NEVER add** comments, emojis, status indicators, or extra details to task items
+- **NEVER modify** task descriptions or bullet points unless explicitly asked
+- **Keep format clean**: Maintain established task list syntax without decoration
+- **Document details elsewhere**: Use separate files for implementation notes and completion reports
+
 ### Database Changes
 **Prisma Migration Approach**:
 1. Modify `prisma/schema.prisma`
