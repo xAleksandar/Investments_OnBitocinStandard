@@ -1,5 +1,5 @@
 const express = require('express');
-const pool = require('../config/database');
+const prisma = require('../config/database');
 const authenticateToken = require('../middleware/auth');
 const crypto = require('crypto');
 const PortfolioImageGenerator = require('../services/PortfolioImageGenerator');
@@ -69,8 +69,6 @@ class SetForgetPortfolio {
 
   // Create a new Set & Forget portfolio
   static async create(userId, portfolioData, allocations) {
-    const client = await pool.connect();
-
     try {
       // Validate allocations
       const validation = this.validateAllocations(allocations);
@@ -103,124 +101,148 @@ class SetForgetPortfolio {
         }
       }
 
-      await client.query('BEGIN');
+      // Use Prisma transaction to create portfolio and allocations
+      const result = await prisma.$transaction(async (tx) => {
+        // Create portfolio record
+        const shareToken = this.generateShareToken();
+        const trackingStartDate = new Date(); // Just for reference, no actual locking
 
-      // Create portfolio record
-      const shareToken = this.generateShareToken();
-      const trackingStartDate = new Date(); // Just for reference, no actual locking
+        const portfolio = await tx.setForgetPortfolio.create({
+          data: {
+            userId: userId,
+            name: portfolioData.name,
+            share_token: shareToken,
+            locked_until: trackingStartDate
+          }
+        });
 
-      const portfolioResult = await client.query(`
-        INSERT INTO set_forget_portfolios (user_id, name, share_token, locked_until)
-        VALUES ($1, $2, $3, $4)
-        RETURNING *
-      `, [userId, portfolioData.name, shareToken, trackingStartDate]);
+        // Create allocation records
+        const allocationPromises = allocations.map(async (allocation) => {
+          const btcAmount = Math.floor((allocation.allocation_percentage / 100) * initialBtcAmount);
+          const assetPrice = priceMap[allocation.asset_symbol];
 
-      const portfolio = portfolioResult.rows[0];
+          let assetAmount;
+          if (allocation.asset_symbol === 'BTC') {
+            assetAmount = btcAmount;
+          } else {
+            // Calculate asset amount based on USD value
+            const usdValue = (btcAmount / 100000000) * btcPrice;
+            assetAmount = Math.floor((usdValue / assetPrice) * 100000000); // Store with 8 decimal precision
+          }
 
-      // Create allocation records
-      for (const allocation of allocations) {
-        const btcAmount = Math.floor((allocation.allocation_percentage / 100) * initialBtcAmount);
-        const assetPrice = priceMap[allocation.asset_symbol];
+          return tx.set_forget_allocations.create({
+            data: {
+              portfolio_id: portfolio.id,
+              asset_symbol: allocation.asset_symbol,
+              allocation_percentage: allocation.allocation_percentage,
+              btc_amount: BigInt(btcAmount),
+              asset_amount: BigInt(assetAmount),
+              purchase_price_usd: assetPrice,
+              btc_price_usd: btcPrice
+            }
+          });
+        });
 
-        let assetAmount;
-        if (allocation.asset_symbol === 'BTC') {
-          assetAmount = btcAmount;
-        } else {
-          // Calculate asset amount based on USD value
-          const usdValue = (btcAmount / 100000000) * btcPrice;
-          assetAmount = Math.floor((usdValue / assetPrice) * 100000000); // Store with 8 decimal precision
-        }
+        await Promise.all(allocationPromises);
 
-        await client.query(`
-          INSERT INTO set_forget_allocations
-          (portfolio_id, asset_symbol, allocation_percentage, btc_amount, asset_amount, purchase_price_usd, btc_price_usd)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [
-          portfolio.id,
-          allocation.asset_symbol,
-          allocation.allocation_percentage,
-          btcAmount,
-          assetAmount,
-          assetPrice,
-          btcPrice
-        ]);
-      }
-
-      // No actual BTC deduction - this is a theoretical portfolio
-
-      await client.query('COMMIT');
+        return portfolio;
+      });
 
       // Return the created portfolio with allocations
-      return await this.findById(portfolio.id);
+      return await this.findById(result.id);
 
     } catch (error) {
-      await client.query('ROLLBACK');
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   // Find portfolio by ID with allocations
   static async findById(portfolioId) {
-    const portfolioResult = await pool.query(
-      'SELECT * FROM set_forget_portfolios WHERE id = $1',
-      [portfolioId]
-    );
+    const portfolioData = await prisma.setForgetPortfolio.findUnique({
+      where: { id: portfolioId },
+      include: {
+        set_forget_allocations: {
+          orderBy: { allocation_percentage: 'desc' }
+        }
+      }
+    });
 
-    if (portfolioResult.rows.length === 0) {
+    if (!portfolioData) {
       return null;
     }
 
-    const allocationsResult = await pool.query(
-      'SELECT * FROM set_forget_allocations WHERE portfolio_id = $1 ORDER BY allocation_percentage DESC',
-      [portfolioId]
-    );
+    // Convert Prisma result to match expected format
+    const formattedData = {
+      id: portfolioData.id,
+      user_id: portfolioData.userId,
+      name: portfolioData.name,
+      share_token: portfolioData.share_token,
+      locked_until: portfolioData.locked_until,
+      created_at: portfolioData.createdAt,
+      updated_at: portfolioData.updatedAt,
+      allocations: portfolioData.set_forget_allocations
+    };
 
-    const portfolioData = portfolioResult.rows[0];
-    portfolioData.allocations = allocationsResult.rows;
-
-    return new SetForgetPortfolio(portfolioData);
+    return new SetForgetPortfolio(formattedData);
   }
 
   // Find portfolio by share token (for public sharing)
   static async findByShareToken(shareToken) {
-    const portfolioResult = await pool.query(
-      'SELECT * FROM set_forget_portfolios WHERE share_token = $1',
-      [shareToken]
-    );
+    const portfolioData = await prisma.setForgetPortfolio.findUnique({
+      where: { share_token: shareToken },
+      include: {
+        set_forget_allocations: {
+          orderBy: { allocation_percentage: 'desc' }
+        }
+      }
+    });
 
-    if (portfolioResult.rows.length === 0) {
+    if (!portfolioData) {
       return null;
     }
 
-    const allocationsResult = await pool.query(
-      'SELECT * FROM set_forget_allocations WHERE portfolio_id = $1 ORDER BY allocation_percentage DESC',
-      [portfolioResult.rows[0].id]
-    );
+    // Convert Prisma result to match expected format
+    const formattedData = {
+      id: portfolioData.id,
+      user_id: portfolioData.userId,
+      name: portfolioData.name,
+      share_token: portfolioData.share_token,
+      locked_until: portfolioData.locked_until,
+      created_at: portfolioData.createdAt,
+      updated_at: portfolioData.updatedAt,
+      allocations: portfolioData.set_forget_allocations
+    };
 
-    const portfolioData = portfolioResult.rows[0];
-    portfolioData.allocations = allocationsResult.rows;
-
-    return new SetForgetPortfolio(portfolioData);
+    return new SetForgetPortfolio(formattedData);
   }
 
   // Find all portfolios for a user
   static async findByUserId(userId) {
-    const portfoliosResult = await pool.query(
-      'SELECT * FROM set_forget_portfolios WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
-    );
+    const portfoliosData = await prisma.setForgetPortfolio.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        set_forget_allocations: {
+          orderBy: { allocation_percentage: 'desc' }
+        }
+      }
+    });
 
     const portfolios = [];
-    for (const portfolioData of portfoliosResult.rows) {
-      const allocationsResult = await pool.query(
-        'SELECT * FROM set_forget_allocations WHERE portfolio_id = $1 ORDER BY allocation_percentage DESC',
-        [portfolioData.id]
-      );
+    for (const portfolioData of portfoliosData) {
+      // Convert Prisma result to match expected format
+      const formattedData = {
+        id: portfolioData.id,
+        user_id: portfolioData.userId,
+        name: portfolioData.name,
+        share_token: portfolioData.share_token,
+        locked_until: portfolioData.locked_until,
+        created_at: portfolioData.createdAt,
+        updated_at: portfolioData.updatedAt,
+        allocations: portfolioData.set_forget_allocations
+      };
 
-      portfolioData.allocations = allocationsResult.rows;
-      portfolios.push(new SetForgetPortfolio(portfolioData));
+      portfolios.push(new SetForgetPortfolio(formattedData));
     }
 
     return portfolios;
@@ -449,12 +471,12 @@ router.get('/public/:shareToken/image', async (req, res) => {
     }
 
     // Check if we need to regenerate the image (daily limit)
-    const portfolioRecord = await pool.query(
-      'SELECT last_image_generated FROM set_forget_portfolios WHERE share_token = $1',
-      [shareToken]
-    );
+    const portfolioRecord = await prisma.setForgetPortfolio.findUnique({
+      where: { share_token: shareToken },
+      select: { lastImageGenerated: true }
+    });
 
-    const lastGenerated = portfolioRecord.rows[0]?.last_image_generated;
+    const lastGenerated = portfolioRecord?.lastImageGenerated;
     const shouldRegenerate = imageGenerator.shouldRegenerateImage(lastGenerated);
 
     if (!shouldRegenerate) {
@@ -526,10 +548,10 @@ router.get('/public/:shareToken/image', async (req, res) => {
     const imageBuffer = await imageGenerator.generatePortfolioImage(performance, imageMetadata, translations);
 
     // Update last generation timestamp
-    await pool.query(
-      'UPDATE set_forget_portfolios SET last_image_generated = NOW() WHERE share_token = $1',
-      [shareToken]
-    );
+    await prisma.setForgetPortfolio.update({
+      where: { share_token: shareToken },
+      data: { lastImageGenerated: new Date() }
+    });
 
     // Set appropriate headers for image response
     res.set({
@@ -576,16 +598,16 @@ router.get('/public/:shareToken/image-info', async (req, res) => {
     const t = messageTranslations[language] || messageTranslations.en;
 
     // Get portfolio and last image generation time
-    const portfolioRecord = await pool.query(
-      'SELECT last_image_generated FROM set_forget_portfolios WHERE share_token = $1',
-      [shareToken]
-    );
+    const portfolioRecord = await prisma.setForgetPortfolio.findUnique({
+      where: { share_token: shareToken },
+      select: { lastImageGenerated: true }
+    });
 
-    if (portfolioRecord.rows.length === 0) {
+    if (!portfolioRecord) {
       return res.status(404).json({ error: 'Portfolio not found' });
     }
 
-    const lastGenerated = portfolioRecord.rows[0]?.last_image_generated;
+    const lastGenerated = portfolioRecord?.lastImageGenerated;
 
     if (!lastGenerated) {
       return res.json({
@@ -646,12 +668,15 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     // Check if user is admin
     const { isUserAdmin } = require('../utils/adminCheck');
-    const user = await pool.query('SELECT email FROM users WHERE id = $1', [req.user.userId]);
-    if (!user.rows[0]) {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { email: true }
+    });
+    if (!user) {
       return res.status(403).json({ error: 'User not found' });
     }
 
-    const isAdmin = await isUserAdmin(user.rows[0].email, req.user.userId);
+    const isAdmin = await isUserAdmin(user.email, req.user.userId);
     if (!isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -662,29 +687,23 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Portfolio not found' });
     }
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
+    // Use Prisma transaction to delete portfolio and allocations
+    await prisma.$transaction(async (tx) => {
       // Delete allocations first (foreign key constraint)
-      await client.query('DELETE FROM set_forget_allocations WHERE portfolio_id = $1', [portfolioId]);
-
-      // Delete portfolio
-      await client.query('DELETE FROM set_forget_portfolios WHERE id = $1', [portfolioId]);
-
-      await client.query('COMMIT');
-
-      res.json({
-        message: 'Portfolio deleted successfully',
-        deleted_portfolio: portfolio.name
+      await tx.set_forget_allocations.deleteMany({
+        where: { portfolio_id: portfolioId }
       });
 
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+      // Delete portfolio
+      await tx.setForgetPortfolio.delete({
+        where: { id: portfolioId }
+      });
+    });
+
+    res.json({
+      message: 'Portfolio deleted successfully',
+      deleted_portfolio: portfolio.name
+    });
 
   } catch (error) {
     console.error('Delete portfolio error:', error);
