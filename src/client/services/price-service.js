@@ -160,6 +160,35 @@ class PriceService {
                 }
             }
 
+            // Augment missing symbols with /api/assets data
+            try {
+                const assetsList = await this.apiClient.getAssets();
+                assetsList.forEach(asset => {
+                    const sym = asset.symbol;
+                    const usd = typeof asset.currentPriceUsd === 'number' ? asset.currentPriceUsd : parseFloat(asset.currentPriceUsd);
+                    if (!isNaN(usd)) {
+                        if (pricesUsd[sym] === undefined) {
+                            pricesUsd[sym] = usd;
+                        }
+                    }
+                });
+                // If btcPrice still missing, derive from BTC entry
+                if ((!btcPrice || btcPrice <= 0) && typeof pricesUsd['BTC'] === 'number') {
+                    btcPrice = pricesUsd['BTC'];
+                }
+                // Recompute sats for any symbols without sats
+                if (btcPrice && btcPrice > 0) {
+                    Object.entries(pricesUsd).forEach(([sym, usd]) => {
+                        if (pricesInSats[sym] === undefined) {
+                            pricesInSats[sym] = Math.round((usd / btcPrice) * 100000000);
+                        }
+                    });
+                }
+            } catch (e) {
+                // Non-fatal; continue with what we have
+                console.warn('Augmenting prices from /api/assets failed:', e);
+            }
+
             // Update price data
             this.prices = pricesInSats;
             this.pricesUsd = pricesUsd;
