@@ -117,6 +117,8 @@ class PortfolioService {
                 const fromAmount = typeof t.fromAmount === 'string' ? Number(t.fromAmount) : (t.fromAmount ?? 0);
                 const toAmount = typeof t.toAmount === 'string' ? Number(t.toAmount) : (t.toAmount ?? 0);
                 const createdAt = t.executedAt || t.createdAt || t.created_at || null;
+                const btcPriceUsd = t.btc_price_usd ?? t.btcPriceUsd ?? null;
+                const assetPriceUsd = t.asset_price_usd ?? t.assetPriceUsd ?? null;
 
                 return {
                     id: t.id,
@@ -124,7 +126,9 @@ class PortfolioService {
                     to_asset: t.toAsset || t.to_asset,
                     from_amount: fromAmount,
                     to_amount: toAmount,
-                    created_at: createdAt
+                    created_at: createdAt,
+                    btc_price_usd: btcPriceUsd !== null ? Number(btcPriceUsd) : null,
+                    asset_price_usd: assetPriceUsd !== null ? Number(assetPriceUsd) : null
                 };
             });
 
