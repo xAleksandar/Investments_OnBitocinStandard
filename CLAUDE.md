@@ -93,6 +93,30 @@ Required in `.env`:
 - `ADMIN_EMAILS` - Comma-separated admin email addresses
 - `EMAIL_*` - SMTP settings for magic links (optional in dev)
 
+## Expert Consultation Agents
+
+### Senior Developer Consultant Agent
+
+**Use the `senior-dev-consultant` agent for expert second opinions on**:
+- **Complex architectural decisions** requiring deep technical evaluation
+- **Difficult debugging scenarios** where initial attempts haven't resolved issues
+- **Performance optimization** requiring advanced analysis and solutions
+- **Security-sensitive code reviews** for authentication, data handling, or API security
+- **Database schema design** or complex migration planning
+- **API design decisions** with long-term architectural implications
+- **Refactoring strategies** for large-scale code reorganization
+- **Code quality reviews** before major releases or deployments
+- **Algorithm optimization** for complex calculations (especially financial/satoshi math)
+- **Concurrency issues** and race condition debugging
+- **Memory leaks** and resource optimization problems
+
+**When to invoke**: Proactively use when facing tasks that would benefit from senior-level expertise. Examples:
+- "Let me consult the senior developer agent for guidance on this architecture decision"
+- "This debugging issue is complex - I'll get a second opinion from the senior consultant"
+- "Before implementing this critical calculation, I'll verify approach with the senior dev agent"
+
+**Cost optimization**: This agent uses a more capable (and expensive) model - use for complex problems where expert guidance provides clear value, not for routine implementation tasks.
+
 ## Automated Browser Testing
 
 **Playwright QA Tester Agent**: Use the `playwright-qa-tester` agent for comprehensive browser testing:
