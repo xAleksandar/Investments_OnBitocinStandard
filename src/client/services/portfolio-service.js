@@ -107,7 +107,26 @@ class PortfolioService {
     async loadTradeHistory() {
         try {
             const resp = await this.apiClient.getTradeHistory();
-            const trades = Array.isArray(resp) ? resp : (resp?.trades || []);
+            const rawTrades = Array.isArray(resp) ? resp : (resp?.trades || []);
+
+            // Normalize trade objects for UI components expecting snake_case
+            const trades = rawTrades.map(t => {
+                // If already in expected shape, return as-is
+                if (t && (t.from_asset || t.created_at)) return t;
+
+                const fromAmount = typeof t.fromAmount === 'string' ? Number(t.fromAmount) : (t.fromAmount ?? 0);
+                const toAmount = typeof t.toAmount === 'string' ? Number(t.toAmount) : (t.toAmount ?? 0);
+                const createdAt = t.executedAt || t.createdAt || t.created_at || null;
+
+                return {
+                    id: t.id,
+                    from_asset: t.fromAsset || t.from_asset,
+                    to_asset: t.toAsset || t.to_asset,
+                    from_amount: fromAmount,
+                    to_amount: toAmount,
+                    created_at: createdAt
+                };
+            });
 
             this.tradeHistory = trades;
             return trades;
