@@ -275,21 +275,6 @@ export class HomePage {
 
         // Create TradingView mini symbol embed (external script)
         try {
-            const chartOverlay = document.createElement('div');
-            chartOverlay.id = `${containerId}-chart-overlay`;
-            chartOverlay.style.position = 'absolute';
-            chartOverlay.style.top = '10px';
-            chartOverlay.style.right = '10px';
-            chartOverlay.style.zIndex = '11';
-            chartOverlay.style.fontSize = '14px';
-            chartOverlay.style.fontWeight = '600';
-            chartOverlay.style.color = '#ffffff';
-            chartOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-            chartOverlay.style.padding = '4px 8px';
-            chartOverlay.style.borderRadius = '4px';
-            chartOverlay.textContent = 'Loading...';
-            wrapper.appendChild(chartOverlay);
-
             // Embedded mini-symbol-overview widget
             const chartDiv = document.createElement('div');
             chartDiv.style.width = '100%';
@@ -416,14 +401,8 @@ export class HomePage {
                 const sign = performance.performance >= 0 ? '+' : '';
                 const color = performance.performance >= 0 ? '#10B981' : '#EF4444';
 
-                // Update chart overlay if chart container provided
+                // Update 5Y big overlay in the card
                 if (chartContainerId) {
-                    const chartOverlay = getElementById(`${chartContainerId}-chart-overlay`);
-                    if (chartOverlay) {
-                        chartOverlay.textContent = `5Y: ${sign}${perf}%`;
-                        chartOverlay.style.backgroundColor = color;
-                    }
-
                     const perfElement = getElementById(`${chartContainerId}-5y-perf`);
                     if (perfElement) {
                         perfElement.textContent = `${sign}${perf}%`;
