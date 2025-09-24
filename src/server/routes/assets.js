@@ -22,6 +22,11 @@ router.get('/prices', asyncHandler(async (req, res) => {
     await assetController.getAllPrices(req, res);
 }));
 
+// Get asset performance vs BTC for a period
+router.get('/performance/:symbol/:period', asyncHandler(async (req, res) => {
+    await assetController.getAssetPerformance(req, res);
+}));
+
 // Get specific asset information
 router.get('/:symbol', asyncHandler(async (req, res) => {
     await assetController.getAsset(req, res);

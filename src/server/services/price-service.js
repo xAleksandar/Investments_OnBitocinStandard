@@ -192,6 +192,46 @@ class PriceService extends BaseService {
         return price;
     }
 
+    /**
+     * Fetch Yahoo Finance chart and return first/last non-null close
+     * @param {string} yahooSymbol - Yahoo Finance symbol (e.g., 'AAPL', 'GC=F', 'BTC-USD')
+     * @param {string} range - Range like '5y', '1y'
+     * @returns {Promise<{first:number,last:number}|null>}
+     */
+    async getYahooHistoricalCloses(yahooSymbol, range = '5y') {
+        try {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=${encodeURIComponent(range)}&interval=1d`;
+            const response = await axios.get(url, {
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            const result = response?.data?.chart?.result?.[0];
+            const closes = result?.indicators?.quote?.[0]?.close || [];
+            if (!closes || closes.length === 0) return null;
+
+            // Find first and last non-null close
+            let first = null;
+            let last = null;
+            for (let i = 0; i < closes.length; i++) {
+                const v = closes[i];
+                if (v !== null && v !== undefined) { first = v; break; }
+            }
+            for (let i = closes.length - 1; i >= 0; i--) {
+                const v = closes[i];
+                if (v !== null && v !== undefined) { last = v; break; }
+            }
+
+            if (first === null || last === null) return null;
+            return { first: Number(first), last: Number(last) };
+        } catch (error) {
+            console.error(`Failed to fetch Yahoo historical for ${yahooSymbol}:`, error.message);
+            return null;
+        }
+    }
+
     async cachePrice(symbol, price) {
         try {
             await this.prisma.asset.upsert({

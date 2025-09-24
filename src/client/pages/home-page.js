@@ -273,7 +273,7 @@ export class HomePage {
         // Append overlay to wrapper
         wrapper.appendChild(performanceOverlay);
 
-        // Create TradingView widget
+        // Create TradingView mini symbol embed (external script)
         try {
             const chartOverlay = document.createElement('div');
             chartOverlay.id = `${containerId}-chart-overlay`;
@@ -290,50 +290,42 @@ export class HomePage {
             chartOverlay.textContent = 'Loading...';
             wrapper.appendChild(chartOverlay);
 
-            // Create TradingView widget container
-            const chartContainer = document.createElement('div');
-            chartContainer.style.height = '100%';
-            chartContainer.style.width = '100%';
-            // Assign a unique id for TradingView container
-            const tvContainerId = `${containerId}-tv`;
-            chartContainer.id = tvContainerId;
-            wrapper.appendChild(chartContainer);
+            // Embedded mini-symbol-overview widget
+            const chartDiv = document.createElement('div');
+            chartDiv.style.width = '100%';
+            chartDiv.style.height = '100%';
+            chartDiv.style.position = 'absolute';
+            chartDiv.style.top = '0';
+            chartDiv.style.left = '0';
+            chartDiv.style.pointerEvents = 'none';
 
-            // Initialize TradingView widget (if available)
-            if (typeof TradingView !== 'undefined') {
-                // Determine numeric height for widget (100% can fail)
-                const widgetHeight = container.clientHeight || 192;
-                // Delay slightly to ensure DOM attachment
-                setTimeout(() => {
-                    try {
-                        new TradingView.widget({
-                            width: '100%',
-                            height: widgetHeight,
-                            symbol: symbol,
-                            interval: '1D',
-                            timezone: 'Etc/UTC',
-                            theme: 'light',
-                            style: '1',
-                            locale: 'en',
-                            toolbar_bg: '#f1f3f6',
-                            enable_publishing: false,
-                            hide_top_toolbar: true,
-                            hide_legend: true,
-                            save_image: false,
-                            container_id: tvContainerId,
-                            hide_volume: true
-                        });
-                    } catch (e) {
-                        console.error('TradingView widget init error:', e);
-                    }
-                }, 0);
-            } else {
-                // Fallback for when TradingView is not available
-                chartContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6b7280;">Chart Loading...</div>';
-            }
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+            script.innerHTML = JSON.stringify({
+                symbol,
+                width: '100%',
+                height: '100%',
+                locale: 'en',
+                dateRange: '60M',
+                colorTheme: 'light',
+                trendLineColor: 'rgba(251, 146, 60, 1)',
+                underLineColor: 'rgba(251, 146, 60, 0.1)',
+                underLineBottomColor: 'rgba(251, 146, 60, 0)',
+                isTransparent: true,
+                autosize: true,
+                noTimeScale: true,
+                chartOnly: true,
+                hide_top_toolbar: true,
+                hide_legend: true,
+                allow_symbol_change: false
+            });
+
+            chartDiv.appendChild(script);
+            wrapper.appendChild(chartDiv);
 
         } catch (error) {
-            console.error('Error creating TradingView widget:', error);
+            console.error('Error creating TradingView embed:', error);
         }
 
         // Add wrapper to container
@@ -388,15 +380,24 @@ export class HomePage {
         const priceElement = getElementById(`${asset.elementId}Price`);
         const changeElement = getElementById(`${asset.elementId}Change`);
 
-        if (priceElement && pricesInSats[asset.symbol]) {
-            // Convert sats to BTC for display
-            const priceInBTC = pricesInSats[asset.symbol] / 100000000;
-            priceElement.textContent = priceInBTC < 0.001 ? priceInBTC.toFixed(8) : priceInBTC.toFixed(4);
+        if (!priceElement) return;
 
-            // Get performance data and update if available
-            if (changeElement) {
-                this.loadAssetPerformance(asset.symbol, null, changeElement);
-            }
+        let sats = pricesInSats[asset.symbol];
+        // Fallback: compute from USD if sats not present
+        if ((sats === undefined || sats === null) && pricesUsd[asset.symbol] && btcPrice) {
+            sats = Math.round((pricesUsd[asset.symbol] / btcPrice) * 100000000);
+        }
+
+        if (typeof sats === 'number' && sats > 0) {
+            const priceInBTC = sats / 100000000;
+            priceElement.textContent = priceInBTC < 0.001 ? priceInBTC.toFixed(8) : priceInBTC.toFixed(4);
+        } else {
+            priceElement.textContent = '—';
+        }
+
+        // Load and display performance if element exists
+        if (changeElement) {
+            this.loadAssetPerformance(asset.symbol, null, changeElement);
         }
     }
 

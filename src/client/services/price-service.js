@@ -122,15 +122,42 @@ class PriceService {
                 }
 
                 Object.entries(pricesObj).forEach(([symbol, info]) => {
-                    if (info && typeof info.usd === 'number' && btcPrice > 0) {
+                    if (info && typeof info.usd === 'number') {
                         pricesUsd[symbol] = info.usd;
-                        // Convert USD price to BTC satoshi price for 1 unit of asset
-                        const sats = Math.round((info.usd / btcPrice) * 100000000);
-                        pricesInSats[symbol] = sats;
                     }
                 });
+
+                // Compute sats if we have btcPrice
+                if (btcPrice && btcPrice > 0) {
+                    Object.entries(pricesUsd).forEach(([symbol, usd]) => {
+                        pricesInSats[symbol] = Math.round((usd / btcPrice) * 100000000);
+                    });
+                }
             } else {
                 console.warn('Unexpected prices payload shape:', data);
+            }
+
+            // Fallback: if prices maps are empty, attempt to fetch from /api/assets
+            if (Object.keys(pricesUsd).length === 0 || Object.keys(pricesInSats).length === 0) {
+                try {
+                    const assets = await this.apiClient.getAssets();
+                    assets.forEach(a => {
+                        if (typeof a.currentPriceUsd === 'number') {
+                            pricesUsd[a.symbol] = a.currentPriceUsd;
+                        }
+                    });
+                    // Ensure BTC price set if available
+                    if ((!btcPrice || btcPrice <= 0) && typeof pricesUsd['BTC'] === 'number') {
+                        btcPrice = pricesUsd['BTC'];
+                    }
+                    if (btcPrice && btcPrice > 0) {
+                        Object.entries(pricesUsd).forEach(([symbol, usd]) => {
+                            pricesInSats[symbol] = Math.round((usd / btcPrice) * 100000000);
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Fallback to /api/assets failed:', e);
+                }
             }
 
             // Update price data

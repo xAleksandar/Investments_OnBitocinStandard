@@ -142,6 +142,54 @@ class AssetController extends BaseController {
     }
 
     /**
+     * Get asset performance vs BTC over a period
+     * GET /api/assets/performance/:symbol/:period
+     */
+    async getAssetPerformance(req, res) {
+        try {
+            const { symbol, period = '5y' } = req.params;
+            if (!symbol || typeof symbol !== 'string') {
+                throw new Error('Invalid asset symbol');
+            }
+
+            const sanitizedSymbol = this.sanitizeInput(symbol).toUpperCase();
+
+            // Map app symbols to Yahoo Finance symbols
+            const yahooMap = {
+                'XAU': 'GC=F', // Gold futures
+                'XAG': 'SI=F', // Silver futures
+                'WTI': 'CL=F', // Crude oil futures
+                'BTC': 'BTC-USD'
+            };
+            const assetYahoo = yahooMap[sanitizedSymbol] || sanitizedSymbol;
+            const btcYahoo = 'BTC-USD';
+
+            // Fetch historical closes
+            const PriceService = require('../services/price-service');
+            const ps = new PriceService();
+
+            const assetHist = await ps.getYahooHistoricalCloses(assetYahoo, period);
+            const btcHist = await ps.getYahooHistoricalCloses(btcYahoo, period);
+
+            if (!assetHist || !assetHist.first || !assetHist.last) {
+                throw new Error('Asset history not available');
+            }
+            if (!btcHist || !btcHist.first || !btcHist.last) {
+                throw new Error('BTC history not available');
+            }
+
+            // Compute performance vs BTC as ratio change
+            const startRatio = assetHist.first / btcHist.first;
+            const endRatio = assetHist.last / btcHist.last;
+            const performance = (endRatio / startRatio - 1) * 100;
+
+            this.sendSuccess(res, { performance });
+        } catch (error) {
+            this.handleError(error, res, 'getAssetPerformance');
+        }
+    }
+
+    /**
      * Get prices for multiple assets
      * POST /api/assets/prices
      */
