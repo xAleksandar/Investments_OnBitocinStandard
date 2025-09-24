@@ -45,7 +45,17 @@ class ApiClient {
 
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
-                return await response.json();
+                const payload = await response.json();
+                // Unwrap standardized API envelope { success, data }
+                if (payload && typeof payload === 'object') {
+                    if (payload.error) {
+                        throw new Error(payload.message || 'Request failed');
+                    }
+                    if (Object.prototype.hasOwnProperty.call(payload, 'success') && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                        return payload.data;
+                    }
+                }
+                return payload;
             }
 
             return await response.text();
@@ -112,7 +122,16 @@ class ApiClient {
      * @returns {Promise<Array>} Array of assets
      */
     async getAssets() {
-        return this.get('/api/assets');
+        const resp = await this.get('/api/assets');
+        if (Array.isArray(resp)) return resp;
+        if (resp && resp.assets) {
+            try {
+                return Object.values(resp.assets).flat();
+            } catch (_) {
+                return [];
+            }
+        }
+        return [];
     }
 
     /**

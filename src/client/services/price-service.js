@@ -103,19 +103,40 @@ class PriceService {
         try {
             const data = await this.apiClient.getPrices();
 
-            // Check if response contains valid data
-            if (data.error) {
-                console.error('Server error loading prices:', data.error);
-                if (this.notificationService) {
-                    this.notificationService.showNotification('Failed to load current prices', 'error');
+            // Normalize various server response shapes
+            let pricesInSats = {};
+            let pricesUsd = {};
+            let btcPrice = this.btcPrice;
+
+            if (data && (data.pricesInSats || data.pricesUsd || data.btcPrice)) {
+                // Legacy/expected shape
+                pricesInSats = data.pricesInSats || {};
+                pricesUsd = data.pricesUsd || {};
+                btcPrice = data.btcPrice || btcPrice;
+            } else if (data && data.prices) {
+                // Server envelope from /api/assets/prices: { prices: {SYM: {usd, lastUpdated}}, lastUpdated }
+                const pricesObj = data.prices || {};
+                const btcEntry = pricesObj['BTC'];
+                if (btcEntry && typeof btcEntry.usd === 'number') {
+                    btcPrice = btcEntry.usd;
                 }
-                return null;
+
+                Object.entries(pricesObj).forEach(([symbol, info]) => {
+                    if (info && typeof info.usd === 'number' && btcPrice > 0) {
+                        pricesUsd[symbol] = info.usd;
+                        // Convert USD price to BTC satoshi price for 1 unit of asset
+                        const sats = Math.round((info.usd / btcPrice) * 100000000);
+                        pricesInSats[symbol] = sats;
+                    }
+                });
+            } else {
+                console.warn('Unexpected prices payload shape:', data);
             }
 
             // Update price data
-            this.prices = data.pricesInSats || {};
-            this.pricesUsd = data.pricesUsd || {};
-            this.btcPrice = data.btcPrice || this.btcPrice;
+            this.prices = pricesInSats;
+            this.pricesUsd = pricesUsd;
+            this.btcPrice = btcPrice;
 
             // Notify listeners of price update
             this.notifyPriceChange({

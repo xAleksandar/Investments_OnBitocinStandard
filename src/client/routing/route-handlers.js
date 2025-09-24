@@ -278,8 +278,12 @@ export class RouteHandlers {
     async loadAssetsData() {
         try {
             // Load assets
-            const assets = await this.services.apiClient?.getAssets();
-            if (assets) {
+            const assetsResp = await this.services.apiClient?.getAssets();
+            if (assetsResp) {
+                // Normalize to a flat array of assets
+                const assets = Array.isArray(assetsResp)
+                    ? assetsResp
+                    : (assetsResp.assets ? Object.values(assetsResp.assets).flat() : []);
                 this.services.portfolioService?.setAssets(assets);
             }
 

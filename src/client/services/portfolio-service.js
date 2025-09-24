@@ -106,12 +106,8 @@ class PortfolioService {
      */
     async loadTradeHistory() {
         try {
-            const trades = await this.apiClient.getTradeHistory();
-
-            // Check if response contains an error
-            if (trades.error) {
-                throw new Error(trades.error);
-            }
+            const resp = await this.apiClient.getTradeHistory();
+            const trades = Array.isArray(resp) ? resp : (resp?.trades || []);
 
             this.tradeHistory = trades;
             return trades;
