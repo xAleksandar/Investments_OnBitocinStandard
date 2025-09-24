@@ -111,6 +111,14 @@ export class EducationPage {
         if (!educationContent) return;
 
         const t = this.getTranslationFunction();
+        const tOr = (key, fallback) => {
+            try {
+                const val = t(key);
+                return (typeof val === 'string' && val !== key) ? val : fallback;
+            } catch (_) {
+                return fallback;
+            }
+        };
 
         // Generate topic cards HTML
         const topicCards = this.availableTopics.map(topic => `
@@ -119,8 +127,8 @@ export class EducationPage {
                 <h3 class="text-xl font-semibold text-gray-800 mb-3">${topic.title}</h3>
                 <p class="text-gray-600 mb-4">${topic.description}</p>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-500">${topic.estimatedTime} ${t('education.minutesReading')}</span>
-                    <span class="text-orange-500 font-medium">${t('education.readMore')} →</span>
+                    <span class="text-sm text-gray-500">${topic.estimatedTime} ${tOr('education.minutesReading', 'min read')}</span>
+                    <span class="text-orange-500 font-medium">${tOr('education.readMore', 'Read')} →</span>
                 </div>
             </div>
         `).join('');
@@ -217,6 +225,14 @@ export class EducationPage {
         if (!educationContent || !content) return;
 
         const t = this.getTranslationFunction();
+        const tOr = (key, fallback) => {
+            try {
+                const val = t(key);
+                return (typeof val === 'string' && val !== key) ? val : fallback;
+            } catch (_) {
+                return fallback;
+            }
+        };
 
         // Generate table of contents
         const tocItems = content.tableOfContents.map(item => `
@@ -273,8 +289,8 @@ export class EducationPage {
                     <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
                     <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
                     <div class="flex items-center space-x-6 text-sm text-gray-500">
-                        <span>${content.readingTime} ${t('education.minutesReading')}</span>
-                        <span>${t('education.lastUpdatedLabel')}: ${content.lastUpdated}</span>
+                        <span>${content.readingTime} ${tOr('education.minutesReading', 'min read')}</span>
+                        <span>${tOr('education.lastUpdatedLabel', 'Last updated')}: ${content.lastUpdated}</span>
                     </div>
                 </div>
 
