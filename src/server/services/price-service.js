@@ -258,13 +258,8 @@ class PriceService extends BaseService {
                 where: { symbol },
                 select: {
                     symbol: true,
-                    name: true,
-                    type: true,
-                    exchange: true,
-                    description: true,
                     currentPriceUsd: true,
-                    lastUpdated: true,
-                    isActive: true
+                    lastUpdated: true
                 }
             });
 

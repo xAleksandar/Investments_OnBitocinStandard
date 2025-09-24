@@ -75,9 +75,14 @@ export class MainNavigation {
         }
 
         try {
+            console.log('🔥 MainNavigation init - services:', this.services);
+            console.log('🔥 MainNavigation init - authService:', !!this.services.authService);
+            console.log('🔥 MainNavigation init - router:', !!this.services.router);
+
             // Check for required services
             if (!this.services.authService || !this.services.router) {
                 console.error('MainNavigation requires authService and router');
+                console.error('🔥 Available services:', Object.keys(this.services));
                 return;
             }
 
@@ -113,14 +118,28 @@ export class MainNavigation {
      * Set up navigation event listeners
      */
     setupEventListeners() {
+        console.log('🔥 MainNavigation - setupEventListeners called');
+
         // Login button
         const loginBtn = getElementById('navLoginBtn');
+        console.log('🔥 MainNavigation - getElementById result for navLoginBtn:', loginBtn);
+        console.log('🔥 MainNavigation - Setting up login button:', !!loginBtn);
+
         if (loginBtn) {
+            console.log('🔥 MainNavigation - About to add click listener to login button');
+
             const cleanup = addEventListener(loginBtn, 'click', (e) => {
+                console.log('🔥 MainNavigation - Login button clicked via MainNavigation!');
                 e.preventDefault();
                 this.handleLoginClick();
             });
+
             this.eventListeners.push(cleanup);
+            console.log('🔥 MainNavigation - Login button event handler attached successfully');
+            console.log('🔥 MainNavigation - cleanup function:', typeof cleanup);
+        } else {
+            console.error('🔥 MainNavigation - Login button not found!');
+            console.error('🔥 MainNavigation - document.getElementById(navLoginBtn) returned:', document.getElementById('navLoginBtn'));
         }
 
         // Logout button
@@ -228,6 +247,7 @@ export class MainNavigation {
      * Handle login button click
      */
     handleLoginClick() {
+        console.log('🔥 MainNavigation - handleLoginClick called');
         this.showLoginForm();
     }
 
@@ -249,13 +269,19 @@ export class MainNavigation {
      * Show login form
      */
     showLoginForm() {
+        console.log('🔥 MainNavigation - showLoginForm called');
+
         // Hide all pages
         this.hideAllPages();
 
         // Show login form
         const loginForm = getElementById('loginForm');
+        console.log('🔥 MainNavigation - Login form element found:', !!loginForm);
         if (loginForm) {
             showElement(loginForm);
+            console.log('🔥 MainNavigation - Login form should now be visible');
+        } else {
+            console.error('🔥 MainNavigation - Login form element not found!');
         }
 
         this.currentPage = 'login';

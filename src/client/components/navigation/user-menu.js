@@ -104,15 +104,8 @@ export class UserMenu {
      * Set up user menu event listeners
      */
     setupEventListeners() {
-        // Login button
-        const loginBtn = getElementById('navLoginBtn');
-        if (loginBtn) {
-            const cleanup = addEventListener(loginBtn, 'click', (e) => {
-                e.preventDefault();
-                this.handleLogin();
-            });
-            this.eventListeners.push(cleanup);
-        }
+        // Note: Login button (navLoginBtn) is handled by MainNavigation component
+        // UserMenu focuses on user dropdown menu functionality
 
         // User info trigger (for dropdown)
         const userInfo = getElementById('navUserInfo');

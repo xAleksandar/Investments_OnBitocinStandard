@@ -16,21 +16,10 @@ class AssetController extends BaseController {
     async getAllAssets(req, res) {
         try {
             const assets = await this.priceService.prisma.asset.findMany({
-                where: {
-                    OR: [
-                        { isActive: true },
-                        { isActive: null } // Handle legacy data
-                    ]
-                },
                 select: {
                     symbol: true,
-                    name: true,
-                    type: true,
-                    exchange: true,
-                    description: true,
                     currentPriceUsd: true,
-                    lastUpdated: true,
-                    isActive: true
+                    lastUpdated: true
                 },
                 orderBy: { symbol: 'asc' }
             });
@@ -107,6 +96,48 @@ class AssetController extends BaseController {
             });
         } catch (error) {
             this.handleError(error, res, 'getAssetPrice');
+        }
+    }
+
+    /**
+     * Get current prices for all assets
+     * GET /api/assets/prices
+     */
+    async getAllPrices(req, res) {
+        try {
+            // Get all assets with their current prices
+            const assets = await this.priceService.prisma.asset.findMany({
+                select: {
+                    symbol: true,
+                    currentPriceUsd: true,
+                    lastUpdated: true
+                },
+                orderBy: { symbol: 'asc' }
+            });
+
+            // Convert to key-value format for easier frontend consumption
+            const prices = {};
+            let lastUpdate = null;
+
+            assets.forEach(asset => {
+                prices[asset.symbol] = {
+                    usd: asset.currentPriceUsd,
+                    lastUpdated: asset.lastUpdated
+                };
+
+                // Track the most recent update
+                if (!lastUpdate || (asset.lastUpdated && asset.lastUpdated > lastUpdate)) {
+                    lastUpdate = asset.lastUpdated;
+                }
+            });
+
+            this.sendSuccess(res, {
+                prices,
+                lastUpdated: lastUpdate || new Date().toISOString(),
+                count: assets.length
+            });
+        } catch (error) {
+            this.handleError(error, res, 'getAllPrices');
         }
     }
 

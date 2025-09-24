@@ -70,12 +70,22 @@ class AuthController extends BaseController {
 
     /**
      * Verify magic link token and authenticate user
-     * POST /api/auth/verify-magic-link
+     * Accepts both GET (token in query) and POST (token in body)
+     * GET /api/auth/verify?token=...
+     * POST /api/auth/verify-magic-link { token }
      */
     async verifyMagicLink(req, res) {
         try {
-            this.validateRequiredFields(req.body, ['token']);
-            const { token } = this.sanitizeInput(req.body);
+            // Support both GET (query param) and POST (body) usages
+            const tokenFromQuery = req.query?.token;
+            const tokenFromBody = req.body?.token;
+
+            const rawToken = tokenFromQuery || tokenFromBody;
+            if (!rawToken) {
+                throw new Error('Missing required field: token');
+            }
+
+            const { token } = this.sanitizeInput({ token: rawToken });
 
             const result = await this.authService.verifyMagicLink(token);
 
