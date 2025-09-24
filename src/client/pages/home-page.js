@@ -164,13 +164,17 @@ export class HomePage {
 
             // Define home page chart configurations
             const chartConfigs = [
-                { containerId: 'chartGold', symbol: 'TVC:GOLD/BITSTAMP:BTCUSD', name: 'Gold', assetSymbol: 'XAU' },
-                { containerId: 'chartSPY', symbol: 'AMEX:SPY/BITSTAMP:BTCUSD', name: 'S&P 500', assetSymbol: 'SPY' },
-                { containerId: 'chartAAPL', symbol: 'NASDAQ:AAPL/BITSTAMP:BTCUSD', name: 'Apple', assetSymbol: 'AAPL' },
-                { containerId: 'chartTSLA', symbol: 'NASDAQ:TSLA/BITSTAMP:BTCUSD', name: 'Tesla', assetSymbol: 'TSLA' },
-                { containerId: 'chartVNQ', symbol: 'AMEX:VNQ/BITSTAMP:BTCUSD', name: 'Real Estate', assetSymbol: 'VNQ' },
-                { containerId: 'chartOil', symbol: 'TVC:USOIL/BITSTAMP:BTCUSD', name: 'Oil', assetSymbol: 'WTI' }
+                // Use standard TradingView symbols; performance overlay shows vs BTC separately
+                { containerId: 'chartGold', symbol: 'TVC:GOLD', name: 'Gold', assetSymbol: 'XAU' },
+                { containerId: 'chartSPY', symbol: 'AMEX:SPY', name: 'S&P 500', assetSymbol: 'SPY' },
+                { containerId: 'chartAAPL', symbol: 'NASDAQ:AAPL', name: 'Apple', assetSymbol: 'AAPL' },
+                { containerId: 'chartTSLA', symbol: 'NASDAQ:TSLA', name: 'Tesla', assetSymbol: 'TSLA' },
+                { containerId: 'chartVNQ', symbol: 'AMEX:VNQ', name: 'Real Estate', assetSymbol: 'VNQ' },
+                { containerId: 'chartOil', symbol: 'TVC:USOIL', name: 'Oil', assetSymbol: 'WTI' }
             ];
+
+            // Ensure TradingView library is loaded before initializing charts
+            await this.ensureTradingViewLoaded();
 
             // Initialize each chart
             chartConfigs.forEach(config => {
@@ -180,6 +184,28 @@ export class HomePage {
         } catch (error) {
             console.error('Failed to initialize mini charts:', error);
         }
+    }
+
+    /**
+     * Ensure TradingView tv.js is loaded (once)
+     */
+    ensureTradingViewLoaded() {
+        if (typeof TradingView !== 'undefined') {
+            return Promise.resolve();
+        }
+
+        if (this._tvLoadingPromise) return this._tvLoadingPromise;
+
+        this._tvLoadingPromise = new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.onload = () => resolve();
+            script.onerror = () => resolve(); // Resolve anyway to allow fallbacks
+            document.head.appendChild(script);
+        });
+
+        return this._tvLoadingPromise;
     }
 
     /**
@@ -268,27 +294,39 @@ export class HomePage {
             const chartContainer = document.createElement('div');
             chartContainer.style.height = '100%';
             chartContainer.style.width = '100%';
+            // Assign a unique id for TradingView container
+            const tvContainerId = `${containerId}-tv`;
+            chartContainer.id = tvContainerId;
             wrapper.appendChild(chartContainer);
 
             // Initialize TradingView widget (if available)
             if (typeof TradingView !== 'undefined') {
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": symbol,
-                    "interval": "1D",
-                    "timezone": "Etc/UTC",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "en",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": true,
-                    "hide_legend": true,
-                    "save_image": false,
-                    "container_id": chartContainer,
-                    "hide_volume": true
-                });
+                // Determine numeric height for widget (100% can fail)
+                const widgetHeight = container.clientHeight || 192;
+                // Delay slightly to ensure DOM attachment
+                setTimeout(() => {
+                    try {
+                        new TradingView.widget({
+                            width: '100%',
+                            height: widgetHeight,
+                            symbol: symbol,
+                            interval: '1D',
+                            timezone: 'Etc/UTC',
+                            theme: 'light',
+                            style: '1',
+                            locale: 'en',
+                            toolbar_bg: '#f1f3f6',
+                            enable_publishing: false,
+                            hide_top_toolbar: true,
+                            hide_legend: true,
+                            save_image: false,
+                            container_id: tvContainerId,
+                            hide_volume: true
+                        });
+                    } catch (e) {
+                        console.error('TradingView widget init error:', e);
+                    }
+                }, 0);
             } else {
                 // Fallback for when TradingView is not available
                 chartContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6b7280;">Chart Loading...</div>';
