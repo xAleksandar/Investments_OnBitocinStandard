@@ -217,8 +217,77 @@ export class PortfolioPage {
             this.initializePortfolioGrid(),
             this.initializeTradingInterface(),
             this.initializeAssetDetailsModal(),
+            this.initializePriceChart(),
             this.updateAssetDropdowns()
         ]);
+    }
+
+    /**
+     * Initialize the TradingView price chart in portfolio view
+     */
+    async initializePriceChart() {
+        const container = getElementById('tradingview-widget-container');
+        if (!container) return;
+
+        // Clear any existing content
+        container.innerHTML = '';
+
+        const defaultSymbol = 'BITSTAMP:BTCUSD';
+
+        const createWidget = () => {
+            if (typeof TradingView === 'undefined') {
+                console.error('TradingView library not loaded');
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to load chart. Please check your internet connection.
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                new TradingView.widget({
+                    width: '100%',
+                    height: 600,
+                    symbol: defaultSymbol,
+                    interval: 'D',
+                    timezone: 'Etc/UTC',
+                    theme: 'light',
+                    style: '1',
+                    locale: 'en',
+                    toolbar_bg: '#f1f3f6',
+                    enable_publishing: false,
+                    hide_top_toolbar: false,
+                    hide_legend: false,
+                    save_image: false,
+                    container_id: 'tradingview-widget-container'
+                });
+            } catch (err) {
+                console.error('Failed to initialize TradingView widget:', err);
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to initialize chart.
+                    </div>
+                `;
+            }
+        };
+
+        if (typeof TradingView !== 'undefined') {
+            createWidget();
+        } else {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.onload = createWidget;
+            script.onerror = () => {
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to load chart library.
+                    </div>
+                `;
+            };
+            document.head.appendChild(script);
+        }
     }
 
     /**
