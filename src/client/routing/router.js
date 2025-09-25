@@ -521,10 +521,12 @@ export class Router {
      */
     handleEducationContent(params) {
         console.log('Loading education content:', params.content);
-
-        if (params.content) {
-            // This would be handled by education service
-            console.log('Loading educational content:', params.content);
+        if (params.content && this.pages && this.pages.education) {
+            if (this.pages.education.show) {
+                this.pages.education.show({ content: params.content });
+            } else if (this.pages.education.loadEducationalContent) {
+                this.pages.education.loadEducationalContent(params.content);
+            }
         }
     }
 

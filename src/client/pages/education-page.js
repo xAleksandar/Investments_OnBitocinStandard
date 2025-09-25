@@ -45,6 +45,24 @@ export class EducationPage {
     }
 
     /**
+     * Show education page content based on params
+     * @param {Object} params - Optional params, e.g., { content: 'why-bitcoin' }
+     */
+    async show(params = {}) {
+        const educationPage = getElementById('educationPage');
+        if (educationPage) {
+            showElement(educationPage);
+        }
+
+        // If a specific article/content is requested, load it; otherwise show overview
+        if (params && params.content) {
+            await this.loadEducationalContent(params.content);
+        } else {
+            this.showEducationOverview();
+        }
+    }
+
+    /**
      * Initialize education page
      * @param {string} contentType - Optional specific content to load
      */
@@ -147,6 +165,8 @@ export class EducationPage {
             </div>
         `).join('');
 
+        const firstTopic = this.availableTopics?.[0] || { id: 'fiat-experiment', title: 'The Fiat Experiment' };
+
         educationContent.innerHTML = `
             <div class="max-w-4xl mx-auto py-8">
                 <div class="text-center mb-12">
@@ -167,8 +187,8 @@ export class EducationPage {
                     </p>
                     <div class="flex flex-wrap justify-center gap-4">
                         <button class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors"
-                                data-topic="why-bitcoin">
-                            <span data-translate="education.startWithBitcoin">Start with "Why Bitcoin?"</span>
+                                data-topic="${firstTopic.id}">
+                            <span>Start with "${firstTopic.title}"</span>
                         </button>
                         <button class="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
                                 onclick="window.location.hash = '#portfolio'">
@@ -183,6 +203,9 @@ export class EducationPage {
         if (this.services.translationService) {
             this.services.translationService.updatePageTranslations();
         }
+
+        // Bind click handlers for newly rendered topic cards
+        this.setupEventListeners();
     }
 
     /**
@@ -201,15 +224,29 @@ export class EducationPage {
                 </div>
             `;
 
-            // Get current language
-            const currentLang = this.services.translationService?.getCurrentLanguage() || 'en';
+            // Get current language; always fallback to 'en' if specific locale missing
+            const currentLang = this.services.translationService?.getCurrentLanguage?.() || 'en';
 
-            // Dynamically import the appropriate content file from public directory
-            const contentModule = await import(`../../../public/content/educational/${contentType}-${currentLang}.js`);
-            const content = contentModule.default || contentModule.content;
+            // Build candidate module URLs (absolute paths from static /public)
+            const candidates = [
+                `/content/educational/${contentType}-${currentLang}.js`,
+                `/content/educational/${contentType}-en.js`
+            ];
+
+            let content = null;
+            let lastError = null;
+            for (const url of candidates) {
+                try {
+                    const mod = await import(url);
+                    content = mod?.default || mod?.content || null;
+                    if (content) break;
+                } catch (e) {
+                    lastError = e;
+                }
+            }
 
             if (!content) {
-                throw new Error(`Content not found for ${contentType}`);
+                throw new Error(`Content not found for ${contentType} (${currentLang})${lastError ? ': ' + lastError.message : ''}`);
             }
 
             // Store current content
@@ -358,6 +395,9 @@ export class EducationPage {
         if (this.services.translationService) {
             this.services.translationService.updatePageTranslations();
         }
+
+        // Bind navigation handlers for newly rendered content (back button, TOC links)
+        this.setupEventListeners();
     }
 
     /**
