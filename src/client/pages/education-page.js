@@ -17,11 +17,11 @@ export class EducationPage {
         this.currentContent = null;
         this.availableTopics = [
             {
-                id: 'why-bitcoin',
-                title: 'Why Bitcoin?',
-                description: 'Understanding Bitcoin as neutral, apolitical money',
-                link: '#education/why-bitcoin',
-                estimatedTime: 8
+                id: 'fiat-experiment',
+                title: 'The Fiat Experiment',
+                description: 'How we moved away from sound money',
+                link: '#education/fiat-experiment',
+                estimatedTime: 10
             },
             {
                 id: 'why-not-gold',
@@ -31,11 +31,11 @@ export class EducationPage {
                 estimatedTime: 6
             },
             {
-                id: 'fiat-experiment',
-                title: 'The Fiat Experiment',
-                description: 'How we moved away from sound money',
-                link: '#education/fiat-experiment',
-                estimatedTime: 10
+                id: 'why-bitcoin',
+                title: 'Why Bitcoin?',
+                description: 'Understanding Bitcoin as neutral, apolitical money',
+                link: '#education/why-bitcoin',
+                estimatedTime: 8
             }
         ];
 
@@ -120,10 +120,24 @@ export class EducationPage {
             }
         };
 
+        const getTopicIcon = (id) => {
+            switch (id) {
+                case 'fiat-experiment':
+                    return '<div class="text-green-500 text-4xl mb-4">💵</div>';
+                case 'why-not-gold':
+                    return '<div class="text-yellow-500 text-4xl mb-4">🥇</div>';
+                case 'why-bitcoin':
+                    return '<div class="text-orange-500 text-4xl mb-4">₿</div>';
+                default:
+                    return '';
+            }
+        };
+
         // Generate topic cards HTML
         const topicCards = this.availableTopics.map(topic => `
             <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow duration-200 cursor-pointer"
                  data-topic="${topic.id}">
+                ${getTopicIcon(topic.id)}
                 <h3 class="text-xl font-semibold text-gray-800 mb-3">${topic.title}</h3>
                 <p class="text-gray-600 mb-4">${topic.description}</p>
                 <div class="flex items-center justify-between">
@@ -286,7 +300,19 @@ export class EducationPage {
                         <span class="mx-2 text-gray-500">→</span>
                         <span class="text-gray-700">${content.title}</span>
                     </nav>
-                    <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-3xl">
+                            ${(() => {
+                                const id = (this.availableTopics.find(t => t.title === content.title)?.id) || '';
+                                if (id === 'fiat-experiment') return '💵';
+                                if (id === 'why-not-gold') return '🥇';
+                                if (id === 'why-bitcoin') return '₿';
+                                return '';
+                            })()}
+                        </span>
+                        <h1 class="text-4xl font-bold text-gray-800">${content.title}</h1>
+                    </div>
+                    
                     <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
                     <div class="flex items-center space-x-6 text-sm text-gray-500">
                         <span>${content.readingTime} ${tOr('education.minutesReading', 'min read')}</span>
