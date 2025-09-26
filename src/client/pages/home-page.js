@@ -162,23 +162,24 @@ export class HomePage {
         try {
             console.log('Initializing mini charts');
 
-            // Define home page chart configurations
+            // Define home page chart configurations (use ratio vs BTC like old app)
             const chartConfigs = [
-                // Use standard TradingView symbols; performance overlay shows vs BTC separately
-                { containerId: 'chartGold', symbol: 'TVC:GOLD', name: 'Gold', assetSymbol: 'XAU' },
-                { containerId: 'chartSPY', symbol: 'AMEX:SPY', name: 'S&P 500', assetSymbol: 'SPY' },
-                { containerId: 'chartAAPL', symbol: 'NASDAQ:AAPL', name: 'Apple', assetSymbol: 'AAPL' },
-                { containerId: 'chartTSLA', symbol: 'NASDAQ:TSLA', name: 'Tesla', assetSymbol: 'TSLA' },
-                { containerId: 'chartVNQ', symbol: 'AMEX:VNQ', name: 'Real Estate', assetSymbol: 'VNQ' },
-                { containerId: 'chartOil', symbol: 'TVC:USOIL', name: 'Oil', assetSymbol: 'WTI' }
+                { containerId: 'chartGold', name: 'Gold', assetSymbol: 'XAU' },
+                { containerId: 'chartSPY', name: 'S&P 500', assetSymbol: 'SPY' },
+                { containerId: 'chartAAPL', name: 'Apple', assetSymbol: 'AAPL' },
+                { containerId: 'chartTSLA', name: 'Tesla', assetSymbol: 'TSLA' },
+                { containerId: 'chartVNQ', name: 'Real Estate', assetSymbol: 'VNQ' },
+                { containerId: 'chartOil', name: 'Oil', assetSymbol: 'WTI' }
             ];
 
             // Ensure TradingView library is loaded before initializing charts
             await this.ensureTradingViewLoaded();
 
-            // Initialize each chart
+            // Initialize each chart with ratio symbol (ASSET/BTC)
             chartConfigs.forEach(config => {
-                this.initMiniChart(config.containerId, config.symbol, config.name, config.assetSymbol);
+                const base = this.getTradingViewBaseSymbol(config.assetSymbol);
+                const tvSymbol = `${base}/BITSTAMP:BTCUSD`;
+                this.initMiniChart(config.containerId, tvSymbol, config.name, config.assetSymbol);
             });
 
         } catch (error) {
@@ -318,6 +319,65 @@ export class HomePage {
 
         // Load performance data for this asset
         this.loadAssetPerformance(assetSymbol, containerId);
+    }
+
+    /**
+     * Map asset symbol to TradingView base symbol
+     * @param {string} assetSymbol
+     * @returns {string} TradingView base symbol (USD pair or TVC)
+     */
+    getTradingViewBaseSymbol(assetSymbol) {
+        const map = {
+            // Crypto
+            'BTC': 'BITSTAMP:BTCUSD',
+            // Commodities
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER',
+            'WTI': 'TVC:USOIL',
+            // US stocks and ETFs
+            'SPY': 'AMEX:SPY',
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'META': 'NASDAQ:META',
+            'NVDA': 'NASDAQ:NVDA',
+            'QQQ': 'NASDAQ:QQQ',
+            'VTI': 'AMEX:VTI',
+            'VOO': 'AMEX:VOO',
+            'VEA': 'AMEX:VEA',
+            'VWO': 'AMEX:VWO',
+            'AGG': 'NASDAQ:AGG',
+            'TLT': 'NASDAQ:TLT',
+            'IEF': 'NASDAQ:IEF',
+            'HYG': 'AMEX:HYG',
+            'LQD': 'AMEX:LQD',
+            'TIP': 'NASDAQ:TIP',
+            'VNQ': 'AMEX:VNQ',
+            'SLV': 'AMEX:SLV',
+            'DBC': 'AMEX:DBC',
+            'USO': 'AMEX:USO',
+            'UNG': 'AMEX:UNG',
+            'ARKK': 'AMEX:ARKK',
+            'COIN': 'NASDAQ:COIN',
+            'MSTR': 'NASDAQ:MSTR',
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            // Ticker with dot in TradingView
+            'BRK-B': 'NYSE:BRK.B'
+        };
+        return map[assetSymbol] || `NASDAQ:${assetSymbol}`;
     }
 
     /**
