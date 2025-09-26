@@ -16,7 +16,7 @@ export class LanguageSwitcher {
         this.currentLanguage = 'en';
         this.isDropdownOpen = false;
 
-        // Supported languages configuration
+        // Supported languages (limited to available translations)
         this.supportedLanguages = [
             {
                 code: 'en',
@@ -26,67 +26,11 @@ export class LanguageSwitcher {
                 rtl: false
             },
             {
-                code: 'es',
-                name: 'Spanish',
-                nativeName: 'Español',
-                flag: '🇪🇸',
+                code: 'bg',
+                name: 'Bulgarian',
+                nativeName: 'Български',
+                flag: '🇧🇬',
                 rtl: false
-            },
-            {
-                code: 'fr',
-                name: 'French',
-                nativeName: 'Français',
-                flag: '🇫🇷',
-                rtl: false
-            },
-            {
-                code: 'de',
-                name: 'German',
-                nativeName: 'Deutsch',
-                flag: '🇩🇪',
-                rtl: false
-            },
-            {
-                code: 'pt',
-                name: 'Portuguese',
-                nativeName: 'Português',
-                flag: '🇵🇹',
-                rtl: false
-            },
-            {
-                code: 'it',
-                name: 'Italian',
-                nativeName: 'Italiano',
-                flag: '🇮🇹',
-                rtl: false
-            },
-            {
-                code: 'ru',
-                name: 'Russian',
-                nativeName: 'Русский',
-                flag: '🇷🇺',
-                rtl: false
-            },
-            {
-                code: 'zh',
-                name: 'Chinese',
-                nativeName: '中文',
-                flag: '🇨🇳',
-                rtl: false
-            },
-            {
-                code: 'ja',
-                name: 'Japanese',
-                nativeName: '日本語',
-                flag: '🇯🇵',
-                rtl: false
-            },
-            {
-                code: 'ar',
-                name: 'Arabic',
-                nativeName: 'العربية',
-                flag: '🇸🇦',
-                rtl: true
             }
         ];
     }
@@ -102,7 +46,10 @@ export class LanguageSwitcher {
         }
 
         try {
-            // Check for required services
+            // Ensure translation service is available (fallback to global)
+            if (!this.services.translationService && window.translationService) {
+                this.services.translationService = window.translationService;
+            }
             if (!this.services.translationService) {
                 console.error('LanguageSwitcher requires translationService');
                 return;
@@ -261,6 +208,8 @@ export class LanguageSwitcher {
             // Switch language in translation service
             if (this.services.translationService?.switchLanguage) {
                 await this.services.translationService.switchLanguage(languageCode);
+            } else if (this.services.translationService?.setLanguage) {
+                await this.services.translationService.setLanguage(languageCode);
             }
 
             // Update current language
@@ -287,11 +236,6 @@ export class LanguageSwitcher {
 
             // Emit language change event
             this.emitLanguageChangeEvent(languageCode, language);
-
-            // Notify user of successful change
-            this.services.notificationService?.showSuccess(
-                `Language changed to ${language.name}`
-            );
 
             // Hide loading state
             this.hideLoadingState();
@@ -392,12 +336,15 @@ export class LanguageSwitcher {
      */
     updateLanguageSwitcherUI() {
         const currentLang = this.getCurrentLanguageInfo();
-        if (!currentLang) return;
+        if (!currentLang) {
+return;
+}
 
         // Update desktop language switcher
-        const langFlag = getElementById('currentLanguageFlag');
+        // Support both legacy and current IDs in DOM
+        const langFlag = getElementById('currentLanguageFlag') || getElementById('currentFlag');
         const langName = getElementById('currentLanguageName');
-        const langCode = getElementById('currentLanguageCode');
+        const langCode = getElementById('currentLanguageCode') || getElementById('currentLanguage');
 
         if (langFlag) {
             langFlag.textContent = currentLang.flag;
@@ -408,7 +355,8 @@ export class LanguageSwitcher {
         }
 
         if (langCode) {
-            langCode.textContent = currentLang.code.toUpperCase();
+            // If this is a code element, show code; if text element, show code
+            langCode.textContent = (currentLang.code || 'en').toUpperCase();
         }
 
         // Update language switcher trigger
@@ -423,7 +371,9 @@ export class LanguageSwitcher {
      */
     updateMobileLanguageSwitcher() {
         const currentLang = this.getCurrentLanguageInfo();
-        if (!currentLang) return;
+        if (!currentLang) {
+return;
+}
 
         // Update mobile language switcher
         const mobileLangFlag = getElementById('mobileCurrentLanguageFlag');
@@ -443,7 +393,9 @@ export class LanguageSwitcher {
      */
     updateDropdownContent() {
         const dropdown = getElementById('languageDropdown');
-        if (!dropdown) return;
+        if (!dropdown) {
+return;
+}
 
         let content = '';
         this.supportedLanguages.forEach(lang => {
@@ -481,7 +433,9 @@ export class LanguageSwitcher {
      */
     updateMobileDropdownContent() {
         const mobileDropdown = getElementById('mobileLanguageDropdown');
-        if (!mobileDropdown) return;
+        if (!mobileDropdown) {
+return;
+}
 
         let content = '';
         this.supportedLanguages.forEach(lang => {
@@ -642,7 +596,7 @@ export class LanguageSwitcher {
         const event = new CustomEvent('languageChange', {
             detail: {
                 language: languageCode,
-                languageInfo: languageInfo,
+                languageInfo,
                 previousLanguage: this.currentLanguage,
                 component: 'LanguageSwitcher'
             }
