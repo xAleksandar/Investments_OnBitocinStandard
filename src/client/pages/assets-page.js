@@ -74,7 +74,9 @@ export class AssetsPage {
      * Initialize the assets page
      */
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+return;
+}
 
         console.log('Initializing Assets Page');
         this.isInitialized = true;
@@ -117,15 +119,21 @@ export class AssetsPage {
      */
     destroy() {
         if (this.chartInstance) {
-            try { this.chartInstance.remove(); } catch {}
+            try {
+ this.chartInstance.remove();
+} catch {}
             this.chartInstance = null;
         }
         if (this._priceListener && this.services?.priceService) {
-            try { this.services.priceService.removePriceListener(this._priceListener); } catch {}
+            try {
+ this.services.priceService.removePriceListener(this._priceListener);
+} catch {}
             this._priceListener = null;
         }
         if (this._langListener) {
-            try { window.removeEventListener('languageChanged', this._langListener); } catch {}
+            try {
+ window.removeEventListener('languageChanged', this._langListener);
+} catch {}
             this._langListener = null;
         }
         this.isInitialized = false;
@@ -144,8 +152,11 @@ export class AssetsPage {
             if (this.currentSymbol) {
                 // If option exists, set it; otherwise keep current selection
                 const opt = Array.from(selector.options).find(o => o.value === this.currentSymbol);
-                if (opt) selector.value = this.currentSymbol;
-                else this.currentSymbol = selector.value;
+                if (opt) {
+selector.value = this.currentSymbol;
+} else {
+this.currentSymbol = selector.value;
+}
             } else {
                 this.currentSymbol = selector.value;
             }
@@ -161,17 +172,21 @@ export class AssetsPage {
         if (btcBtn && usdBtn) {
             const setActive = (isBTC) => {
                 if (isBTC) {
-                    addClass(btcBtn, ['bg-blue-500','text-white']);
-                    removeClass(usdBtn, ['bg-blue-500','text-white']);
+                    addClass(btcBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(usdBtn, ['bg-blue-500', 'text-white']);
                     removeClass(btcBtn, 'text-gray-700');
                     addClass(usdBtn, 'text-gray-700');
-                    if (denomLabel) denomLabel.textContent = 'in Bitcoin';
+                    if (denomLabel) {
+denomLabel.textContent = 'in Bitcoin';
+}
                 } else {
-                    addClass(usdBtn, ['bg-blue-500','text-white']);
-                    removeClass(btcBtn, ['bg-blue-500','text-white']);
+                    addClass(usdBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(btcBtn, ['bg-blue-500', 'text-white']);
                     removeClass(usdBtn, 'text-gray-700');
                     addClass(btcBtn, 'text-gray-700');
-                    if (denomLabel) denomLabel.textContent = 'in USD';
+                    if (denomLabel) {
+denomLabel.textContent = 'in USD';
+}
                 }
             };
 
@@ -222,7 +237,9 @@ export class AssetsPage {
 
     async updatePerformanceMetric(period, elementId) {
         const el = getElementById(elementId);
-        if (!el || !this.services?.priceService) return;
+        if (!el || !this.services?.priceService) {
+return;
+}
         try {
             el.textContent = '…';
             const resp = await this.services.priceService.getAssetPerformance(this.currentSymbol, period);
@@ -231,13 +248,70 @@ export class AssetsPage {
                 const sign = val > 0 ? '+' : '';
                 el.textContent = `${sign}${val.toFixed(2)}%`;
                 el.className = `text-sm font-semibold ${val >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                // Add performance metric styling and tooltip
+                const container = el.closest('.bg-gray-50');
+                if (container) {
+                    container.classList.add('performance-metric');
+
+                    // Create detailed tooltip content if we have detailed performance data
+                    if (resp.details) {
+                        const details = resp.details;
+                        const assetMultiplier = (details.assetPriceCurrent / details.assetPriceOld).toFixed(1);
+                        const btcMultiplier = (details.btcPriceCurrent / details.btcPriceOld).toFixed(1);
+
+                        // Use the same translation keys as the old version
+                        const periodLabelKey = period === '24h' ? 'time.twentyFourHoursAgo' :
+                                              period === '1y' ? 'time.oneYearAgo' :
+                                              period === '5y' ? 'time.fiveYearsAgo' :
+                                              period === '10y' ? 'time.tenYearsAgo' : period;
+
+                        const periodLabel = window.translationService?.translate(periodLabelKey) || period;
+                        const vsPerformance = window.translationService?.translate('tooltips.vsPerformance') || 'vs Bitcoin Performance';
+                        const netPerformance = window.translationService?.translate('tooltips.netPerformance') || 'Net performance';
+                        const bitcoinGrew = window.translationService?.translate('tooltips.bitcoinGrew') || 'Bitcoin grew';
+                        const vs = window.translationService?.translate('tooltips.vs') || 'vs';
+
+                        const tooltipContent = `${this.currentSymbol} ${vsPerformance} (${period})\n\n` +
+                                              `${periodLabel}:\n` +
+                                              `${this.currentSymbol}: $${details.assetPriceOld.toLocaleString()} → $${details.assetPriceCurrent.toLocaleString()} (${assetMultiplier}x)\n` +
+                                              `Bitcoin: $${details.btcPriceOld.toLocaleString()} → $${details.btcPriceCurrent.toLocaleString()} (${btcMultiplier}x)\n\n` +
+                                              `${bitcoinGrew} ${btcMultiplier}x ${vs} ${this.currentSymbol}'s ${assetMultiplier}x\n` +
+                                              `${netPerformance}: ${val.toFixed(2)}%`;
+
+                        this.setupPerformanceTooltip(container, tooltipContent);
+                    } else {
+                        // Simple tooltip without detailed breakdown
+                        const performanceOverPeriod = window.translationService?.translate('tooltips.performanceOverPeriod') || 'Performance vs Bitcoin over';
+                        const tooltipContent = `${performanceOverPeriod} ${period}: ${sign}${val.toFixed(2)}%`;
+                        this.setupPerformanceTooltip(container, tooltipContent);
+                    }
+                }
             } else {
                 el.textContent = 'N/A';
                 el.className = 'text-sm font-semibold text-gray-500';
+
+                // Add tooltip for N/A cases
+                const container = el.closest('.bg-gray-50');
+                if (container) {
+                    container.classList.add('performance-metric');
+                    const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                    const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                    this.setupPerformanceTooltip(container, `${dataNotAvailable} ${period} ${periodText}`);
+                }
             }
         } catch (e) {
             el.textContent = 'N/A';
             el.className = 'text-sm font-semibold text-gray-500';
+
+            // Add tooltip for error cases
+            const container = el.closest('.bg-gray-50');
+            if (container) {
+                container.classList.add('performance-metric');
+                const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                this.setupPerformanceTooltip(container, `${dataNotAvailable} ${period} ${periodText}`);
+            }
         }
     }
 
@@ -247,7 +321,9 @@ export class AssetsPage {
 
     renderChart() {
         const container = getElementById('assetChart');
-        if (!container) return;
+        if (!container) {
+return;
+}
 
         // Clear previous widget content (TradingView manages its container)
         container.innerHTML = '';
@@ -310,8 +386,12 @@ export class AssetsPage {
             const descKey = `assets.assetDescriptions.${symbol}.description`;
             const title = t(titleKey, null);
             const description = t(descKey, null);
-            if (titleEl && title && title !== titleKey) titleEl.textContent = title;
-            if (descEl && description && description !== descKey) descEl.textContent = description;
+            if (titleEl && title && title !== titleKey) {
+titleEl.textContent = title;
+}
+            if (descEl && description && description !== descKey) {
+descEl.textContent = description;
+}
         }
 
         // Infer category from the optgroup label that contains the selected option
@@ -330,7 +410,9 @@ export class AssetsPage {
         if (typeof TradingView !== 'undefined') {
             return Promise.resolve();
         }
-        if (this._tvLoadingPromise) return this._tvLoadingPromise;
+        if (this._tvLoadingPromise) {
+return this._tvLoadingPromise;
+}
         this._tvLoadingPromise = new Promise((resolve) => {
             const script = document.createElement('script');
             script.type = 'text/javascript';
@@ -340,6 +422,51 @@ export class AssetsPage {
             document.head.appendChild(script);
         });
         return this._tvLoadingPromise;
+    }
+
+    /**
+     * Set up performance tooltip for an element
+     * @param {HTMLElement} element - Target element
+     * @param {string} content - Tooltip content
+     */
+    setupPerformanceTooltip(element, content) {
+        if (!element) {
+return;
+}
+
+        // Remove existing title attribute to prevent native tooltip
+        element.removeAttribute('title');
+
+        // Add performance-metric class for cursor styling
+        element.classList.add('performance-metric');
+
+        // Remove existing event listeners to prevent duplicates
+        element.onmouseenter = null;
+        element.onmouseleave = null;
+        element.onmousemove = null;
+
+        // Check if tooltip service is available
+        const tooltipService = this.services?.tooltipService;
+        if (tooltipService && tooltipService.showTooltip && tooltipService.hideTooltip) {
+            // Use the tooltip service if available
+            element.onmouseenter = (e) => {
+                tooltipService.showTooltip(element, content, e);
+            };
+
+            element.onmouseleave = () => {
+                tooltipService.hideTooltip();
+            };
+
+            element.onmousemove = (e) => {
+                if (tooltipService.activeTooltip && tooltipService.activeTooltip.element === element) {
+                    tooltipService.updatePosition(element, e);
+                }
+            };
+        } else {
+            // Fallback: add data-tooltip attribute for basic tooltip functionality
+            element.setAttribute('data-tooltip', content);
+            console.warn('Tooltip service not available, using data-tooltip fallback');
+        }
     }
 }
 

@@ -54,33 +54,19 @@ export class Tooltip {
      * Create the tooltip DOM element
      */
     createTooltipElement() {
-        // Remove existing tooltip if any
+        // Use existing tooltip element if available
         const existingTooltip = getElementById('customTooltip');
         if (existingTooltip) {
-            existingTooltip.remove();
+            this.tooltipElement = existingTooltip;
+            // Ensure it has the correct CSS class
+            this.tooltipElement.className = 'custom-tooltip';
+            return;
         }
 
-        // Create new tooltip element
+        // Create new tooltip element only if none exists
         this.tooltipElement = document.createElement('div');
         this.tooltipElement.id = 'customTooltip';
-        this.tooltipElement.className = 'tooltip-container';
-        this.tooltipElement.style.cssText = `
-            position: fixed;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            line-height: 1.4;
-            max-width: ${this.config.maxWidth};
-            word-wrap: break-word;
-            z-index: ${this.config.zIndex};
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.2s ease, visibility 0.2s ease;
-            pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        `;
+        this.tooltipElement.className = 'custom-tooltip';
 
         document.body.appendChild(this.tooltipElement);
     }
@@ -162,8 +148,7 @@ export class Tooltip {
 
         // Show with delay
         this.showTimer = setTimeout(() => {
-            this.tooltipElement.style.opacity = '1';
-            this.tooltipElement.style.visibility = 'visible';
+            this.tooltipElement.classList.add('show');
 
             // Position tooltip
             this.updatePosition(element, event);
@@ -182,8 +167,7 @@ export class Tooltip {
         // Hide with delay
         this.hideTimer = setTimeout(() => {
             if (this.tooltipElement) {
-                this.tooltipElement.style.opacity = '0';
-                this.tooltipElement.style.visibility = 'hidden';
+                this.tooltipElement.classList.remove('show');
             }
             this.activeTooltip = null;
         }, this.config.hideDelay);
@@ -339,8 +323,7 @@ export class Tooltip {
         this.clearTimers();
         this.activeTooltip = { element, content };
         this.tooltipElement.textContent = content;
-        this.tooltipElement.style.opacity = '1';
-        this.tooltipElement.style.visibility = 'visible';
+        this.tooltipElement.classList.add('show');
         this.updatePosition(element, event);
     }
 
@@ -350,8 +333,7 @@ export class Tooltip {
     hideTooltip() {
         this.clearTimers();
         if (this.tooltipElement) {
-            this.tooltipElement.style.opacity = '0';
-            this.tooltipElement.style.visibility = 'hidden';
+            this.tooltipElement.classList.remove('show');
         }
         this.activeTooltip = null;
     }

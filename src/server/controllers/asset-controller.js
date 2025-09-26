@@ -183,7 +183,37 @@ class AssetController extends BaseController {
             const endRatio = assetHist.last / btcHist.last;
             const performance = (endRatio / startRatio - 1) * 100;
 
-            this.sendSuccess(res, { performance });
+            // Get start date for period
+            const now = new Date();
+            let startDate;
+            switch(period) {
+                case '24h':
+                    startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    break;
+                case '1y':
+                    startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                    break;
+                case '5y':
+                    startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+                    break;
+                case '10y':
+                    startDate = new Date(now.getFullYear() - 10, now.getMonth(), now.getDate());
+                    break;
+                default:
+                    startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+            }
+
+            this.sendSuccess(res, {
+                performance,
+                period,
+                startDate: startDate.toISOString(),
+                details: {
+                    assetPriceOld: assetHist.first,
+                    btcPriceOld: btcHist.first,
+                    assetPriceCurrent: assetHist.last,
+                    btcPriceCurrent: btcHist.last
+                }
+            });
         } catch (error) {
             this.handleError(error, res, 'getAssetPerformance');
         }
