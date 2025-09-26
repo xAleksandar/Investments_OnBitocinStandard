@@ -347,6 +347,8 @@ return;
         const langCode = getElementById('currentLanguageCode') || getElementById('currentLanguage');
 
         if (langFlag) {
+            // Ensure we don't keep any sprite/background classes like flag-en/bg
+            try { langFlag.className = 'language-flag'; } catch {}
             langFlag.textContent = currentLang.flag;
         }
 
