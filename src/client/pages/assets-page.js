@@ -15,6 +15,7 @@ export class AssetsPage {
         this.chartInstance = null;
         this._tvLoadingPromise = null;
         this._priceListener = null;
+        this._langListener = null;
 
         // Minimal symbol mapping for TradingView
         this.symbolMap = {
@@ -96,6 +97,11 @@ export class AssetsPage {
             this._priceListener = () => this.updateMetrics();
             this.services.priceService.onPriceChange(this._priceListener);
         }
+        // Listen for language changes so description updates
+        if (!this._langListener) {
+            this._langListener = () => this.updateAssetDescription();
+            window.addEventListener('languageChanged', this._langListener);
+        }
         this.renderChart();
     }
 
@@ -117,6 +123,10 @@ export class AssetsPage {
         if (this._priceListener && this.services?.priceService) {
             try { this.services.priceService.removePriceListener(this._priceListener); } catch {}
             this._priceListener = null;
+        }
+        if (this._langListener) {
+            try { window.removeEventListener('languageChanged', this._langListener); } catch {}
+            this._langListener = null;
         }
         this.isInitialized = false;
     }
@@ -143,6 +153,7 @@ export class AssetsPage {
             selector.onchange = () => {
                 this.currentSymbol = selector.value;
                 this.updateMetrics();
+                this.updateAssetDescription();
                 this.renderChart();
             };
         }
@@ -181,6 +192,9 @@ export class AssetsPage {
                 }
             };
         }
+
+        // Initial description render
+        this.updateAssetDescription();
     }
 
     updateMetrics() {
@@ -274,6 +288,41 @@ export class AssetsPage {
         };
 
         this.ensureTradingViewLoaded().then(createWidget).catch(createWidget);
+    }
+
+    updateAssetDescription() {
+        const symbol = this.currentSymbol;
+        const titleEl = getElementById('assetTitle');
+        const descEl = getElementById('assetDescriptionText');
+        const categoryEl = getElementById('assetCategory');
+        const selector = getElementById('assetSelector');
+
+        // If translations are still loading, retry after ready
+        if (window.translationService && !window.translationService.isReady) {
+            window.translationService.whenReady().then(() => this.updateAssetDescription());
+            return;
+        }
+
+        // Update title/description via translation service if available
+        const t = window.translationService?.t?.bind(window.translationService);
+        if (t) {
+            const titleKey = `assets.assetDescriptions.${symbol}.title`;
+            const descKey = `assets.assetDescriptions.${symbol}.description`;
+            const title = t(titleKey, null);
+            const description = t(descKey, null);
+            if (titleEl && title && title !== titleKey) titleEl.textContent = title;
+            if (descEl && description && description !== descKey) descEl.textContent = description;
+        }
+
+        // Infer category from the optgroup label that contains the selected option
+        if (categoryEl && selector) {
+            const opt = selector.options[selector.selectedIndex];
+            const group = opt?.parentElement;
+            if (group && group.tagName === 'OPTGROUP' && group.label) {
+                // Use the optgroup label directly (already translated with emoji prefix retained)
+                categoryEl.textContent = group.label.replace(/^([^\w\s]+)\s*/, '').trim();
+            }
+        }
     }
 
     // Load tv.js once (similar approach used on home page)
