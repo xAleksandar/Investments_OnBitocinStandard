@@ -120,7 +120,10 @@ class AuthService {
             console.log('🔍 Data structure:', JSON.stringify(data, null, 2));
 
             if (this.notificationService) {
-                this.notificationService.showMessage(data.message || data.data?.message, 'success');
+                const fallbackMsg = 'Magic link sent. Please check your email.';
+                const msg = typeof data?.message === 'string' ? data.message
+                    : (typeof data?.data?.message === 'string' ? data.data.message : fallbackMsg);
+                this.notificationService.showMessage(msg, 'success');
 
                 // Check for magic link URL - server returns nested in data.data.magicLinkUrl
                 const magicLink = data.magicLink || data.magicLinkUrl || data.data?.magicLinkUrl || data.data?.magicLink;
@@ -169,18 +172,18 @@ class AuthService {
         }
 
         console.log('✅ authMessage element found, adding magic link button');
-
+        // Replace content with message + button to avoid leftover values like 'true'
         const buttonHtml = `
-            <button
-                type="button"
-                onclick="window.open('${magicLink}', '_blank')"
-                class="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-                Open Magic Link
-            </button>
-        `;
-
-        messageDiv.innerHTML = messageDiv.innerHTML + buttonHtml;
+            <div class="mt-2">
+                <button type="button"
+                    onclick="window.open('${magicLink}', '_blank')"
+                    class="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Open Magic Link
+                </button>
+            </div>`;
+        // Preserve current message text (already set by showMessage)
+        const currentText = messageDiv.textContent || '';
+        messageDiv.innerHTML = `<div class="${messageDiv.className}">${currentText}</div>${buttonHtml}`;
         console.log('🔗 Magic link button added to DOM');
     }
 

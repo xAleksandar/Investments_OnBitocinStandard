@@ -118,6 +118,10 @@ export class RouteHandlers {
             console.log('Portfolio page loaded successfully');
         } catch (error) {
             console.error('Error loading portfolio page:', error);
+             // Check authentication
+            if (!this.services.authService?.isAuthenticated()) {
+                return;
+            }
             this.services.notificationService?.showError('Failed to load portfolio');
         }
     }

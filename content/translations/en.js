@@ -43,7 +43,7 @@ export const translations = {
     },
 
     auth: {
-        loginTitle: 'Login to Bitcoin Investment Game',
+        loginTitle: 'Login to Measure Everything in Bitcoin',
         enterEmail: 'Enter your email address',
         emailPlaceholder: 'your@email.com',
         sendMagicLink: 'Send Magic Link',

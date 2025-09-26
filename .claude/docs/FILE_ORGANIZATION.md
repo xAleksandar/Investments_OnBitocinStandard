@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-**Bitcoin Investment Game** - Express.js application with Prisma ORM for PostgreSQL database management.
+**Measure Everything in Bitcoin** - Express.js application with Prisma ORM for PostgreSQL database management.
 
 - `server.js` - Main Express server entry point
 - `public/` - Frontend static files (vanilla JavaScript SPA)
@@ -100,6 +100,7 @@ bitcoin-investment-game/
 ## Claude Documentation Structure
 
 ### Main Documentation Files
+
 - **CLAUDE.md** - Main project overview, commands, and quick references
 - **.claude/docs/ARCHITECTURE.md** - Detailed system architecture and Prisma integration
 - **.claude/docs/TESTING.md** - Testing strategies and database validation
@@ -108,7 +109,9 @@ bitcoin-investment-game/
 - **.claude/docs/AGENT_TESTING_GUIDE.md** - Agent efficiency and setup protocols
 
 ### Documentation Maintenance Guidelines
+
 **When to Update Documentation**:
+
 - Adding new API routes or modifying existing endpoints
 - Making changes to Prisma schema or database structure
 - Implementing new trading features or financial calculations
@@ -119,19 +122,24 @@ bitcoin-investment-game/
 ## Prisma ORM Integration
 
 ### Database Schema Management
+
 **Primary Files**:
+
 - `prisma/schema.prisma` - Single source of truth for database structure
 - `prisma/migrations/` - Version-controlled schema changes
 - Generated Prisma client provides type-safe database access
 
 **Migration Workflow**:
+
 1. Modify `prisma/schema.prisma`
 2. Run `npx prisma migrate dev --name <description>`
 3. Commit both schema and migration files
 4. Team runs `npx prisma migrate deploy` on pull
 
 ### Legacy Script Integration
+
 **Emergency Use Only** (`scripts/` directory):
+
 - Use only for data fixes, NOT schema changes
 - Prisma migrations should handle all schema modifications
 - Legacy scripts maintained for troubleshooting and data recovery
@@ -139,6 +147,7 @@ bitcoin-investment-game/
 ## Frontend Architecture (Vanilla JavaScript)
 
 ### Public Directory Structure
+
 ```
 public/
 ├── index.html              # Main SPA entry point
@@ -150,6 +159,7 @@ public/
 ```
 
 ### State Management
+
 - Global `window.app` object for application state
 - JWT token stored in localStorage for session persistence
 - Real-time price updates every 30 seconds
@@ -158,11 +168,13 @@ public/
 ## Development Workflow Files
 
 ### Environment Configuration
+
 - `.env` - Environment variables (database, JWT, email config)
 - `.env.example` - Template for required environment variables
 - `.gitignore` - Excludes sensitive files and temporary directories
 
 ### Package Management
+
 - `package.json` - Dependencies and npm scripts including Prisma commands
 - `package-lock.json` - Locked dependency versions
 - Node.js version specified for team consistency
@@ -170,12 +182,14 @@ public/
 ## Temporary Files Management
 
 ### .temp/ Directory Structure
+
 **Purpose**: Store temporary test files, screenshots, quick experiments, and test results
 **Usage**: Always use `.temp/` directory instead of putting temporary files in project root
 **Cleanup**: Consider these files disposable - they can be deleted anytime
 **Git**: All files in `.temp/` are ignored by git and won't be committed
 
 ### QA Testing Outputs
+
 - **Screenshots**: Visual evidence of bugs and test results
 - **Test Reports**: Structured findings from playwright-qa-tester agent
 - **Financial Validation**: Results of portfolio calculation accuracy tests
@@ -184,12 +198,14 @@ public/
 ## Configuration Management
 
 ### Claude Code Integration
-- **Agent Configurations**: Bitcoin investment game specific testing agents
+
+- **Agent Configurations**: Measure Everything in Bitcoin specific testing agents
 - **Command Configurations**: Custom commit commands with project-specific logic
 - **MCP Integration**: Playwright testing automation setup
 - **Settings**: Personal Claude configurations (not committed to git)
 
 ### Development Tools
+
 - **Prisma Studio**: Database browser accessible via `npx prisma studio`
 - **Migration Tools**: `npx prisma migrate` commands for schema management
 - **Client Generation**: `npx prisma generate` for type-safe database access

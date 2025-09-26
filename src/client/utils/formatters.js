@@ -35,8 +35,8 @@ export function formatSatoshisForUI(sats, compact = false) {
         }
     }
 
-    // Full precision for main displays
-    return btc < 0.001 ? `${btc.toFixed(8)} BTC` : `${btc.toFixed(4)} BTC`;
+    // Full precision for main displays: always show 8 decimals to reflect small changes
+    return `${btc.toFixed(8)} BTC`;
 }
 
 /**

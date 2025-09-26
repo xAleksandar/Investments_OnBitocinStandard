@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Basic test runner for Bitcoin Investment Game QA tests
+# Basic test runner for Measure Everything in Bitcoin QA tests
 # Runs a subset of critical smoke tests for quick validation
 
-echo "🚀 Starting Basic QA Tests for Bitcoin Investment Game"
+echo "🚀 Starting Basic QA Tests for Measure Everything in Bitcoin"
 echo "=============================================="
 
 # Check if server is running

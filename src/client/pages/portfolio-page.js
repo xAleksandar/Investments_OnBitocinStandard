@@ -52,17 +52,12 @@ export class PortfolioPage {
      * Initialize the portfolio page component
      */
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+return;
+}
 
         try {
             console.log('Initializing portfolio page component');
-
-            // Check authentication
-            if (!this.services.authService?.isAuthenticated()) {
-                this.services.notificationService?.showError('Please login to access your portfolio');
-                window.location.hash = '#login';
-                return;
-            }
 
             // Get DOM elements
             this.initializeDOMElements();
@@ -83,6 +78,10 @@ export class PortfolioPage {
             console.log('Portfolio page component initialized successfully');
         } catch (error) {
             console.error('Failed to initialize portfolio page:', error);
+             // Check authentication
+            if (!this.services.authService?.isAuthenticated()) {
+                return;
+            }
             this.services.notificationService?.showError('Failed to load portfolio page');
         }
     }
@@ -93,7 +92,8 @@ export class PortfolioPage {
     initializeDOMElements() {
         this.holdingsGrid = getElementById('holdings');
         this.tradeForm = getElementById('tradeForm');
-        this.assetDetailsModal = getElementById('assetDetailsModal');
+        // Support both new and legacy modal IDs
+        this.assetDetailsModal = getElementById('assetDetailsModal') || getElementById('assetModal');
         this.tradingInterface = getElementById('tradingInterface');
     }
 
@@ -101,7 +101,9 @@ export class PortfolioPage {
      * Set up event listeners
      */
     setupEventListeners() {
-        if (this.mainAppListenersSetup) return;
+        if (this.mainAppListenersSetup) {
+return;
+}
         this.mainAppListenersSetup = true;
 
         // Trade form submission
@@ -219,7 +221,8 @@ export class PortfolioPage {
             this.initializeTradingInterface(),
             this.initializeAssetDetailsModal(),
             this.initializePriceChart(),
-            this.updateAssetDropdowns()
+            this.updateAssetDropdowns(),
+            this.initializeSetForgetPortfolios()
         ]);
     }
 
@@ -228,7 +231,9 @@ export class PortfolioPage {
      */
     async initializePriceChart() {
         const container = getElementById('tradingview-widget-container');
-        if (!container) return;
+        if (!container) {
+return;
+}
 
         // Clear any existing content
         container.innerHTML = '';
@@ -295,7 +300,9 @@ export class PortfolioPage {
      * Initialize portfolio grid component
      */
     async initializePortfolioGrid() {
-        if (!this.holdingsGrid) return;
+        if (!this.holdingsGrid) {
+return;
+}
 
         // Display current portfolio
         this.displayPortfolio();
@@ -308,7 +315,9 @@ export class PortfolioPage {
      * Initialize trading interface component
      */
     async initializeTradingInterface() {
-        if (!this.tradingInterface) return;
+        if (!this.tradingInterface) {
+return;
+}
 
         // Set up trading form validation
         this.setupTradingValidation();
@@ -321,17 +330,320 @@ export class PortfolioPage {
      * Initialize asset details modal component
      */
     async initializeAssetDetailsModal() {
-        if (!this.assetDetailsModal) return;
+        if (!this.assetDetailsModal) {
+return;
+}
 
         // Set up modal close handlers
         this.setupModalCloseHandlers();
     }
 
     /**
+     * Initialize Set & Forget portfolios UI
+     */
+    async initializeSetForgetPortfolios() {
+        // Button to open creation modal
+        const openBtn = getElementById('createSetForgetBtn');
+        const modal = getElementById('setForgetModal');
+        const closeBtn = getElementById('closeSetForgetModal');
+        const cancelBtn = getElementById('cancelSetForget');
+
+        if (openBtn && modal) {
+            const openHandler = (e) => {
+                e.preventDefault();
+                this.showSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(openBtn, 'click', openHandler));
+        }
+
+        if (closeBtn && modal) {
+            const closeHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(closeBtn, 'click', closeHandler));
+        }
+
+        if (cancelBtn && modal) {
+            const cancelHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(cancelBtn, 'click', cancelHandler));
+        }
+
+        // Close when clicking backdrop (but not inner content)
+        if (modal) {
+            const backdropHandler = (e) => {
+                if (e.target === modal) {
+this.hideSetForgetModal();
+}
+            };
+            this.eventListeners.push(addEventListener(modal, 'click', backdropHandler));
+        }
+
+        // Form submit
+        const form = getElementById('setForgetForm');
+        if (form) {
+            const submitHandler = (e) => {
+                e.preventDefault();
+                this.createSetForgetPortfolio();
+            };
+            this.eventListeners.push(addEventListener(form, 'submit', submitHandler));
+        }
+    }
+
+    // ===== Set & Forget (ported popup behavior) =====
+
+    async showSetForgetModal() {
+        const modal = getElementById('setForgetModal');
+        if (!modal) {
+return;
+}
+        try {
+            this.setForgetAssets = await (this.services.apiClient?.getAssets() || []);
+        } catch (_) {
+ this.setForgetAssets = [];
+}
+        this.resetSetForgetForm();
+        this.initAllocationChart();
+        this.addAllocationInput();
+        showElement(modal);
+        const cs = window.getComputedStyle(modal);
+        if (cs.display === 'none') {
+modal.style.display = 'block';
+}
+    }
+
+    hideSetForgetModal() {
+        const modal = getElementById('setForgetModal');
+        if (modal) {
+hideElement(modal);
+}
+        this.resetSetForgetForm();
+    }
+
+    resetSetForgetForm() {
+        const form = getElementById('setForgetForm');
+        if (form) {
+form.reset();
+}
+        const container = getElementById('allocationInputs');
+        if (container) {
+container.innerHTML = '';
+}
+        this.updateAllocationTotal();
+        this.clearAllocationChart?.();
+    }
+
+    addAllocationInput() {
+        const container = getElementById('allocationInputs');
+        if (!container) {
+return;
+}
+        const row = document.createElement('div');
+        row.className = 'allocation-input flex items-center gap-3';
+        const select = document.createElement('select');
+        select.className = 'asset-select w-full px-3 py-2 border rounded-lg';
+        select.appendChild(new Option('Select Asset', ''));
+        (this.setForgetAssets || []).forEach(a => {
+            const name = a?.name && a.name.trim() ? a.name : a.symbol;
+            select.appendChild(new Option(`${name} (${a.symbol})`, a.symbol));
+        });
+        const pct = document.createElement('input');
+        pct.type = 'number'; pct.min = '0'; pct.max = '100'; pct.step = '0.1';
+        pct.placeholder = '%';
+        pct.className = 'percentage-input w-24 px-3 py-2 border rounded-lg';
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50';
+        remove.textContent = 'Remove';
+        row.appendChild(select); row.appendChild(pct); row.appendChild(remove);
+        container.appendChild(row);
+        select.addEventListener('change', () => {
+ this.updateAssetDropdownsForSetForget(); this.ensureOneEmptyAllocation();
+});
+        pct.addEventListener('input', () => {
+ this.updateAllocationTotal(); this.updateAllocationChart(); this.ensureOneEmptyAllocation();
+});
+        remove.addEventListener('click', () => {
+ row.remove(); this.updateAssetDropdownsForSetForget(); this.updateAllocationTotal(); this.updateAllocationChart(); this.ensureOneEmptyAllocation();
+});
+    }
+
+    ensureOneEmptyAllocation() {
+        const total = this.getCurrentAllocationTotal();
+        if (total >= 100) {
+return;
+}
+        const empties = Array.from(document.querySelectorAll('.allocation-input')).filter(d => !(d.querySelector('.asset-select')?.value));
+        if (empties.length === 0) {
+this.addAllocationInput();
+}
+        if (empties.length > 1) {
+for (let i = 1; i < empties.length; i++) {
+empties[i].remove();
+}
+}
+    }
+
+    getCurrentAllocationTotal() {
+        let total = 0;
+        document.querySelectorAll('.percentage-input').forEach(inp => total += (parseFloat(inp.value) || 0));
+        return total;
+    }
+
+    updateAllocationTotal() {
+        const total = this.getCurrentAllocationTotal();
+        const el = getElementById('totalAllocation');
+        if (el) {
+            el.textContent = `${total.toFixed(2)}%`;
+            el.className = total === 100 ? 'font-medium text-green-600' : total > 100 ? 'font-medium text-red-600' : 'font-medium text-gray-700';
+        }
+        const submit = getElementById('createSetForgetSubmit');
+        if (submit) {
+submit.disabled = total !== 100 || this.getValidAllocations().length === 0 || this.hasUnselectedAssets();
+}
+    }
+
+    updateAssetDropdownsForSetForget() {
+        const all = new Set((this.setForgetAssets || []).map(a => a.symbol));
+        document.querySelectorAll('.asset-select').forEach(sel => {
+            const current = sel.value;
+            const selected = new Set();
+            document.querySelectorAll('.asset-select').forEach(s => {
+ if (s !== sel && s.value) {
+selected.add(s.value);
+}
+});
+            sel.querySelectorAll('option').forEach(opt => {
+                if (!opt.value) {
+return;
+}
+                opt.disabled = selected.has(opt.value) || !all.has(opt.value);
+            });
+            if (current) {
+sel.value = current;
+}
+        });
+    }
+
+    getValidAllocations() {
+        const rows = document.querySelectorAll('.allocation-input');
+        const out = [];
+        rows.forEach(r => {
+            const sym = r.querySelector('.asset-select')?.value;
+            const pct = parseFloat(r.querySelector('.percentage-input')?.value) || 0;
+            if (sym && pct >= 5) {
+out.push({ asset: sym, percentage: pct });
+}
+        });
+        return out;
+    }
+
+    hasUnselectedAssets() {
+        const rows = document.querySelectorAll('.allocation-input');
+        for (const r of rows) {
+            const sym = r.querySelector('.asset-select')?.value;
+            const pct = parseFloat(r.querySelector('.percentage-input')?.value) || 0;
+            if (!sym && pct > 0) {
+return true;
+}
+        }
+        return false;
+    }
+
+    initAllocationChart() {
+        this.allocationChart = {
+            canvas: getElementById('allocationChart'),
+            colors: ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+        };
+        this.clearAllocationChart();
+    }
+
+    updateAllocationChart() {
+        if (!this.allocationChart?.canvas) {
+return;
+}
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2, cy = canvas.height / 2, r = Math.min(cx, cy) - 20;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const allocs = this.getValidAllocations();
+        const total = allocs.reduce((s, a) => s + a.percentage, 0);
+        if (allocs.length === 0 || total === 0) {
+ this.clearAllocationChart(); return;
+}
+        let ang = -Math.PI / 2;
+        allocs.forEach((a, i) => {
+            const slice = (a.percentage / 100) * 2 * Math.PI;
+            const color = this.allocationChart.colors[i % this.allocationChart.colors.length];
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, ang, ang + slice); ctx.closePath();
+            ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ang += slice;
+        });
+        this.updateChartLegend(allocs);
+    }
+
+    updateChartLegend(allocs) {
+        const legend = getElementById('chartLegend');
+        if (!legend) {
+return;
+}
+        legend.innerHTML = allocs.map((a, i) => {
+            const color = this.allocationChart.colors[i % this.allocationChart.colors.length];
+            return `<div class="flex items-center gap-2"><div class="w-4 h-4 rounded" style="background-color:${color}"></div><span class="text-sm">${a.asset} (${a.percentage.toFixed(1)}%)</span></div>`;
+        }).join('');
+    }
+
+    clearAllocationChart() {
+        const canvas = this.allocationChart?.canvas;
+        if (!canvas) {
+return;
+}
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) / 2 - 20, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+        const legend = getElementById('chartLegend');
+        if (legend) {
+legend.innerHTML = '<p class="text-gray-500 text-sm">Add allocations to see preview</p>';
+}
+    }
+
+    async createSetForgetPortfolio() {
+        const nameEl = getElementById('setForgetName');
+        const name = nameEl?.value?.trim();
+        const total = this.getCurrentAllocationTotal();
+        const allocations = this.getValidAllocations();
+        if (!name || allocations.length === 0 || Math.abs(total - 100) > 0.01) {
+            this.services.notificationService?.showError('Please enter name and make allocations sum to 100%');
+            return;
+        }
+        const payload = { name, allocations: allocations.map(a => ({ asset_symbol:a.asset, allocation_percentage:a.percentage })) };
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await fetch('/api/set-forget-portfolios', {
+                method:'POST', headers:{ 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) }, body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+throw new Error(data?.error || 'Failed to create portfolio');
+}
+            this.services.notificationService?.showSuccess('Set & Forget portfolio created successfully!');
+            this.hideSetForgetModal();
+        } catch (e) {
+            console.error('Set&Forget create error:', e);
+            this.services.notificationService?.showError(e.message || 'Failed to create portfolio');
+        }
+    }
+
+    /**
      * Display portfolio data
      */
     displayPortfolio() {
-        if (!this.services.portfolioService) return;
+        if (!this.services.portfolioService) {
+return;
+}
 
         // Get portfolio data
         const holdings = this.services.portfolioService.getHoldings();
@@ -382,7 +694,9 @@ export class PortfolioPage {
      * @param {Array} holdings - Array of holdings
      */
     updateHoldingsGrid(holdings) {
-        if (!this.holdingsGrid) return;
+        if (!this.holdingsGrid) {
+return;
+}
 
         clearElement(this.holdingsGrid);
 
@@ -530,7 +844,7 @@ export class PortfolioPage {
      * Set up modal close handlers
      */
     setupModalCloseHandlers() {
-        const closeModalBtn = getElementById('closeAssetDetailsModal');
+        const closeModalBtn = getElementById('closeAssetDetailsModal') || getElementById('closeModal');
         if (closeModalBtn) {
             const closeHandler = () => this.hideAssetDetailsModal();
             this.eventListeners.push(
@@ -558,7 +872,9 @@ export class PortfolioPage {
         const fromAssetSelect = getElementById('fromAsset');
         const toAssetSelect = getElementById('toAsset');
 
-        if (!fromAssetSelect || !toAssetSelect) return;
+        if (!fromAssetSelect || !toAssetSelect) {
+return;
+}
 
         try {
             // Get available assets
@@ -618,7 +934,9 @@ export class PortfolioPage {
         // Clear amount input if assets are invalid
         if (fromAsset === toAsset && fromAsset) {
             const tradeAmountInput = getElementById('tradeAmount');
-            if (tradeAmountInput) tradeAmountInput.value = '';
+            if (tradeAmountInput) {
+tradeAmountInput.value = '';
+}
         }
     }
 
@@ -627,7 +945,9 @@ export class PortfolioPage {
      */
     handleTradeAmountInput() {
         const validation = this.validateCurrentTradeAmount();
-        if (validation) this.displayAmountValidation(validation);
+        if (validation) {
+this.displayAmountValidation(validation);
+}
     }
 
     /**
@@ -636,7 +956,9 @@ export class PortfolioPage {
     validateCurrentTradeAmount() {
         const fromAsset = getElementById('fromAsset')?.value;
         const amountInput = getElementById('tradeAmount');
-        if (!fromAsset || !amountInput) return null;
+        if (!fromAsset || !amountInput) {
+return null;
+}
 
         const unitSelect = getElementById('amountUnit');
         const unit = unitSelect?.value || 'btc';
@@ -655,7 +977,9 @@ export class PortfolioPage {
      */
     convertToSats(amount, unit) {
         const num = Number(amount);
-        if (isNaN(num)) return 0;
+        if (isNaN(num)) {
+return 0;
+}
         switch ((unit || 'btc').toLowerCase()) {
             case 'btc':
                 return Math.round(num * 100000000);
@@ -697,7 +1021,9 @@ export class PortfolioPage {
      * Execute trade
      */
     async executeTrade() {
-        if (this.isTrading) return;
+        if (this.isTrading) {
+return;
+}
 
         const fromAsset = getElementById('fromAsset')?.value;
         const toAsset = getElementById('toAsset')?.value;
@@ -826,7 +1152,9 @@ export class PortfolioPage {
      */
     updateAvailableBalance(fromAsset) {
         const balanceDisplay = getElementById('availableBalance');
-        if (!balanceDisplay || !fromAsset) return;
+        if (!balanceDisplay || !fromAsset) {
+return;
+}
 
         const holding = this.holdings.find(h => h.asset_symbol === fromAsset);
         if (holding) {
@@ -889,11 +1217,21 @@ export class PortfolioPage {
         const tradeHelper = getElementById('tradeHelper');
         const availableBalance = getElementById('availableBalance');
 
-        if (fromAsset) fromAsset.value = '';
-        if (toAsset) toAsset.value = '';
-        if (tradeAmount) tradeAmount.value = '';
-        if (tradeHelper) setText(tradeHelper, '');
-        if (availableBalance) setText(availableBalance, '');
+        if (fromAsset) {
+fromAsset.value = '';
+}
+        if (toAsset) {
+toAsset.value = '';
+}
+        if (tradeAmount) {
+tradeAmount.value = '';
+}
+        if (tradeHelper) {
+setText(tradeHelper, '');
+}
+        if (availableBalance) {
+setText(availableBalance, '');
+}
     }
 
     /**
@@ -903,8 +1241,88 @@ export class PortfolioPage {
      * @param {string} name - Asset name
      */
     populateAssetDetailsModal(details, symbol, name) {
-        // Modal population logic would go here
-        console.log('Populating asset details modal:', { details, symbol, name });
+        const titleEl = getElementById('modalTitle');
+        const contentEl = getElementById('modalContent');
+        if (titleEl) {
+titleEl.textContent = `${name || symbol} (${symbol}) Purchase History`;
+}
+        if (!contentEl) {
+return;
+}
+
+        const purchases = Array.isArray(details.purchases) ? details.purchases : [];
+        const sales = Array.isArray(details.sales) ? details.sales : [];
+
+        if (purchases.length === 0 && sales.length === 0) {
+            contentEl.innerHTML = '<p class="text-gray-500">No transactions found for this asset.</p>';
+            return;
+        }
+
+        let content = '';
+        if (purchases.length > 0) {
+            content += '<h4 class="font-semibold mb-2">Individual Purchases</h4>';
+            content += '<div class="overflow-x-auto mb-4">';
+            content += '<table class="w-full text-sm">';
+            content += `
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Date</th>
+                        <th class="text-left p-2">Amount</th>
+                        <th class="text-left p-2">BTC Spent</th>
+                        <th class="text-left p-2">Status</th>
+                        <th class="text-left p-2">Unlocks</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            purchases.forEach(p => {
+                const amount = (Number(p.amount) / 100000000).toFixed(8);
+                const btcSpent = (Number(p.btc_spent) / 100000000).toFixed(8);
+                const isLocked = !!p.is_locked;
+                const unlockDate = p.locked_until ? new Date(p.locked_until).toLocaleString() : 'N/A';
+                content += `
+                    <tr class="border-b ${isLocked ? 'bg-red-50' : 'bg-green-50'}">
+                        <td class="p-2">${new Date(p.created_at).toLocaleDateString()}</td>
+                        <td class="p-2">${amount} ${symbol}</td>
+                        <td class="p-2">${btcSpent} BTC</td>
+                        <td class="p-2"><span class="${isLocked ? 'text-red-600' : 'text-green-600'}">${isLocked ? '🔒 Locked' : '✅ Unlocked'}</span></td>
+                        <td class="p-2 text-xs">${isLocked ? unlockDate : 'Available'}</td>
+                    </tr>
+                `;
+            });
+            content += '</tbody></table></div>';
+        }
+
+        if (sales.length > 0) {
+            content += '<h4 class="font-semibold mb-2">Sales History</h4>';
+            content += '<div class="overflow-x-auto">';
+            content += '<table class="w-full text-sm">';
+            content += `
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Date</th>
+                        <th class="text-left p-2">Sold</th>
+                        <th class="text-left p-2">Received</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            sales.forEach(s => {
+                const soldAmount = (Number(s.fromAmount ?? s.from_amount) / 100000000).toFixed(8);
+                const receivedBTC = (Number(s.toAmount ?? s.to_amount) / 100000000).toFixed(8);
+                const dateStr = new Date(s.createdAt ?? s.created_at).toLocaleDateString();
+                content += `
+                    <tr class="border-b">
+                        <td class="p-2">${dateStr}</td>
+                        <td class="p-2">${soldAmount} ${symbol}</td>
+                        <td class="p-2">${receivedBTC} BTC</td>
+                    </tr>
+                `;
+            });
+            content += '</tbody></table></div>';
+        }
+
+        contentEl.innerHTML = content;
     }
 
     /**

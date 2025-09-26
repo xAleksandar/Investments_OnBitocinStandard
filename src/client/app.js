@@ -349,13 +349,13 @@ continue;
 return;
 }
 
-            // Check if user exists
-            const response = await this.services.apiClient.post('/api/auth/check-user', { email });
+            // Check if user exists (API client unwraps {success,data})
+            const response = await this.services.apiClient.checkUser(email);
             const usernameField = document.getElementById('usernameField');
 
             console.log('🔍 User existence check:', { email, response });
 
-            if (!response.data.exists && usernameField) {
+            if (response && response.exists === false && usernameField) {
                 // Show username field for new users
                 usernameField.style.display = 'block';
                 const usernameInput = document.getElementById('username');
