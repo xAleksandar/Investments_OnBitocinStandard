@@ -448,12 +448,19 @@ class PortfolioService {
      * Execute a trade
      * @param {string} fromAsset - Source asset symbol
      * @param {string} toAsset - Target asset symbol
-     * @param {number} amount - Amount to trade
+     * @param {number|string} amount - Amount to trade (raw, paired with unit)
+     * @param {string} unit - Unit of amount ('btc'|'sat'|'ksat'|'msat'|'asset')
      * @returns {Promise<Object>} Trade result
      */
-    async executeTrade(fromAsset, toAsset, amount) {
+    async executeTrade(fromAsset, toAsset, amount, unit) {
         try {
-            const result = await this.apiClient.executeTrade(fromAsset, toAsset, amount);
+            // Support object-style payload for backward compatibility
+            if (typeof fromAsset === 'object' && fromAsset !== null) {
+                const data = fromAsset;
+                return await this.apiClient.executeTrade(data.fromAsset, data.toAsset, data.amount, data.unit);
+            }
+
+            const result = await this.apiClient.executeTrade(fromAsset, toAsset, amount, unit);
 
             // Reload portfolio after successful trade
             await this.loadPortfolio();
@@ -530,8 +537,8 @@ class PortfolioService {
      * Trade and conversion methods for user actions
      */
     async convertAsset(data) {
-        // Alias for executeTrade with specific conversion logic
-        return await this.executeTrade(data.fromAsset, data.toAsset, data.amount);
+        // Alias for executeTrade with explicit unit
+        return await this.executeTrade(data.fromAsset, data.toAsset, data.amount, data.unit);
     }
 
     async exportPortfolio(format = 'json') {

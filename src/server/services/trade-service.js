@@ -108,19 +108,42 @@ class TradeService extends BaseService {
     }
 
     async getAssetPrices(tx, symbols) {
+        // Try database cache first
         const assets = await tx.asset.findMany({
-            where: {
-                symbol: { in: symbols }
-            }
+            where: { symbol: { in: symbols } }
         });
 
         const assetPrices = {};
         assets.forEach(asset => {
-            assetPrices[asset.symbol] = parseFloat(asset.currentPriceUsd);
+            const price = parseFloat(asset.currentPriceUsd);
+            if (!isNaN(price)) {
+                assetPrices[asset.symbol] = price;
+            }
         });
 
+        // If any price missing, fetch on-demand and cache
+        const missing = symbols.filter(sym => assetPrices[sym] === undefined || assetPrices[sym] === null);
+        if (missing.length > 0) {
+            try {
+                const PriceCacheService = require('./price-cache-service');
+                const priceCache = new PriceCacheService();
+                const fetched = await priceCache.getPrices(missing);
+
+                // Merge fetched prices
+                Object.entries(fetched).forEach(([sym, price]) => {
+                    if (typeof price === 'number' && !isNaN(price)) {
+                        assetPrices[sym] = price;
+                    }
+                });
+            } catch (e) {
+                // Non-fatal; will validate below
+                console.warn('Price fetch fallback failed:', e.message);
+            }
+        }
+
+        // Validate presence of BTC and all required symbols
         const btcPrice = assetPrices['BTC'];
-        const requiredPrices = symbols.every(symbol => assetPrices[symbol]);
+        const requiredPrices = symbols.every(symbol => typeof assetPrices[symbol] === 'number' && !isNaN(assetPrices[symbol]));
 
         if (!btcPrice || !requiredPrices) {
             throw new Error('Asset prices not available');

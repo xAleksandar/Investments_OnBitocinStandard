@@ -144,6 +144,7 @@ export class PortfolioPage {
 
         // Trade amount input
         const tradeAmountInput = getElementById('tradeAmount');
+        const amountUnitSelect = getElementById('amountUnit');
         if (tradeAmountInput) {
             const amountInputHandler = () => this.handleTradeAmountInput();
             this.eventListeners.push(
@@ -492,6 +493,8 @@ export class PortfolioPage {
             const validateAssets = () => {
                 const validation = validateAssetPair(fromAssetSelect.value, toAssetSelect.value);
                 this.displayAssetValidation(validation);
+                // Also re-validate amount when asset changes (unit conversion may differ)
+                this.handleTradeAmountInput();
             };
 
             addEventListener(fromAssetSelect, 'change', validateAssets);
@@ -501,11 +504,14 @@ export class PortfolioPage {
         // Amount validation
         if (tradeAmountInput && fromAssetSelect) {
             const validateAmount = () => {
-                const validation = validateTradeAmount(tradeAmountInput.value, fromAssetSelect.value);
+                const validation = this.validateCurrentTradeAmount();
                 this.displayAmountValidation(validation);
             };
 
             addEventListener(tradeAmountInput, 'input', validateAmount);
+            if (amountUnitSelect) {
+                addEventListener(amountUnitSelect, 'change', validateAmount);
+            }
         }
     }
 
@@ -569,13 +575,20 @@ export class PortfolioPage {
             // Add asset options based on holdings for "from" dropdown
             this.holdings.forEach(holding => {
                 const asset = assets.find(a => a.symbol === holding.asset_symbol);
-                const displayName = asset ? `${asset.name} (${asset.symbol})` : holding.asset_symbol;
-                fromAssetSelect.appendChild(createElement('option', { value: holding.asset_symbol }, displayName));
+                const name = asset && typeof asset.name === 'string' && asset.name.trim()
+                    ? asset.name
+                    : holding.asset_symbol;
+                const symbol = holding.asset_symbol;
+                const displayName = `${name} (${symbol})`;
+                fromAssetSelect.appendChild(createElement('option', { value: symbol }, displayName));
             });
 
-            // Add all assets to "to" dropdown
+            // Add all assets to "to" dropdown (fallback if name missing)
             assets.forEach(asset => {
-                const displayName = `${asset.name} (${asset.symbol})`;
+                const name = asset && typeof asset.name === 'string' && asset.name.trim()
+                    ? asset.name
+                    : asset.symbol;
+                const displayName = `${name} (${asset.symbol})`;
                 toAssetSelect.appendChild(createElement('option', { value: asset.symbol }, displayName));
             });
 
@@ -613,12 +626,49 @@ export class PortfolioPage {
      * Handle trade amount input
      */
     handleTradeAmountInput() {
-        const fromAsset = getElementById('fromAsset')?.value;
-        const amount = getElementById('tradeAmount')?.value;
+        const validation = this.validateCurrentTradeAmount();
+        if (validation) this.displayAmountValidation(validation);
+    }
 
-        if (fromAsset && amount) {
-            const validation = validateTradeAmount(amount, fromAsset);
-            this.displayAmountValidation(validation);
+    /**
+     * Validate current trade amount considering unit selection
+     */
+    validateCurrentTradeAmount() {
+        const fromAsset = getElementById('fromAsset')?.value;
+        const amountInput = getElementById('tradeAmount');
+        if (!fromAsset || !amountInput) return null;
+
+        const unitSelect = getElementById('amountUnit');
+        const unit = unitSelect?.value || 'btc';
+        const raw = amountInput.value;
+
+        // For BTC, convert to sats for validation; for others, raw amount is fine
+        if (fromAsset === 'BTC') {
+            const sats = this.convertToSats(raw, unit);
+            return validateTradeAmount(sats, fromAsset);
+        }
+        return validateTradeAmount(raw, fromAsset);
+    }
+
+    /**
+     * Convert UI amount to satoshis based on unit
+     */
+    convertToSats(amount, unit) {
+        const num = Number(amount);
+        if (isNaN(num)) return 0;
+        switch ((unit || 'btc').toLowerCase()) {
+            case 'btc':
+                return Math.round(num * 100000000);
+            case 'msat':
+                // UI label says mSats but to avoid server mismatch we'll convert to sats here if used
+                // Assume mSats means 1/100 BTC (legacy label). Convert to sats accordingly.
+                return Math.round(num * 1000000);
+            case 'ksat':
+                return Math.round(num * 1000);
+            case 'sat':
+                return Math.round(num);
+            default:
+                return Math.round(num * 100000000);
         }
     }
 
@@ -651,11 +701,19 @@ export class PortfolioPage {
 
         const fromAsset = getElementById('fromAsset')?.value;
         const toAsset = getElementById('toAsset')?.value;
-        const amount = parseFloat(getElementById('tradeAmount')?.value);
+        const rawAmount = parseFloat(getElementById('tradeAmount')?.value);
+        const unitSelect = getElementById('amountUnit');
+        const unitChoice = unitSelect?.value || 'btc';
 
         // Validate inputs
         const assetValidation = validateAssetPair(fromAsset, toAsset);
-        const amountValidation = validateTradeAmount(amount, fromAsset);
+        let amountForValidation;
+        if (fromAsset === 'BTC') {
+            amountForValidation = this.convertToSats(rawAmount, unitChoice);
+        } else {
+            amountForValidation = rawAmount;
+        }
+        const amountValidation = validateTradeAmount(amountForValidation, fromAsset);
 
         if (!assetValidation.isValid) {
             this.services.notificationService?.showError(assetValidation.message);
@@ -672,16 +730,29 @@ export class PortfolioPage {
             this.updateTradeButtonState(true);
 
             // Execute trade through portfolio service
-            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, amount);
-
-            if (result?.success) {
-                this.services.notificationService?.showTradeSuccess(result.trade);
-                this.clearTradeForm();
-
-                // Portfolio will be refreshed through service listener
+            let payloadAmount, payloadUnit;
+            if (fromAsset === 'BTC') {
+                // Send sats to align with server validation and conversion
+                payloadAmount = this.convertToSats(rawAmount, unitChoice);
+                payloadUnit = 'sat';
             } else {
+                // Selling asset: send in asset units with 'asset' unit
+                payloadAmount = rawAmount;
+                payloadUnit = 'asset';
+            }
+
+            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, payloadAmount, payloadUnit);
+
+            // API client unwraps { success, data } → returns data object
+            // Accept either { trade, message } or a raw trade object
+            const tradeDetails = result?.trade || result;
+            if (!tradeDetails) {
                 throw new Error(result?.error || 'Trade failed');
             }
+
+            this.services.notificationService?.showTradeSuccess(tradeDetails);
+            this.clearTradeForm();
+            // Portfolio refresh happens via service listener
 
         } catch (error) {
             console.error('Trade execution failed:', error);

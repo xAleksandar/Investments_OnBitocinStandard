@@ -207,11 +207,12 @@ class ApiClient {
      * Execute a trade
      * @param {string} fromAsset - Source asset symbol
      * @param {string} toAsset - Target asset symbol
-     * @param {number} amount - Amount to trade
+     * @param {number|string} amount - Amount to trade (raw number based on unit)
+     * @param {string} unit - Unit of amount ('btc'|'sat'|'ksat'|'msat'|'asset')
      * @returns {Promise<Object>} Trade result
      */
-    async executeTrade(fromAsset, toAsset, amount) {
-        return this.post('/api/trades/execute', { fromAsset, toAsset, amount });
+    async executeTrade(fromAsset, toAsset, amount, unit) {
+        return this.post('/api/trades/execute', { fromAsset, toAsset, amount, unit });
     }
 
     /**
