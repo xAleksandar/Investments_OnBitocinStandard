@@ -144,8 +144,11 @@ export class LanguageSwitcher {
         langOptions.forEach(option => {
             const cleanup = addEventListener(option, 'click', (e) => {
                 e.preventDefault();
-                const langCode = option.dataset.language;
+                e.stopPropagation();
+                const langCode = option.dataset.language || option.dataset.lang;
                 if (langCode) {
+                    // Close immediately for snappy UX
+                    this.closeDropdown();
                     this.switchLanguage(langCode);
                 }
             });
@@ -421,8 +424,11 @@ return;
         options.forEach(option => {
             const cleanup = addEventListener(option, 'click', (e) => {
                 e.preventDefault();
-                const langCode = option.dataset.language;
+                e.stopPropagation();
+                const langCode = option.dataset.language || option.dataset.lang;
                 if (langCode) {
+                    // Close immediately to reflect selection
+                    this.closeDropdown();
                     this.switchLanguage(langCode);
                 }
             });
@@ -460,8 +466,11 @@ return;
         options.forEach(option => {
             const cleanup = addEventListener(option, 'click', (e) => {
                 e.preventDefault();
-                const langCode = option.dataset.language;
+                e.stopPropagation();
+                const langCode = option.dataset.language || option.dataset.lang;
                 if (langCode) {
+                    // Close immediately
+                    this.closeDropdown();
                     this.switchLanguage(langCode);
                 }
             });
