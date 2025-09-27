@@ -102,7 +102,7 @@ return;
         // Listen for language changes so description updates
         if (!this._langListener) {
             this._langListener = () => this.updateAssetDescription();
-            window.addEventListener('languageChanged', this._langListener);
+            window.addEventListener('languageChange', this._langListener);
         }
         this.renderChart();
     }
@@ -132,7 +132,7 @@ return;
         }
         if (this._langListener) {
             try {
- window.removeEventListener('languageChanged', this._langListener);
+ window.removeEventListener('languageChange', this._langListener);
 } catch {}
             this._langListener = null;
         }

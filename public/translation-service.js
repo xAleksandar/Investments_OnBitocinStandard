@@ -1,6 +1,6 @@
 class TranslationService {
     constructor() {
-        this.currentLanguage = localStorage.getItem('preferred_language') || 'en';
+        this.currentLanguage = localStorage.getItem('language') || 'en';
         this.translations = {};
         this.isReady = false;
         this.readyPromise = null;
@@ -20,6 +20,18 @@ class TranslationService {
             const translationModule = await import(`./translations/${this.currentLanguage}.js`);
             this.translations = translationModule.default || translationModule.translations;
             this.isReady = true;
+
+            // Auto-update page translations when ready (if DOM is loaded)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.updatePageTranslations();
+                    this.notifyLanguageReady();
+                });
+            } else {
+                // DOM is already loaded, update immediately
+                this.updatePageTranslations();
+                this.notifyLanguageReady();
+            }
         } catch (error) {
             console.warn(`Failed to load translations for ${this.currentLanguage}, falling back to English`);
             if (this.currentLanguage !== 'en') {
@@ -28,6 +40,18 @@ class TranslationService {
                 this.translations = englishModule.default || englishModule.translations;
             }
             this.isReady = true;
+
+            // Auto-update page translations when ready (if DOM is loaded)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.updatePageTranslations();
+                    this.notifyLanguageReady();
+                });
+            } else {
+                // DOM is already loaded, update immediately
+                this.updatePageTranslations();
+                this.notifyLanguageReady();
+            }
         }
     }
 
@@ -43,12 +67,12 @@ class TranslationService {
         if (language === this.currentLanguage) return;
 
         this.currentLanguage = language;
-        localStorage.setItem('preferred_language', language);
+        localStorage.setItem('language', language);
         await this.loadTranslations();
         await this.updatePageTranslations();
 
         // Trigger a custom event for other components to listen to
-        window.dispatchEvent(new CustomEvent('languageChanged', {
+        window.dispatchEvent(new CustomEvent('languageChange', {
             detail: { language: this.currentLanguage }
         }));
     }
@@ -160,6 +184,15 @@ class TranslationService {
             { code: 'en', name: 'English', nativeName: 'English' },
             { code: 'bg', name: 'Bulgarian', nativeName: 'Български' }
         ];
+    }
+
+    /**
+     * Notify components that translation service is ready with current language
+     */
+    notifyLanguageReady() {
+        window.dispatchEvent(new CustomEvent('languageServiceReady', {
+            detail: { language: this.currentLanguage }
+        }));
     }
 }
 
