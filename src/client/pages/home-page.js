@@ -538,8 +538,7 @@ export class HomePage {
             // Create or update quick stats section
             this.createQuickStatsSection();
 
-            // Show recent activity
-            await this.showRecentActivity();
+            // Recent activity removed per user request
         } catch (error) {
             console.error('Failed to show quick stats:', error);
         }
@@ -554,133 +553,10 @@ export class HomePage {
             hideElement(quickStats);
         }
 
-        const recentActivity = getElementById('homeRecentActivity');
-        if (recentActivity) {
-            hideElement(recentActivity);
-        }
+        // Recent activity component removed
     }
 
-    /**
-     * Show recent activity for authenticated users
-     */
-    async showRecentActivity() {
-        try {
-            if (!this.services.portfolioService) return;
-
-            // Load recent trades if needed
-            const trades = this.services.portfolioService.getTradeHistory();
-            if (!trades.length) {
-                await this.services.portfolioService.loadTradeHistory();
-            }
-
-            // Create or update recent activity section
-            this.createRecentActivitySection();
-        } catch (error) {
-            console.error('Failed to show recent activity:', error);
-        }
-    }
-
-    /**
-     * Create recent activity section
-     */
-    createRecentActivitySection() {
-        let recentActivity = getElementById('homeRecentActivity');
-
-        if (!recentActivity) {
-            recentActivity = document.createElement('div');
-            recentActivity.id = 'homeRecentActivity';
-            recentActivity.className = 'bg-white rounded-lg shadow-md p-6 mb-8';
-
-            // Insert after quick stats
-            const quickStats = getElementById('homeQuickStats');
-            if (quickStats && quickStats.nextSibling) {
-                quickStats.parentNode.insertBefore(recentActivity, quickStats.nextSibling);
-            }
-        }
-
-        // Update recent activity content
-        this.updateRecentActivityContent(recentActivity);
-        showElement(recentActivity);
-    }
-
-    /**
-     * Update recent activity content
-     * @param {HTMLElement} activityElement - Activity container element
-     */
-    updateRecentActivityContent(activityElement) {
-        const portfolioService = this.services.portfolioService;
-        if (!portfolioService) return;
-
-        const trades = portfolioService.getTradeHistory().slice(0, 5); // Show last 5 trades
-
-        let activityHTML = `
-            <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
-        `;
-
-        if (trades.length === 0) {
-            activityHTML += `
-                <div class="text-center py-8 text-gray-500">
-                    <div class="text-4xl mb-2">📊</div>
-                    <div>No trades yet</div>
-                    <div class="text-sm">Start trading to see your activity here</div>
-                </div>
-            `;
-        } else {
-            activityHTML += `<div class="space-y-3">`;
-
-            trades.forEach(trade => {
-                const tradeDate = new Date(trade.created_at).toLocaleDateString();
-                const fromAmount = this.formatTradeAmount(trade.from_amount, trade.from_asset);
-                const toAmount = this.formatTradeAmount(trade.to_amount, trade.to_asset);
-
-                activityHTML += `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span class="text-blue-600 text-sm font-semibold">↔</span>
-                            </div>
-                            <div>
-                                <div class="font-medium">${fromAmount} → ${toAmount}</div>
-                                <div class="text-sm text-gray-500">${tradeDate}</div>
-                            </div>
-                        </div>
-                        <div class="text-sm text-gray-400">
-                            <span class="hover:text-gray-600 cursor-pointer" onclick="window.location.hash='#portfolio'">View Details</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            activityHTML += `</div>`;
-
-            // Add view all link
-            activityHTML += `
-                <div class="mt-4 text-center">
-                    <button onclick="window.location.hash='#portfolio'" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View All Trades →
-                    </button>
-                </div>
-            `;
-        }
-
-        activityElement.innerHTML = activityHTML;
-    }
-
-    /**
-     * Format trade amount for display
-     * @param {number} amount - Raw amount
-     * @param {string} asset - Asset symbol
-     * @returns {string} Formatted amount
-     */
-    formatTradeAmount(amount, asset) {
-        if (asset === 'BTC') {
-            const btc = amount / 100000000;
-            return `${btc.toFixed(8)} BTC`;
-        } else {
-            const actualAmount = amount / 100000000;
-            return `${actualAmount.toFixed(2)} ${asset}`;
-        }
-    }
+    // Recent activity section removed per user request
 
     /**
      * Create quick stats section
@@ -706,37 +582,12 @@ export class HomePage {
     }
 
     /**
-     * Update quick stats content
+     * Update quick stats content - Portfolio at a Glance removed per user request
      * @param {HTMLElement} statsElement - Stats container element
      */
     updateQuickStatsContent(statsElement) {
-        const portfolioService = this.services.portfolioService;
-        if (!portfolioService) return;
-
-        const holdings = portfolioService.getHoldings();
-        const totalValue = holdings.reduce((sum, holding) => sum + (holding.current_value_sats || 0), 0);
-        const baseline = portfolioService.getPortfolioBaseline();
-        const performance = portfolioService.calculatePerformance(totalValue);
-
-        const statsHTML = `
-            <h3 class="text-lg font-semibold mb-4">Your Portfolio at a Glance</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">${formatSatoshisForUI(totalValue)}</div>
-                    <div class="text-sm text-gray-600">Current Value</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold ${performance.isPositive ? 'text-green-600' : 'text-red-600'}">${performance.formatted}</div>
-                    <div class="text-sm text-gray-600">Performance</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-gray-700">${holdings.length}</div>
-                    <div class="text-sm text-gray-600">Assets</div>
-                </div>
-            </div>
-        `;
-
-        statsElement.innerHTML = statsHTML;
+        // Portfolio at a Glance section removed per user request
+        statsElement.style.display = 'none';
     }
 
     /**
@@ -1027,9 +878,7 @@ export class HomePage {
         // Update dynamic content
         this.updateContentForAuthState();
 
-        if (this.services.authService?.isAuthenticated()) {
-            await this.showQuickStats();
-        }
+        // Portfolio at a Glance and Recent Activity sections removed per user request
 
         console.log('Home page rendered');
     }
