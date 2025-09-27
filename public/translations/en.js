@@ -578,7 +578,7 @@ export const translations = {
 
     education: {
         title: 'Education',
-        subtitle: 'Learn about Bitcoin and sound money principles',
+        subtitle: 'Learn about Bitcoin, sound money principles, and why Bitcoin serves as the ultimate measuring stick for value.',
         pages: {
             whyBitcoin: {
                 title: 'Why Bitcoin?',
@@ -593,6 +593,26 @@ export const translations = {
                 subtitle: 'How we arrived at today\'s monetary system'
             }
         },
+        topics: [
+            {
+                id: 'fiat-experiment',
+                title: 'The Fiat Experiment',
+                description: 'How we moved away from sound money',
+                estimatedTime: 10
+            },
+            {
+                id: 'why-not-gold',
+                title: 'Why Not Gold?',
+                description: 'The limitations of gold in the digital age',
+                estimatedTime: 6
+            },
+            {
+                id: 'why-bitcoin',
+                title: 'Why Bitcoin?',
+                description: 'Understanding Bitcoin as neutral, apolitical money',
+                estimatedTime: 8
+            }
+        ],
         backToEducation: 'Back to Education',
         tableOfContents: 'Table of Contents',
         minutesReading: 'min read',
@@ -602,7 +622,10 @@ export const translations = {
         lastUpdated: 'Last updated: {date}',
         shareArticle: 'Share Article',
         relatedTopics: 'Related Topics',
-        furtherReading: 'Further Reading'
+        furtherReading: 'Further Reading',
+        getStarted: 'Get Started',
+        getStartedDescription: 'Begin your journey to understanding Bitcoin as a unit of account. Start with any topic that interests you.',
+        tryPortfolio: 'Try the Portfolio'
     }
 };
 

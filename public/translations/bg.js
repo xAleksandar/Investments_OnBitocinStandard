@@ -563,7 +563,7 @@ export const translations = {
 
     education: {
         title: 'Образование',
-        subtitle: 'Научете за Биткойн и принципите на здравите пари',
+        subtitle: 'Научете за Биткойн, принципите на здравите пари и защо Биткойн служи като крайният мерник за стойност.',
         pages: {
             whyBitcoin: {
                 title: 'Защо Биткойн?',
@@ -578,6 +578,26 @@ export const translations = {
                 subtitle: 'Как стигнахме до днешната парична система'
             }
         },
+        topics: [
+            {
+                id: 'fiat-experiment',
+                title: 'Фиатният експеримент',
+                description: 'Как се отклонихме от здравите пари',
+                estimatedTime: 10
+            },
+            {
+                id: 'why-not-gold',
+                title: 'Защо не злато?',
+                description: 'Ограниченията на златото в дигиталната епоха',
+                estimatedTime: 6
+            },
+            {
+                id: 'why-bitcoin',
+                title: 'Защо Биткойн?',
+                description: 'Разбиране на Биткойн като неутрални, аполитични пари',
+                estimatedTime: 8
+            }
+        ],
         backToEducation: 'Назад към образованието',
         tableOfContents: 'Съдържание',
         minutesReading: 'мин четене',
@@ -587,7 +607,10 @@ export const translations = {
         lastUpdated: 'Последна актуализация: {date}',
         shareArticle: 'Споделяне на статията',
         relatedTopics: 'Свързани теми',
-        furtherReading: 'Допълнително четене'
+        furtherReading: 'Допълнително четене',
+        getStarted: 'Започнете',
+        getStartedDescription: 'Започнете вашето пътешествие към разбирането на Биткойн като разчетна единица. Започнете с която и да е тема, която ви интересува.',
+        tryPortfolio: 'Опитайте портфолиото'
     }
 };
 

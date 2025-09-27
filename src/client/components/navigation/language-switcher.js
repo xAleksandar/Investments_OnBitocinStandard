@@ -20,14 +20,14 @@ export class LanguageSwitcher {
         this.supportedLanguages = [
             {
                 code: 'en',
-                name: 'English',
+                name: '',
                 nativeName: 'English',
                 flag: '🇺🇸',
                 rtl: false
             },
             {
                 code: 'bg',
-                name: 'Bulgarian',
+                name: '',
                 nativeName: 'Български',
                 flag: '🇧🇬',
                 rtl: false
@@ -351,7 +351,9 @@ return;
 
         if (langFlag) {
             // Ensure we don't keep any sprite/background classes like flag-en/bg
-            try { langFlag.className = 'language-flag'; } catch {}
+            try {
+ langFlag.className = 'language-flag';
+} catch {}
             langFlag.textContent = currentLang.flag;
         }
 
