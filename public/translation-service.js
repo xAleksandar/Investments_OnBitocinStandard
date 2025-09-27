@@ -77,7 +77,7 @@ class TranslationService {
         }));
     }
 
-    translate(key, fallback = null) {
+    translate(key, fallback = null, params = {}) {
         const keys = key.split('.');
         let value = this.translations;
 
@@ -89,7 +89,16 @@ class TranslationService {
             }
         }
 
-        return value || fallback || key;
+        let result = value || fallback || key;
+
+        // Replace parameters in the format {paramName}
+        if (typeof result === 'string' && Object.keys(params).length > 0) {
+            Object.keys(params).forEach(param => {
+                result = result.replace(new RegExp(`\\{${param}\\}`, 'g'), params[param]);
+            });
+        }
+
+        return result;
     }
 
     // Short alias for translate

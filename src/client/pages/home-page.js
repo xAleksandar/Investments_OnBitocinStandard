@@ -50,6 +50,9 @@ export class HomePage {
             // Update content based on auth state
             this.updateContentForAuthState();
 
+            // Set up language change listener
+            this.setupLanguageChangeListener();
+
             this.isInitialized = true;
             console.log('Home page component initialized successfully');
         } catch (error) {
@@ -490,15 +493,32 @@ export class HomePage {
         const heroDesc = this.welcomeSection?.querySelector('p');
         const heroBtn = this.heroSection;
 
-        if (heroTitle) {
-            setText(heroTitle, `Welcome back, ${user.username || user.email.split('@')[0]}!`);
+        // Get translation service
+        const translationService = this.services.translationService || window.translationService;
+        const username = user.username || user.email.split('@')[0];
+
+        if (heroTitle && translationService) {
+            const welcomeText = translationService.translate('home.welcomeBack', `Welcome back, ${username}!`, { username });
+            setText(heroTitle, welcomeText);
+        } else if (heroTitle) {
+            // Fallback to English if no translation service
+            setText(heroTitle, `Welcome back, ${username}!`);
         }
 
-        if (heroDesc) {
+        if (heroDesc && translationService) {
+            const trackingText = translationService.translate('home.continueTracking', 'Continue tracking your Bitcoin-denominated portfolio');
+            setText(heroDesc, trackingText);
+        } else if (heroDesc) {
+            // Fallback to English if no translation service
             setText(heroDesc, 'Continue tracking your Bitcoin-denominated portfolio');
         }
 
-        if (heroBtn) {
+        if (heroBtn && translationService) {
+            const buttonText = translationService.translate('home.viewPortfolio', 'View Portfolio');
+            setText(heroBtn, buttonText);
+            heroBtn.setAttribute('data-route', '#portfolio');
+        } else if (heroBtn) {
+            // Fallback to English if no translation service
             setText(heroBtn, 'View Portfolio');
             heroBtn.setAttribute('data-route', '#portfolio');
         }
@@ -513,7 +533,15 @@ export class HomePage {
     updateWelcomeForGuest() {
         const heroBtn = this.heroSection;
 
-        if (heroBtn) {
+        // Get translation service
+        const translationService = this.services.translationService || window.translationService;
+
+        if (heroBtn && translationService) {
+            const buttonText = translationService.translate('home.startYourPortfolio', 'Start Your Portfolio');
+            setText(heroBtn, buttonText);
+            heroBtn.setAttribute('data-route', '#login');
+        } else if (heroBtn) {
+            // Fallback to English if no translation service
             setText(heroBtn, 'Start Your Portfolio');
             heroBtn.setAttribute('data-route', '#login');
         }
@@ -819,6 +847,26 @@ export class HomePage {
         // This would typically trigger the router to show login
         // For now, navigate to login hash
         window.location.hash = '#login';
+    }
+
+    /**
+     * Set up language change listener
+     */
+    setupLanguageChangeListener() {
+        const languageChangeHandler = (event) => {
+            console.log('Language changed in home page, updating welcome section:', event.detail?.language);
+
+            // Update welcome section based on current auth state
+            if (this.services.authService?.isAuthenticated()) {
+                const user = this.services.authService.getCurrentUser();
+                this.updateWelcomeForUser(user);
+            } else {
+                this.updateWelcomeForGuest();
+            }
+        };
+
+        const cleanup = addEventListener(document, 'languageChange', languageChangeHandler);
+        this.eventListeners.push(cleanup);
     }
 
     /**

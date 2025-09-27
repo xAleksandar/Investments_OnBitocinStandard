@@ -611,6 +611,13 @@ export const translations = {
         getStarted: 'Започнете',
         getStartedDescription: 'Започнете вашето пътешествие към разбирането на Биткойн като разчетна единица. Започнете с която и да е тема, която ви интересува.',
         tryPortfolio: 'Опитайте портфолиото'
+    },
+
+    home: {
+        welcomeBack: 'Добре дошли отново, {username}!',
+        continueTracking: 'Продължете да следите вашето портфолио деноминирано в Биткойн',
+        viewPortfolio: 'Вижте портфолиото',
+        startYourPortfolio: 'Започнете вашето портфолио'
     }
 };
 

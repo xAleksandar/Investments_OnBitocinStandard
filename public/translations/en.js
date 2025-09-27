@@ -626,6 +626,13 @@ export const translations = {
         getStarted: 'Get Started',
         getStartedDescription: 'Begin your journey to understanding Bitcoin as a unit of account. Start with any topic that interests you.',
         tryPortfolio: 'Try the Portfolio'
+    },
+
+    home: {
+        welcomeBack: 'Welcome back, {username}!',
+        continueTracking: 'Continue tracking your Bitcoin-denominated portfolio',
+        viewPortfolio: 'View Portfolio',
+        startYourPortfolio: 'Start Your Portfolio'
     }
 };
 
