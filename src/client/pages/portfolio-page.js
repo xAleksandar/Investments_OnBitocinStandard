@@ -222,7 +222,8 @@ return;
             this.initializeAssetDetailsModal(),
             this.initializePriceChart(),
             this.updateAssetDropdowns(),
-            this.initializeSetForgetPortfolios()
+            this.initializeSetForgetPortfolios(),
+            this.loadSetForgetPortfolios()
         ]);
     }
 
@@ -390,6 +391,88 @@ this.hideSetForgetModal();
                 this.createSetForgetPortfolio();
             };
             this.eventListeners.push(addEventListener(form, 'submit', submitHandler));
+        }
+
+        // Portfolio list clicks
+        const portfoliosList = getElementById('setForgetPortfoliosList');
+        if (portfoliosList) {
+            const clickHandler = (e) => {
+                const portfolioCard = e.target.closest('[data-portfolio-id]');
+                if (portfolioCard) {
+                    const portfolioId = portfolioCard.dataset.portfolioId;
+                    this.showPortfolioDetails(portfolioId);
+                }
+            };
+            this.eventListeners.push(addEventListener(portfoliosList, 'click', clickHandler));
+        }
+
+        // Portfolio details modal close button
+        const closeDetailsBtn = getElementById('closeSetForgetDetailsModal');
+        if (closeDetailsBtn) {
+            const closeDetailsHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetDetailsModal();
+            };
+            this.eventListeners.push(addEventListener(closeDetailsBtn, 'click', closeDetailsHandler));
+        }
+
+        // Close modal when clicking backdrop
+        const detailsModal = getElementById('setForgetDetailsModal');
+        if (detailsModal) {
+            const backdropHandler = (e) => {
+                if (e.target === detailsModal) {
+                    this.hideSetForgetDetailsModal();
+                }
+            };
+            this.eventListeners.push(addEventListener(detailsModal, 'click', backdropHandler));
+        }
+
+        // Share portfolio button
+        const shareBtn = getElementById('sharePortfolioBtn');
+        if (shareBtn) {
+            const shareHandler = () => {
+                this.sharePortfolio();
+            };
+            this.eventListeners.push(addEventListener(shareBtn, 'click', shareHandler));
+        }
+
+        // Share modal close button
+        const closeShareBtn = getElementById('closeShareModal');
+        if (closeShareBtn) {
+            const closeShareHandler = (e) => {
+                e.preventDefault();
+                this.hideShareModal();
+            };
+            this.eventListeners.push(addEventListener(closeShareBtn, 'click', closeShareHandler));
+        }
+
+        // Share modal backdrop click
+        const shareModal = getElementById('portfolioShareModal');
+        if (shareModal) {
+            const shareBackdropHandler = (e) => {
+                if (e.target === shareModal) {
+                    this.hideShareModal();
+                }
+            };
+            this.eventListeners.push(addEventListener(shareModal, 'click', shareBackdropHandler));
+        }
+
+        // Copy URL button
+        const copyUrlBtn = getElementById('copyUrlBtn');
+        if (copyUrlBtn) {
+            const copyUrlHandler = () => {
+                this.copyShareUrl();
+            };
+            this.eventListeners.push(addEventListener(copyUrlBtn, 'click', copyUrlHandler));
+        }
+
+        // Download image button
+        const downloadImageBtn = getElementById('downloadImageBtn');
+        if (downloadImageBtn) {
+            const downloadHandler = () => {
+                this.downloadPortfolioImage();
+            };
+            this.eventListeners.push(addEventListener(downloadImageBtn, 'click', downloadHandler));
         }
     }
 
@@ -631,9 +714,429 @@ throw new Error(data?.error || 'Failed to create portfolio');
 }
             this.services.notificationService?.showSuccess('Set & Forget portfolio created successfully!');
             this.hideSetForgetModal();
+            this.loadSetForgetPortfolios();
         } catch (e) {
             console.error('Set&Forget create error:', e);
             this.services.notificationService?.showError(e.message || 'Failed to create portfolio');
+        }
+    }
+
+    /**
+     * Load Set & Forget portfolios from API
+     */
+    async loadSetForgetPortfolios() {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/set-forget-portfolios', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.setForgetPortfolios = data.portfolios;
+                this.displaySetForgetPortfolios(data.portfolios);
+            } else {
+                console.error('Failed to load Set & Forget portfolios');
+            }
+        } catch (error) {
+            console.error('Error loading Set & Forget portfolios:', error);
+        }
+    }
+
+    /**
+     * Display Set & Forget portfolios in the UI
+     */
+    displaySetForgetPortfolios(portfolios) {
+        const listContainer = getElementById('setForgetPortfoliosList');
+        const noPortfoliosMsg = getElementById('noSetForgetPortfolios');
+
+        if (!listContainer) return;
+
+        if (portfolios.length === 0) {
+            listContainer.innerHTML = '';
+            if (noPortfoliosMsg) {
+                noPortfoliosMsg.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (noPortfoliosMsg) {
+            noPortfoliosMsg.classList.add('hidden');
+        }
+
+        listContainer.innerHTML = portfolios.map(portfolio => {
+            const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+            const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+            const PORTFOLIO_BASELINE_SATS = 100000000; // 1 BTC
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer transition-shadow" data-portfolio-id="${portfolio.portfolio_id}">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-semibold text-lg">${portfolio.portfolio_name}</h3>
+                        <span class="text-sm text-gray-500">📊 ${daysRunning} days tracked</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-600">Initial:</span>
+                            <div class="font-medium">${(PORTFOLIO_BASELINE_SATS / 100000000).toFixed(8)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Current:</span>
+                            <div class="font-medium">${(portfolio.current_value_sats / 100000000).toFixed(8)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Performance:</span>
+                            <div class="font-medium ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Created:</span>
+                            <div class="font-medium">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        ${portfolio.allocations.slice(0, 3).map(alloc =>
+                            `<span class="px-2 py-1 bg-gray-100 rounded text-xs">${alloc.asset_symbol} ${alloc.allocation_percentage}%</span>`
+                        ).join('')}
+                        ${portfolio.allocations.length > 3 ? `<span class="px-2 py-1 bg-gray-100 rounded text-xs">+${portfolio.allocations.length - 3} more</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Show portfolio details modal
+     */
+    async showPortfolioDetails(portfolioId) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const portfolio = await response.json();
+                this.displayPortfolioDetails(portfolio);
+            } else {
+                this.services.notificationService?.showError('Failed to load portfolio details');
+            }
+        } catch (error) {
+            console.error('Error loading portfolio details:', error);
+            this.services.notificationService?.showError('Failed to load portfolio details');
+        }
+    }
+
+    /**
+     * Display portfolio details in the modal
+     */
+    displayPortfolioDetails(portfolio) {
+        const titleElement = getElementById('portfolioDetailsTitle');
+        const contentElement = getElementById('portfolioDetailsContent');
+        const deleteBtn = getElementById('deletePortfolioBtn');
+
+        if (!titleElement || !contentElement) return;
+
+        titleElement.textContent = portfolio.portfolio_name;
+
+        // Show delete button only for admins (implement admin check later)
+        if (deleteBtn) {
+            deleteBtn.classList.add('hidden'); // Hide for now
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+        const PORTFOLIO_BASELINE_SATS = 100000000; // 1 BTC
+
+        contentElement.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Portfolio Overview</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Status:</span>
+                                <span>📊 Performance Tracking</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Days Tracked:</span>
+                                <span class="font-medium">${daysRunning}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Created:</span>
+                                <span>${new Date(portfolio.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>BTC Price at Creation:</span>
+                                <span>$${portfolio.current_btc_price.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Performance</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Initial Value:</span>
+                                <span class="font-medium">${(PORTFOLIO_BASELINE_SATS / 100000000).toFixed(8)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Current Value:</span>
+                                <span class="font-medium">${(portfolio.current_value_sats / 100000000).toFixed(8)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Total Performance:</span>
+                                <span class="font-bold ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Asset Allocations</h4>
+                    <div class="space-y-3">
+                        ${portfolio.allocations.map(alloc => {
+                            const assetPerformanceColor = alloc.asset_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+                            return `
+                                <div class="border border-gray-200 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium">${alloc.asset_symbol}</span>
+                                        <span class="text-sm text-gray-600">${alloc.allocation_percentage}%</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                        <div>
+                                            <div>Initial: ${(Math.floor(PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100) / 100000000).toFixed(8)} BTC</div>
+                                            <div>Current: ${(alloc.current_value_sats / 100000000).toFixed(8)} BTC</div>
+                                        </div>
+                                        <div>
+                                            <div>Initial: $${alloc.initial_price_usd.toLocaleString()}</div>
+                                            <div>Current: $${alloc.current_price_usd.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-xs">
+                                        <span class="text-gray-600">Performance vs BTC: </span>
+                                        <span class="${assetPerformanceColor} font-medium">
+                                            ${alloc.asset_performance_percent >= 0 ? '+' : ''}${alloc.asset_performance_percent.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Store current portfolio for sharing
+        this.currentSetForgetPortfolio = portfolio;
+
+        // Show modal
+        const modal = getElementById('setForgetDetailsModal');
+        if (modal) {
+            showElement(modal);
+        }
+    }
+
+    /**
+     * Hide portfolio details modal
+     */
+    hideSetForgetDetailsModal() {
+        const modal = getElementById('setForgetDetailsModal');
+        if (modal) {
+            hideElement(modal);
+        }
+    }
+
+    /**
+     * Share portfolio functionality
+     */
+    async sharePortfolio() {
+        if (!this.currentSetForgetPortfolio) return;
+
+        // Show the share modal
+        this.showShareModal();
+
+        try {
+            const portfolioId = this.currentSetForgetPortfolio.portfolio_id;
+            const shareToken = this.currentSetForgetPortfolio.share_token;
+
+            if (!shareToken) {
+                this.services.notificationService?.showError('Share token not available');
+                this.hideShareModal();
+                return;
+            }
+
+            // Set URLs
+            const shareUrl = `${window.location.origin}/share/${shareToken}`;
+            const imageUrl = `${window.location.origin}/api/set-forget-portfolios/public/${shareToken}/image`;
+
+            // Update URL inputs
+            const shareUrlInput = getElementById('shareUrlInput');
+            const imageUrlInput = getElementById('imageUrlInput');
+
+            if (shareUrlInput) shareUrlInput.value = shareUrl;
+            if (imageUrlInput) imageUrlInput.value = imageUrl;
+
+            // Store URLs for later use
+            this.currentShareUrl = shareUrl;
+            this.currentImageUrl = imageUrl;
+
+            // Load image preview
+            await this.loadImagePreview(imageUrl);
+
+        } catch (error) {
+            console.error('Error preparing share modal:', error);
+            this.services.notificationService?.showError('Failed to prepare sharing options');
+        }
+    }
+
+    /**
+     * Show share modal
+     */
+    showShareModal() {
+        const modal = getElementById('portfolioShareModal');
+        if (modal) {
+            showElement(modal);
+            // Reset modal state
+            this.resetShareModal();
+        }
+    }
+
+    /**
+     * Hide share modal
+     */
+    hideShareModal() {
+        const modal = getElementById('portfolioShareModal');
+        if (modal) {
+            hideElement(modal);
+        }
+    }
+
+    /**
+     * Reset share modal to initial state
+     */
+    resetShareModal() {
+        // Show loader, hide image and error
+        const loader = getElementById('imageLoader');
+        const preview = getElementById('portfolioImagePreview');
+        const error = getElementById('imageError');
+        const infoContainer = getElementById('imageGenerationInfo');
+        const shareUrlInput = getElementById('shareUrlInput');
+        const imageUrlInput = getElementById('imageUrlInput');
+
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating image...
+            `;
+            showElement(loader);
+        }
+        if (preview) hideElement(preview);
+        if (error) hideElement(error);
+        if (infoContainer) hideElement(infoContainer);
+        if (shareUrlInput) shareUrlInput.value = 'Generating link...';
+        if (imageUrlInput) imageUrlInput.value = 'Generating image...';
+    }
+
+    /**
+     * Load image preview
+     */
+    async loadImagePreview(imageUrl) {
+        const loader = getElementById('imageLoader');
+        const preview = getElementById('portfolioImagePreview');
+        const error = getElementById('imageError');
+
+        try {
+            // Show loader
+            if (loader) showElement(loader);
+            if (preview) hideElement(preview);
+            if (error) hideElement(error);
+
+            // Load image
+            const img = new Image();
+
+            img.onload = () => {
+                if (preview) {
+                    preview.src = imageUrl;
+                    showElement(preview);
+                }
+                if (loader) hideElement(loader);
+            };
+
+            img.onerror = () => {
+                if (loader) hideElement(loader);
+                if (error) {
+                    error.textContent = 'Failed to generate image. Please try again.';
+                    showElement(error);
+                }
+            };
+
+            img.src = imageUrl;
+
+        } catch (error) {
+            console.error('Error loading image preview:', error);
+            if (loader) hideElement(loader);
+            const errorEl = getElementById('imageError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to load image preview.';
+                showElement(errorEl);
+            }
+        }
+    }
+
+    /**
+     * Copy share URL to clipboard
+     */
+    async copyShareUrl() {
+        if (!this.currentShareUrl) return;
+
+        try {
+            await navigator.clipboard.writeText(this.currentShareUrl);
+            this.services.notificationService?.showSuccess('Portfolio link copied to clipboard!');
+        } catch (error) {
+            console.error('Failed to copy URL:', error);
+            this.services.notificationService?.showError('Failed to copy link');
+        }
+    }
+
+    /**
+     * Download portfolio image
+     */
+    async downloadPortfolioImage() {
+        if (!this.currentImageUrl || !this.currentSetForgetPortfolio) return;
+
+        try {
+            // Fetch the image
+            const response = await fetch(this.currentImageUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+
+            // Convert to blob
+            const blob = await response.blob();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `portfolio-${this.currentSetForgetPortfolio.portfolio_name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Clean up
+            window.URL.revokeObjectURL(url);
+
+            this.services.notificationService?.showSuccess('Portfolio image downloaded!');
+
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            this.services.notificationService?.showError('Failed to download image');
         }
     }
 

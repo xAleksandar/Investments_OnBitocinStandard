@@ -54,6 +54,7 @@ return;
         try {
             this.showLoadingState();
 
+
             await this.initializeServices();
             // Process magic-link token from URL early and initialize auth state
             await this.services.authService.initializeFromUrlToken();
@@ -569,6 +570,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('🔥 DOMContentLoaded - Starting BitcoinApp initialization');
 
     try {
+        // Immediate early router init to prevent any page flash
+        console.log('🚀 Immediate early router init to prevent page flash');
+        const { Router: RouterClass } = await import('./routing/router.js');
+        const earlyRouter = new RouterClass(null, null);
+        earlyRouter.earlyInit();
+
         console.log('🔥 Creating BitcoinApp instance...');
         window.bitcoinApp = new BitcoinApp();
         console.log('🔥 BitcoinApp instance created successfully');
@@ -581,9 +588,41 @@ window.addEventListener('DOMContentLoaded', async () => {
         window.app = window.bitcoinApp;
         console.log('🔥 window.app reference created, login button should now work');
 
-        // Verify login button exists
+        // Add fallback login button handler in case MainNavigation fails
+        console.log('🔥 Adding fallback login button handler...');
         const loginBtn = document.getElementById('navLoginBtn');
-        console.log('🔥 Login button found:', !!loginBtn);
+        if (loginBtn) {
+            console.log('🔥 Fallback: Login button found, adding click handler');
+            loginBtn.addEventListener('click', (e) => {
+                console.log('🔥 Fallback: Login button clicked!');
+                e.preventDefault();
+
+                // Hide all pages
+                const pageIds = ['homePage', 'assetsPage', 'mainApp', 'adminPage', 'educationPage', 'componentsPage'];
+                pageIds.forEach(pageId => {
+                    const pageEl = document.getElementById(pageId);
+                    if (pageEl) {
+                        pageEl.style.display = 'none';
+                        pageEl.classList.add('hidden');
+                    }
+                });
+
+                // Show login form
+                const loginForm = document.getElementById('loginForm');
+                console.log('🔥 Fallback: Login form element found:', !!loginForm);
+                if (loginForm) {
+                    loginForm.style.display = 'block';
+                    loginForm.classList.remove('hidden');
+                    console.log('🔥 Fallback: Login form should now be visible');
+                } else {
+                    console.error('🔥 Fallback: Login form element not found!');
+                }
+            });
+            console.log('🔥 Fallback login handler added successfully');
+        } else {
+            console.error('🔥 Fallback: Login button not found!');
+        }
+
         if (loginBtn) {
             console.log('🔥 Login button element:', loginBtn);
         }

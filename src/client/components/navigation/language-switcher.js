@@ -369,7 +369,7 @@ return;
         // Update language switcher trigger
         const langSwitcher = getElementById('languageSwitcher');
         if (langSwitcher) {
-            langSwitcher.title = `Current language: ${currentLang.name}`;
+            langSwitcher.removeAttribute('title');
         }
     }
 
