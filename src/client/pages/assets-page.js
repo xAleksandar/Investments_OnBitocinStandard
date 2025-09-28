@@ -1,63 +1,472 @@
 /**
  * Assets Page Component
- * Shows asset information and comparison tools
- * Simple placeholder page for assets functionality
+ * Public assets information page with price chart (BTC/USD)
  */
+
+import { getElementById, addClass, removeClass } from '../utils/dom-helpers.js';
 
 export class AssetsPage {
     constructor(services) {
         this.services = services;
         this.isInitialized = false;
+
+        this.currentSymbol = 'XAU';
+        this.currentDenom = 'BTC'; // 'BTC' | 'USD'
+        this.chartInstance = null;
+        this._tvLoadingPromise = null;
+        this._priceListener = null;
+        this._langListener = null;
+
+        // Minimal symbol mapping for TradingView
+        this.symbolMap = {
+            // Crypto
+            'BTC': 'BITSTAMP:BTCUSD',
+            // US stocks / ETFs
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'META': 'NASDAQ:META',
+            'NVDA': 'NASDAQ:NVDA',
+            'SPY': 'AMEX:SPY',
+            'QQQ': 'NASDAQ:QQQ',
+            'VTI': 'AMEX:VTI',
+            'VOO': 'AMEX:VOO',
+            'VEA': 'AMEX:VEA',
+            'VWO': 'AMEX:VWO',
+            'AGG': 'NASDAQ:AGG',
+            'TLT': 'NASDAQ:TLT',
+            'IEF': 'NASDAQ:IEF',
+            'HYG': 'AMEX:HYG',
+            'LQD': 'AMEX:LQD',
+            'TIP': 'NASDAQ:TIP',
+            'VNQ': 'AMEX:VNQ',
+            'GLD': 'AMEX:GLD',
+            'SLV': 'AMEX:SLV',
+            'DBC': 'AMEX:DBC',
+            'USO': 'AMEX:USO',
+            'UNG': 'AMEX:UNG',
+            'ARKK': 'AMEX:ARKK',
+            'COIN': 'NASDAQ:COIN',
+            'MSTR': 'NASDAQ:MSTR',
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            // Special tickers
+            'BRK-B': 'NYSE:BRK.B',
+            // Commodities
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER'
+        };
     }
 
     /**
      * Initialize the assets page
      */
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+return;
+}
 
         console.log('Initializing Assets Page');
         this.isInitialized = true;
     }
 
     /**
-     * Show the assets page
+     * Show the assets page and initialize UI/chart
      * @param {Object} params - Route parameters
      */
     show(params = {}) {
-        console.log('Showing assets page with params:', params);
-
-        // The page content is handled by the static HTML in index.html
-        // This is just a placeholder for future assets functionality
-
+        // Resolve initial state
         if (params && params.asset) {
-            console.log('Showing specific asset:', params.asset);
-            // Future: Load specific asset data
+            this.currentSymbol = params.asset;
         }
+
+        // Initialize UI hooks and render chart
+        this.initializeUI();
+        this.updateMetrics();
+        if (this.services?.priceService && !this._priceListener) {
+            this._priceListener = () => this.updateMetrics();
+            this.services.priceService.onPriceChange(this._priceListener);
+        }
+        // Listen for language changes so description updates
+        if (!this._langListener) {
+            this._langListener = () => this.updateAssetDescription();
+            window.addEventListener('languageChange', this._langListener);
+        }
+        this.renderChart();
     }
 
     /**
      * Hide the assets page
      */
     hide() {
-        console.log('Hiding assets page');
-    }
-
-    /**
-     * Update assets data
-     * @param {Object} data - Assets data to update
-     */
-    updateAssets(data) {
-        console.log('Updating assets data:', data);
-        // Future: Update assets display with new data
+        // No-op; kept for symmetry
     }
 
     /**
      * Destroy the assets page
      */
     destroy() {
-        console.log('Destroying assets page');
+        if (this.chartInstance) {
+            try {
+ this.chartInstance.remove();
+} catch {}
+            this.chartInstance = null;
+        }
+        if (this._priceListener && this.services?.priceService) {
+            try {
+ this.services.priceService.removePriceListener(this._priceListener);
+} catch {}
+            this._priceListener = null;
+        }
+        if (this._langListener) {
+            try {
+ window.removeEventListener('languageChange', this._langListener);
+} catch {}
+            this._langListener = null;
+        }
         this.isInitialized = false;
+    }
+
+    // ===== Internal helpers =====
+
+    initializeUI() {
+        const selector = getElementById('assetSelector');
+        const btcBtn = getElementById('btcDenomination');
+        const usdBtn = getElementById('usdDenomination');
+        const denomLabel = getElementById('chartDenomination');
+
+        if (selector) {
+            // Sync selector with current symbol if present
+            if (this.currentSymbol) {
+                // If option exists, set it; otherwise keep current selection
+                const opt = Array.from(selector.options).find(o => o.value === this.currentSymbol);
+                if (opt) {
+selector.value = this.currentSymbol;
+} else {
+this.currentSymbol = selector.value;
+}
+            } else {
+                this.currentSymbol = selector.value;
+            }
+
+            selector.onchange = () => {
+                this.currentSymbol = selector.value;
+                this.updateMetrics();
+                this.updateAssetDescription();
+                this.renderChart();
+            };
+        }
+
+        if (btcBtn && usdBtn) {
+            const setActive = (isBTC) => {
+                if (isBTC) {
+                    addClass(btcBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(usdBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(btcBtn, 'text-gray-700');
+                    addClass(usdBtn, 'text-gray-700');
+                    if (denomLabel) {
+denomLabel.textContent = 'in Bitcoin';
+}
+                } else {
+                    addClass(usdBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(btcBtn, ['bg-blue-500', 'text-white']);
+                    removeClass(usdBtn, 'text-gray-700');
+                    addClass(btcBtn, 'text-gray-700');
+                    if (denomLabel) {
+denomLabel.textContent = 'in USD';
+}
+                }
+            };
+
+            setActive(this.currentDenom === 'BTC');
+
+            btcBtn.onclick = () => {
+                if (this.currentDenom !== 'BTC') {
+                    this.currentDenom = 'BTC';
+                    setActive(true);
+                    this.renderChart();
+                }
+            };
+            usdBtn.onclick = () => {
+                if (this.currentDenom !== 'USD') {
+                    this.currentDenom = 'USD';
+                    setActive(false);
+                    this.renderChart();
+                }
+            };
+        }
+
+        // Initial description render
+        this.updateAssetDescription();
+    }
+
+    updateMetrics() {
+        const priceBTCEl = getElementById('assetPriceBTC');
+        const priceUSDEl = getElementById('assetPriceUSD');
+
+        if (this.services?.priceService) {
+            const sats = this.services.priceService.getAssetPrice(this.currentSymbol);
+            const usd = this.services.priceService.getAssetPriceUsd(this.currentSymbol);
+            if (priceBTCEl && typeof sats === 'number') {
+                const btc = sats / 100000000;
+                priceBTCEl.textContent = btc < 0.001 ? btc.toFixed(8) : btc.toFixed(4);
+            }
+            if (priceUSDEl && typeof usd === 'number') {
+                priceUSDEl.textContent = usd.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            }
+        }
+
+        // Performance metrics
+        this.updatePerformanceMetric('24h', 'asset24h');
+        this.updatePerformanceMetric('1y', 'asset1y');
+        this.updatePerformanceMetric('5y', 'asset5y');
+        this.updatePerformanceMetric('10y', 'assetAllTime');
+    }
+
+    async updatePerformanceMetric(period, elementId) {
+        const el = getElementById(elementId);
+        if (!el || !this.services?.priceService) {
+return;
+}
+        try {
+            el.textContent = '…';
+            const resp = await this.services.priceService.getAssetPerformance(this.currentSymbol, period);
+            if (resp && typeof resp.performance === 'number') {
+                const val = resp.performance;
+                const sign = val > 0 ? '+' : '';
+                el.textContent = `${sign}${val.toFixed(2)}%`;
+                el.className = `text-sm font-semibold ${val >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                // Add performance metric styling and tooltip
+                const container = el.closest('.bg-gray-50');
+                if (container) {
+                    container.classList.add('performance-metric');
+
+                    // Create detailed tooltip content if we have detailed performance data
+                    if (resp.details) {
+                        const details = resp.details;
+                        const assetMultiplier = (details.assetPriceCurrent / details.assetPriceOld).toFixed(1);
+                        const btcMultiplier = (details.btcPriceCurrent / details.btcPriceOld).toFixed(1);
+
+                        // Use the same translation keys as the old version
+                        const periodLabelKey = period === '24h' ? 'time.twentyFourHoursAgo' :
+                                              period === '1y' ? 'time.oneYearAgo' :
+                                              period === '5y' ? 'time.fiveYearsAgo' :
+                                              period === '10y' ? 'time.tenYearsAgo' : period;
+
+                        const periodLabel = window.translationService?.translate(periodLabelKey) || period;
+                        const vsPerformance = window.translationService?.translate('tooltips.vsPerformance') || 'vs Bitcoin Performance';
+                        const netPerformance = window.translationService?.translate('tooltips.netPerformance') || 'Net performance';
+                        const bitcoinGrew = window.translationService?.translate('tooltips.bitcoinGrew') || 'Bitcoin grew';
+                        const vs = window.translationService?.translate('tooltips.vs') || 'vs';
+
+                        const tooltipContent = `${this.currentSymbol} ${vsPerformance} (${period})\n\n` +
+                                              `${periodLabel}:\n` +
+                                              `${this.currentSymbol}: $${details.assetPriceOld.toLocaleString()} → $${details.assetPriceCurrent.toLocaleString()} (${assetMultiplier}x)\n` +
+                                              `Bitcoin: $${details.btcPriceOld.toLocaleString()} → $${details.btcPriceCurrent.toLocaleString()} (${btcMultiplier}x)\n\n` +
+                                              `${bitcoinGrew} ${btcMultiplier}x ${vs} ${this.currentSymbol}'s ${assetMultiplier}x\n` +
+                                              `${netPerformance}: ${val.toFixed(2)}%`;
+
+                        this.setupPerformanceTooltip(container, tooltipContent);
+                    } else {
+                        // Simple tooltip without detailed breakdown
+                        const performanceOverPeriod = window.translationService?.translate('tooltips.performanceOverPeriod') || 'Performance vs Bitcoin over';
+                        const tooltipContent = `${performanceOverPeriod} ${period}: ${sign}${val.toFixed(2)}%`;
+                        this.setupPerformanceTooltip(container, tooltipContent);
+                    }
+                }
+            } else {
+                el.textContent = 'N/A';
+                el.className = 'text-sm font-semibold text-gray-500';
+
+                // Add tooltip for N/A cases
+                const container = el.closest('.bg-gray-50');
+                if (container) {
+                    container.classList.add('performance-metric');
+                    const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                    const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                    this.setupPerformanceTooltip(container, `${dataNotAvailable} ${period} ${periodText}`);
+                }
+            }
+        } catch (e) {
+            el.textContent = 'N/A';
+            el.className = 'text-sm font-semibold text-gray-500';
+
+            // Add tooltip for error cases
+            const container = el.closest('.bg-gray-50');
+            if (container) {
+                container.classList.add('performance-metric');
+                const dataNotAvailable = window.translationService?.translate('tooltips.dataNotAvailable') || 'Data not available for';
+                const periodText = window.translationService?.translate('tooltips.period') || 'period';
+                this.setupPerformanceTooltip(container, `${dataNotAvailable} ${period} ${periodText}`);
+            }
+        }
+    }
+
+    getTradingViewSymbol(symbol) {
+        return this.symbolMap[symbol] || `NASDAQ:${symbol}`;
+    }
+
+    renderChart() {
+        const container = getElementById('assetChart');
+        if (!container) {
+return;
+}
+
+        // Clear previous widget content (TradingView manages its container)
+        container.innerHTML = '';
+
+        const baseSymbol = this.getTradingViewSymbol(this.currentSymbol);
+        const btcSymbol = 'BITSTAMP:BTCUSD';
+        const tvSymbol = this.currentDenom === 'BTC' ? `${baseSymbol}/${btcSymbol}` : baseSymbol;
+
+        const createWidget = () => {
+            // TradingView global injected by tv.js
+            if (typeof TradingView === 'undefined') {
+                container.innerHTML = `<div class="flex items-center justify-center h-64 text-gray-500">Failed to load chart. Check connection.</div>`;
+                return;
+            }
+            try {
+                const options = {
+                    width: '100%',
+                    height: 600,
+                    symbol: tvSymbol,
+                    interval: 'D',
+                    timezone: 'Etc/UTC',
+                    theme: 'light',
+                    style: '1',
+                    locale: 'en',
+                    toolbar_bg: '#f1f3f6',
+                    enable_publishing: false,
+                    hide_top_toolbar: false,
+                    hide_legend: false,
+                    save_image: false,
+                    container_id: 'assetChart',
+                    range: '60M'
+                };
+
+                this.chartInstance = new TradingView.widget(options);
+            } catch (err) {
+                container.innerHTML = `<div class=\"flex items-center justify-center h-64 text-gray-500\">Failed to initialize chart.</div>`;
+            }
+        };
+
+        this.ensureTradingViewLoaded().then(createWidget).catch(createWidget);
+    }
+
+    updateAssetDescription() {
+        const symbol = this.currentSymbol;
+        const titleEl = getElementById('assetTitle');
+        const descEl = getElementById('assetDescriptionText');
+        const categoryEl = getElementById('assetCategory');
+        const selector = getElementById('assetSelector');
+
+        // If translations are still loading, retry after ready
+        if (window.translationService && !window.translationService.isReady) {
+            window.translationService.whenReady().then(() => this.updateAssetDescription());
+            return;
+        }
+
+        // Update title/description via translation service if available
+        const t = window.translationService?.t?.bind(window.translationService);
+        if (t) {
+            const titleKey = `assets.assetDescriptions.${symbol}.title`;
+            const descKey = `assets.assetDescriptions.${symbol}.description`;
+            const title = t(titleKey, null);
+            const description = t(descKey, null);
+            if (titleEl && title && title !== titleKey) {
+titleEl.textContent = title;
+}
+            if (descEl && description && description !== descKey) {
+descEl.textContent = description;
+}
+        }
+
+        // Infer category from the optgroup label that contains the selected option
+        if (categoryEl && selector) {
+            const opt = selector.options[selector.selectedIndex];
+            const group = opt?.parentElement;
+            if (group && group.tagName === 'OPTGROUP' && group.label) {
+                // Use the optgroup label directly (already translated with emoji prefix retained)
+                categoryEl.textContent = group.label.replace(/^([^\w\s]+)\s*/, '').trim();
+            }
+        }
+    }
+
+    // Load tv.js once (similar approach used on home page)
+    ensureTradingViewLoaded() {
+        if (typeof TradingView !== 'undefined') {
+            return Promise.resolve();
+        }
+        if (this._tvLoadingPromise) {
+return this._tvLoadingPromise;
+}
+        this._tvLoadingPromise = new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.onload = () => resolve();
+            script.onerror = () => resolve();
+            document.head.appendChild(script);
+        });
+        return this._tvLoadingPromise;
+    }
+
+    /**
+     * Set up performance tooltip for an element
+     * @param {HTMLElement} element - Target element
+     * @param {string} content - Tooltip content
+     */
+    setupPerformanceTooltip(element, content) {
+        if (!element) {
+return;
+}
+
+        // Remove existing title attribute to prevent native tooltip
+        element.removeAttribute('title');
+
+        // Add performance-metric class for cursor styling
+        element.classList.add('performance-metric');
+
+        // Remove existing event listeners to prevent duplicates
+        element.onmouseenter = null;
+        element.onmouseleave = null;
+        element.onmousemove = null;
+
+        // Check if tooltip service is available
+        const tooltipService = this.services?.tooltipService;
+        if (tooltipService && tooltipService.showTooltip && tooltipService.hideTooltip) {
+            // Use the tooltip service if available
+            element.onmouseenter = (e) => {
+                tooltipService.showTooltip(element, content, e);
+            };
+
+            element.onmouseleave = () => {
+                tooltipService.hideTooltip();
+            };
+
+            element.onmousemove = (e) => {
+                if (tooltipService.activeTooltip && tooltipService.activeTooltip.element === element) {
+                    tooltipService.updatePosition(element, e);
+                }
+            };
+        } else {
+            // Fallback: add data-tooltip attribute for basic tooltip functionality
+            element.setAttribute('data-tooltip', content);
+            console.warn('Tooltip service not available, using data-tooltip fallback');
+        }
     }
 }
 

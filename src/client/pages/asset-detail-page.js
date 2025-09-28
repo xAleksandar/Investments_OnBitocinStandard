@@ -573,7 +573,7 @@ export class AssetDetailPage {
     async executeTrade() {
         const fromAsset = getElementById('fromAssetDetail')?.value;
         const toAsset = getElementById('toAssetDetail')?.value;
-        const amount = parseFloat(getElementById('tradeAmountDetail')?.value || 0);
+        const rawAmount = parseFloat(getElementById('tradeAmountDetail')?.value || 0);
 
         if (!this.validateTrade(fromAsset, toAsset, amount)) {
             return;
@@ -581,7 +581,19 @@ export class AssetDetailPage {
 
         try {
             // Execute trade through portfolio service
-            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, amount);
+            // Derive unit and converted amount similar to portfolio page
+            let payloadAmount, payloadUnit;
+            if (fromAsset === 'BTC') {
+                // Interpret input as BTC and convert to sats; send as 'sat'
+                payloadAmount = Math.round(rawAmount * 100000000);
+                payloadUnit = 'sat';
+            } else {
+                // Interpret input as asset units; send as 'asset'
+                payloadAmount = rawAmount;
+                payloadUnit = 'asset';
+            }
+
+            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, payloadAmount, payloadUnit);
 
             if (result) {
                 this.services.notificationService?.showSuccess('Trade executed successfully');

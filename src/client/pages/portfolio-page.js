@@ -52,17 +52,12 @@ export class PortfolioPage {
      * Initialize the portfolio page component
      */
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+return;
+}
 
         try {
             console.log('Initializing portfolio page component');
-
-            // Check authentication
-            if (!this.services.authService?.isAuthenticated()) {
-                this.services.notificationService?.showError('Please login to access your portfolio');
-                window.location.hash = '#login';
-                return;
-            }
 
             // Get DOM elements
             this.initializeDOMElements();
@@ -83,6 +78,10 @@ export class PortfolioPage {
             console.log('Portfolio page component initialized successfully');
         } catch (error) {
             console.error('Failed to initialize portfolio page:', error);
+             // Check authentication
+            if (!this.services.authService?.isAuthenticated()) {
+                return;
+            }
             this.services.notificationService?.showError('Failed to load portfolio page');
         }
     }
@@ -93,7 +92,8 @@ export class PortfolioPage {
     initializeDOMElements() {
         this.holdingsGrid = getElementById('holdings');
         this.tradeForm = getElementById('tradeForm');
-        this.assetDetailsModal = getElementById('assetDetailsModal');
+        // Support both new and legacy modal IDs
+        this.assetDetailsModal = getElementById('assetDetailsModal') || getElementById('assetModal');
         this.tradingInterface = getElementById('tradingInterface');
     }
 
@@ -101,7 +101,9 @@ export class PortfolioPage {
      * Set up event listeners
      */
     setupEventListeners() {
-        if (this.mainAppListenersSetup) return;
+        if (this.mainAppListenersSetup) {
+return;
+}
         this.mainAppListenersSetup = true;
 
         // Trade form submission
@@ -144,6 +146,7 @@ export class PortfolioPage {
 
         // Trade amount input
         const tradeAmountInput = getElementById('tradeAmount');
+        const amountUnitSelect = getElementById('amountUnit');
         if (tradeAmountInput) {
             const amountInputHandler = () => this.handleTradeAmountInput();
             this.eventListeners.push(
@@ -217,15 +220,90 @@ export class PortfolioPage {
             this.initializePortfolioGrid(),
             this.initializeTradingInterface(),
             this.initializeAssetDetailsModal(),
-            this.updateAssetDropdowns()
+            this.initializePriceChart(),
+            this.updateAssetDropdowns(),
+            this.initializeSetForgetPortfolios(),
+            this.loadSetForgetPortfolios()
         ]);
+    }
+
+    /**
+     * Initialize the TradingView price chart in portfolio view
+     */
+    async initializePriceChart() {
+        const container = getElementById('tradingview-widget-container');
+        if (!container) {
+return;
+}
+
+        // Clear any existing content
+        container.innerHTML = '';
+
+        const defaultSymbol = 'BITSTAMP:BTCUSD';
+
+        const createWidget = () => {
+            if (typeof TradingView === 'undefined') {
+                console.error('TradingView library not loaded');
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to load chart. Please check your internet connection.
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                new TradingView.widget({
+                    width: '100%',
+                    height: 600,
+                    symbol: defaultSymbol,
+                    interval: 'D',
+                    timezone: 'Etc/UTC',
+                    theme: 'light',
+                    style: '1',
+                    locale: 'en',
+                    toolbar_bg: '#f1f3f6',
+                    enable_publishing: false,
+                    hide_top_toolbar: false,
+                    hide_legend: false,
+                    save_image: false,
+                    container_id: 'tradingview-widget-container'
+                });
+            } catch (err) {
+                console.error('Failed to initialize TradingView widget:', err);
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to initialize chart.
+                    </div>
+                `;
+            }
+        };
+
+        if (typeof TradingView !== 'undefined') {
+            createWidget();
+        } else {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.onload = createWidget;
+            script.onerror = () => {
+                container.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        Failed to load chart library.
+                    </div>
+                `;
+            };
+            document.head.appendChild(script);
+        }
     }
 
     /**
      * Initialize portfolio grid component
      */
     async initializePortfolioGrid() {
-        if (!this.holdingsGrid) return;
+        if (!this.holdingsGrid) {
+return;
+}
 
         // Display current portfolio
         this.displayPortfolio();
@@ -238,7 +316,9 @@ export class PortfolioPage {
      * Initialize trading interface component
      */
     async initializeTradingInterface() {
-        if (!this.tradingInterface) return;
+        if (!this.tradingInterface) {
+return;
+}
 
         // Set up trading form validation
         this.setupTradingValidation();
@@ -251,17 +331,822 @@ export class PortfolioPage {
      * Initialize asset details modal component
      */
     async initializeAssetDetailsModal() {
-        if (!this.assetDetailsModal) return;
+        if (!this.assetDetailsModal) {
+return;
+}
 
         // Set up modal close handlers
         this.setupModalCloseHandlers();
     }
 
     /**
+     * Initialize Set & Forget portfolios UI
+     */
+    async initializeSetForgetPortfolios() {
+        // Button to open creation modal
+        const openBtn = getElementById('createSetForgetBtn');
+        const modal = getElementById('setForgetModal');
+        const closeBtn = getElementById('closeSetForgetModal');
+        const cancelBtn = getElementById('cancelSetForget');
+
+        if (openBtn && modal) {
+            const openHandler = (e) => {
+                e.preventDefault();
+                this.showSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(openBtn, 'click', openHandler));
+        }
+
+        if (closeBtn && modal) {
+            const closeHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(closeBtn, 'click', closeHandler));
+        }
+
+        if (cancelBtn && modal) {
+            const cancelHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetModal();
+            };
+            this.eventListeners.push(addEventListener(cancelBtn, 'click', cancelHandler));
+        }
+
+        // Close when clicking backdrop (but not inner content)
+        if (modal) {
+            const backdropHandler = (e) => {
+                if (e.target === modal) {
+this.hideSetForgetModal();
+}
+            };
+            this.eventListeners.push(addEventListener(modal, 'click', backdropHandler));
+        }
+
+        // Form submit
+        const form = getElementById('setForgetForm');
+        if (form) {
+            const submitHandler = (e) => {
+                e.preventDefault();
+                this.createSetForgetPortfolio();
+            };
+            this.eventListeners.push(addEventListener(form, 'submit', submitHandler));
+        }
+
+        // Portfolio list clicks
+        const portfoliosList = getElementById('setForgetPortfoliosList');
+        if (portfoliosList) {
+            const clickHandler = (e) => {
+                const portfolioCard = e.target.closest('[data-portfolio-id]');
+                if (portfolioCard) {
+                    const portfolioId = portfolioCard.dataset.portfolioId;
+                    this.showPortfolioDetails(portfolioId);
+                }
+            };
+            this.eventListeners.push(addEventListener(portfoliosList, 'click', clickHandler));
+        }
+
+        // Portfolio details modal close button
+        const closeDetailsBtn = getElementById('closeSetForgetDetailsModal');
+        if (closeDetailsBtn) {
+            const closeDetailsHandler = (e) => {
+                e.preventDefault();
+                this.hideSetForgetDetailsModal();
+            };
+            this.eventListeners.push(addEventListener(closeDetailsBtn, 'click', closeDetailsHandler));
+        }
+
+        // Close modal when clicking backdrop
+        const detailsModal = getElementById('setForgetDetailsModal');
+        if (detailsModal) {
+            const backdropHandler = (e) => {
+                if (e.target === detailsModal) {
+                    this.hideSetForgetDetailsModal();
+                }
+            };
+            this.eventListeners.push(addEventListener(detailsModal, 'click', backdropHandler));
+        }
+
+        // Share portfolio button
+        const shareBtn = getElementById('sharePortfolioBtn');
+        if (shareBtn) {
+            const shareHandler = () => {
+                this.sharePortfolio();
+            };
+            this.eventListeners.push(addEventListener(shareBtn, 'click', shareHandler));
+        }
+
+        // Share modal close button
+        const closeShareBtn = getElementById('closeShareModal');
+        if (closeShareBtn) {
+            const closeShareHandler = (e) => {
+                e.preventDefault();
+                this.hideShareModal();
+            };
+            this.eventListeners.push(addEventListener(closeShareBtn, 'click', closeShareHandler));
+        }
+
+        // Share modal backdrop click
+        const shareModal = getElementById('portfolioShareModal');
+        if (shareModal) {
+            const shareBackdropHandler = (e) => {
+                if (e.target === shareModal) {
+                    this.hideShareModal();
+                }
+            };
+            this.eventListeners.push(addEventListener(shareModal, 'click', shareBackdropHandler));
+        }
+
+        // Copy URL button
+        const copyUrlBtn = getElementById('copyUrlBtn');
+        if (copyUrlBtn) {
+            const copyUrlHandler = () => {
+                this.copyShareUrl();
+            };
+            this.eventListeners.push(addEventListener(copyUrlBtn, 'click', copyUrlHandler));
+        }
+
+        // Download image button
+        const downloadImageBtn = getElementById('downloadImageBtn');
+        if (downloadImageBtn) {
+            const downloadHandler = () => {
+                this.downloadPortfolioImage();
+            };
+            this.eventListeners.push(addEventListener(downloadImageBtn, 'click', downloadHandler));
+        }
+    }
+
+    // ===== Set & Forget (ported popup behavior) =====
+
+    async showSetForgetModal() {
+        const modal = getElementById('setForgetModal');
+        if (!modal) {
+return;
+}
+        try {
+            this.setForgetAssets = await (this.services.apiClient?.getAssets() || []);
+        } catch (_) {
+ this.setForgetAssets = [];
+}
+        this.resetSetForgetForm();
+        this.initAllocationChart();
+        this.addAllocationInput();
+        showElement(modal);
+        const cs = window.getComputedStyle(modal);
+        if (cs.display === 'none') {
+modal.style.display = 'block';
+}
+    }
+
+    hideSetForgetModal() {
+        const modal = getElementById('setForgetModal');
+        if (modal) {
+hideElement(modal);
+}
+        this.resetSetForgetForm();
+    }
+
+    resetSetForgetForm() {
+        const form = getElementById('setForgetForm');
+        if (form) {
+form.reset();
+}
+        const container = getElementById('allocationInputs');
+        if (container) {
+container.innerHTML = '';
+}
+        this.updateAllocationTotal();
+        this.clearAllocationChart?.();
+    }
+
+    addAllocationInput() {
+        const container = getElementById('allocationInputs');
+        if (!container) {
+return;
+}
+        const row = document.createElement('div');
+        row.className = 'allocation-input flex items-center gap-3';
+        const select = document.createElement('select');
+        select.className = 'asset-select w-full px-3 py-2 border rounded-lg';
+        select.appendChild(new Option('Select Asset', ''));
+        (this.setForgetAssets || []).forEach(a => {
+            const name = a?.name && a.name.trim() ? a.name : a.symbol;
+            select.appendChild(new Option(`${name} (${a.symbol})`, a.symbol));
+        });
+        const pct = document.createElement('input');
+        pct.type = 'number'; pct.min = '0'; pct.max = '100'; pct.step = '0.1';
+        pct.placeholder = '%';
+        pct.className = 'percentage-input w-24 px-3 py-2 border rounded-lg';
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'px-3 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50';
+        remove.textContent = 'Remove';
+        row.appendChild(select); row.appendChild(pct); row.appendChild(remove);
+        container.appendChild(row);
+        select.addEventListener('change', () => {
+ this.updateAssetDropdownsForSetForget(); this.ensureOneEmptyAllocation();
+});
+        pct.addEventListener('input', () => {
+ this.updateAllocationTotal(); this.updateAllocationChart(); this.ensureOneEmptyAllocation();
+});
+        remove.addEventListener('click', () => {
+ row.remove(); this.updateAssetDropdownsForSetForget(); this.updateAllocationTotal(); this.updateAllocationChart(); this.ensureOneEmptyAllocation();
+});
+    }
+
+    ensureOneEmptyAllocation() {
+        const total = this.getCurrentAllocationTotal();
+        if (total >= 100) {
+return;
+}
+        const empties = Array.from(document.querySelectorAll('.allocation-input')).filter(d => !(d.querySelector('.asset-select')?.value));
+        if (empties.length === 0) {
+this.addAllocationInput();
+}
+        if (empties.length > 1) {
+for (let i = 1; i < empties.length; i++) {
+empties[i].remove();
+}
+}
+    }
+
+    getCurrentAllocationTotal() {
+        let total = 0;
+        document.querySelectorAll('.percentage-input').forEach(inp => total += (parseFloat(inp.value) || 0));
+        return total;
+    }
+
+    updateAllocationTotal() {
+        const total = this.getCurrentAllocationTotal();
+        const el = getElementById('totalAllocation');
+        if (el) {
+            el.textContent = `${total.toFixed(2)}%`;
+            el.className = total === 100 ? 'font-medium text-green-600' : total > 100 ? 'font-medium text-red-600' : 'font-medium text-gray-700';
+        }
+        const submit = getElementById('createSetForgetSubmit');
+        if (submit) {
+submit.disabled = total !== 100 || this.getValidAllocations().length === 0 || this.hasUnselectedAssets();
+}
+    }
+
+    updateAssetDropdownsForSetForget() {
+        const all = new Set((this.setForgetAssets || []).map(a => a.symbol));
+        document.querySelectorAll('.asset-select').forEach(sel => {
+            const current = sel.value;
+            const selected = new Set();
+            document.querySelectorAll('.asset-select').forEach(s => {
+ if (s !== sel && s.value) {
+selected.add(s.value);
+}
+});
+            sel.querySelectorAll('option').forEach(opt => {
+                if (!opt.value) {
+return;
+}
+                opt.disabled = selected.has(opt.value) || !all.has(opt.value);
+            });
+            if (current) {
+sel.value = current;
+}
+        });
+    }
+
+    getValidAllocations() {
+        const rows = document.querySelectorAll('.allocation-input');
+        const out = [];
+        rows.forEach(r => {
+            const sym = r.querySelector('.asset-select')?.value;
+            const pct = parseFloat(r.querySelector('.percentage-input')?.value) || 0;
+            if (sym && pct >= 5) {
+out.push({ asset: sym, percentage: pct });
+}
+        });
+        return out;
+    }
+
+    hasUnselectedAssets() {
+        const rows = document.querySelectorAll('.allocation-input');
+        for (const r of rows) {
+            const sym = r.querySelector('.asset-select')?.value;
+            const pct = parseFloat(r.querySelector('.percentage-input')?.value) || 0;
+            if (!sym && pct > 0) {
+return true;
+}
+        }
+        return false;
+    }
+
+    initAllocationChart() {
+        this.allocationChart = {
+            canvas: getElementById('allocationChart'),
+            colors: ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16']
+        };
+        this.clearAllocationChart();
+    }
+
+    updateAllocationChart() {
+        if (!this.allocationChart?.canvas) {
+return;
+}
+        const canvas = this.allocationChart.canvas;
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2, cy = canvas.height / 2, r = Math.min(cx, cy) - 20;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const allocs = this.getValidAllocations();
+        const total = allocs.reduce((s, a) => s + a.percentage, 0);
+        if (allocs.length === 0 || total === 0) {
+ this.clearAllocationChart(); return;
+}
+        let ang = -Math.PI / 2;
+        allocs.forEach((a, i) => {
+            const slice = (a.percentage / 100) * 2 * Math.PI;
+            const color = this.allocationChart.colors[i % this.allocationChart.colors.length];
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, ang, ang + slice); ctx.closePath();
+            ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ang += slice;
+        });
+        this.updateChartLegend(allocs);
+    }
+
+    updateChartLegend(allocs) {
+        const legend = getElementById('chartLegend');
+        if (!legend) {
+return;
+}
+        legend.innerHTML = allocs.map((a, i) => {
+            const color = this.allocationChart.colors[i % this.allocationChart.colors.length];
+            return `<div class="flex items-center gap-2"><div class="w-4 h-4 rounded" style="background-color:${color}"></div><span class="text-sm">${a.asset} (${a.percentage.toFixed(1)}%)</span></div>`;
+        }).join('');
+    }
+
+    clearAllocationChart() {
+        const canvas = this.allocationChart?.canvas;
+        if (!canvas) {
+return;
+}
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) / 2 - 20, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+        const legend = getElementById('chartLegend');
+        if (legend) {
+legend.innerHTML = '<p class="text-gray-500 text-sm">Add allocations to see preview</p>';
+}
+    }
+
+    async createSetForgetPortfolio() {
+        const nameEl = getElementById('setForgetName');
+        const name = nameEl?.value?.trim();
+        const total = this.getCurrentAllocationTotal();
+        const allocations = this.getValidAllocations();
+        if (!name || allocations.length === 0 || Math.abs(total - 100) > 0.01) {
+            this.services.notificationService?.showError('Please enter name and make allocations sum to 100%');
+            return;
+        }
+        const payload = { name, allocations: allocations.map(a => ({ asset_symbol:a.asset, allocation_percentage:a.percentage })) };
+        try {
+            const token = localStorage.getItem('token');
+            const resp = await fetch('/api/set-forget-portfolios', {
+                method:'POST', headers:{ 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) }, body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+throw new Error(data?.error || 'Failed to create portfolio');
+}
+            this.services.notificationService?.showSuccess('Set & Forget portfolio created successfully!');
+            this.hideSetForgetModal();
+            this.loadSetForgetPortfolios();
+        } catch (e) {
+            console.error('Set&Forget create error:', e);
+            this.services.notificationService?.showError(e.message || 'Failed to create portfolio');
+        }
+    }
+
+    /**
+     * Load Set & Forget portfolios from API
+     */
+    async loadSetForgetPortfolios() {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/set-forget-portfolios', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.setForgetPortfolios = data.portfolios;
+                this.displaySetForgetPortfolios(data.portfolios);
+            } else {
+                console.error('Failed to load Set & Forget portfolios');
+            }
+        } catch (error) {
+            console.error('Error loading Set & Forget portfolios:', error);
+        }
+    }
+
+    /**
+     * Display Set & Forget portfolios in the UI
+     */
+    displaySetForgetPortfolios(portfolios) {
+        const listContainer = getElementById('setForgetPortfoliosList');
+        const noPortfoliosMsg = getElementById('noSetForgetPortfolios');
+
+        if (!listContainer) return;
+
+        if (portfolios.length === 0) {
+            listContainer.innerHTML = '';
+            if (noPortfoliosMsg) {
+                noPortfoliosMsg.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (noPortfoliosMsg) {
+            noPortfoliosMsg.classList.add('hidden');
+        }
+
+        listContainer.innerHTML = portfolios.map(portfolio => {
+            const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+            const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+            const PORTFOLIO_BASELINE_SATS = 100000000; // 1 BTC
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer transition-shadow" data-portfolio-id="${portfolio.portfolio_id}">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-semibold text-lg">${portfolio.portfolio_name}</h3>
+                        <span class="text-sm text-gray-500">📊 ${daysRunning} days tracked</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-600">Initial:</span>
+                            <div class="font-medium">${(PORTFOLIO_BASELINE_SATS / 100000000).toFixed(8)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Current:</span>
+                            <div class="font-medium">${(portfolio.current_value_sats / 100000000).toFixed(8)} BTC</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Performance:</span>
+                            <div class="font-medium ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Created:</span>
+                            <div class="font-medium">${new Date(portfolio.created_at).toLocaleDateString()}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        ${portfolio.allocations.slice(0, 3).map(alloc =>
+                            `<span class="px-2 py-1 bg-gray-100 rounded text-xs">${alloc.asset_symbol} ${alloc.allocation_percentage}%</span>`
+                        ).join('')}
+                        ${portfolio.allocations.length > 3 ? `<span class="px-2 py-1 bg-gray-100 rounded text-xs">+${portfolio.allocations.length - 3} more</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Show portfolio details modal
+     */
+    async showPortfolioDetails(portfolioId) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/set-forget-portfolios/${portfolioId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const portfolio = await response.json();
+                this.displayPortfolioDetails(portfolio);
+            } else {
+                this.services.notificationService?.showError('Failed to load portfolio details');
+            }
+        } catch (error) {
+            console.error('Error loading portfolio details:', error);
+            this.services.notificationService?.showError('Failed to load portfolio details');
+        }
+    }
+
+    /**
+     * Display portfolio details in the modal
+     */
+    displayPortfolioDetails(portfolio) {
+        const titleElement = getElementById('portfolioDetailsTitle');
+        const contentElement = getElementById('portfolioDetailsContent');
+        const deleteBtn = getElementById('deletePortfolioBtn');
+
+        if (!titleElement || !contentElement) return;
+
+        titleElement.textContent = portfolio.portfolio_name;
+
+        // Show delete button only for admins (implement admin check later)
+        if (deleteBtn) {
+            deleteBtn.classList.add('hidden'); // Hide for now
+        }
+
+        const performanceColor = portfolio.total_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+        const daysRunning = Math.floor((new Date() - new Date(portfolio.created_at)) / (1000 * 60 * 60 * 24));
+        const PORTFOLIO_BASELINE_SATS = 100000000; // 1 BTC
+
+        contentElement.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Portfolio Overview</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Status:</span>
+                                <span>📊 Performance Tracking</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Days Tracked:</span>
+                                <span class="font-medium">${daysRunning}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Created:</span>
+                                <span>${new Date(portfolio.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>BTC Price at Creation:</span>
+                                <span>$${portfolio.current_btc_price.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold mb-2">Performance</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span>Initial Value:</span>
+                                <span class="font-medium">${(PORTFOLIO_BASELINE_SATS / 100000000).toFixed(8)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Current Value:</span>
+                                <span class="font-medium">${(portfolio.current_value_sats / 100000000).toFixed(8)} BTC</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Total Performance:</span>
+                                <span class="font-bold ${performanceColor}">${portfolio.total_performance_percent >= 0 ? '+' : ''}${portfolio.total_performance_percent.toFixed(2)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Asset Allocations</h4>
+                    <div class="space-y-3">
+                        ${portfolio.allocations.map(alloc => {
+                            const assetPerformanceColor = alloc.asset_performance_percent >= 0 ? 'text-green-600' : 'text-red-600';
+                            return `
+                                <div class="border border-gray-200 rounded-lg p-3">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium">${alloc.asset_symbol}</span>
+                                        <span class="text-sm text-gray-600">${alloc.allocation_percentage}%</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                        <div>
+                                            <div>Initial: ${(Math.floor(PORTFOLIO_BASELINE_SATS * alloc.allocation_percentage / 100) / 100000000).toFixed(8)} BTC</div>
+                                            <div>Current: ${(alloc.current_value_sats / 100000000).toFixed(8)} BTC</div>
+                                        </div>
+                                        <div>
+                                            <div>Initial: $${alloc.initial_price_usd.toLocaleString()}</div>
+                                            <div>Current: $${alloc.current_price_usd.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-xs">
+                                        <span class="text-gray-600">Performance vs BTC: </span>
+                                        <span class="${assetPerformanceColor} font-medium">
+                                            ${alloc.asset_performance_percent >= 0 ? '+' : ''}${alloc.asset_performance_percent.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Store current portfolio for sharing
+        this.currentSetForgetPortfolio = portfolio;
+
+        // Show modal
+        const modal = getElementById('setForgetDetailsModal');
+        if (modal) {
+            showElement(modal);
+        }
+    }
+
+    /**
+     * Hide portfolio details modal
+     */
+    hideSetForgetDetailsModal() {
+        const modal = getElementById('setForgetDetailsModal');
+        if (modal) {
+            hideElement(modal);
+        }
+    }
+
+    /**
+     * Share portfolio functionality
+     */
+    async sharePortfolio() {
+        if (!this.currentSetForgetPortfolio) return;
+
+        // Show the share modal
+        this.showShareModal();
+
+        try {
+            const portfolioId = this.currentSetForgetPortfolio.portfolio_id;
+            const shareToken = this.currentSetForgetPortfolio.share_token;
+
+            if (!shareToken) {
+                this.services.notificationService?.showError('Share token not available');
+                this.hideShareModal();
+                return;
+            }
+
+            // Set URLs
+            const shareUrl = `${window.location.origin}/share/${shareToken}`;
+            const imageUrl = `${window.location.origin}/api/set-forget-portfolios/public/${shareToken}/image`;
+
+            // Update URL inputs
+            const shareUrlInput = getElementById('shareUrlInput');
+            const imageUrlInput = getElementById('imageUrlInput');
+
+            if (shareUrlInput) shareUrlInput.value = shareUrl;
+            if (imageUrlInput) imageUrlInput.value = imageUrl;
+
+            // Store URLs for later use
+            this.currentShareUrl = shareUrl;
+            this.currentImageUrl = imageUrl;
+
+            // Load image preview
+            await this.loadImagePreview(imageUrl);
+
+        } catch (error) {
+            console.error('Error preparing share modal:', error);
+            this.services.notificationService?.showError('Failed to prepare sharing options');
+        }
+    }
+
+    /**
+     * Show share modal
+     */
+    showShareModal() {
+        const modal = getElementById('portfolioShareModal');
+        if (modal) {
+            showElement(modal);
+            // Reset modal state
+            this.resetShareModal();
+        }
+    }
+
+    /**
+     * Hide share modal
+     */
+    hideShareModal() {
+        const modal = getElementById('portfolioShareModal');
+        if (modal) {
+            hideElement(modal);
+        }
+    }
+
+    /**
+     * Reset share modal to initial state
+     */
+    resetShareModal() {
+        // Show loader, hide image and error
+        const loader = getElementById('imageLoader');
+        const preview = getElementById('portfolioImagePreview');
+        const error = getElementById('imageError');
+        const infoContainer = getElementById('imageGenerationInfo');
+        const shareUrlInput = getElementById('shareUrlInput');
+        const imageUrlInput = getElementById('imageUrlInput');
+
+        if (loader) {
+            loader.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                Generating image...
+            `;
+            showElement(loader);
+        }
+        if (preview) hideElement(preview);
+        if (error) hideElement(error);
+        if (infoContainer) hideElement(infoContainer);
+        if (shareUrlInput) shareUrlInput.value = 'Generating link...';
+        if (imageUrlInput) imageUrlInput.value = 'Generating image...';
+    }
+
+    /**
+     * Load image preview
+     */
+    async loadImagePreview(imageUrl) {
+        const loader = getElementById('imageLoader');
+        const preview = getElementById('portfolioImagePreview');
+        const error = getElementById('imageError');
+
+        try {
+            // Show loader
+            if (loader) showElement(loader);
+            if (preview) hideElement(preview);
+            if (error) hideElement(error);
+
+            // Load image
+            const img = new Image();
+
+            img.onload = () => {
+                if (preview) {
+                    preview.src = imageUrl;
+                    showElement(preview);
+                }
+                if (loader) hideElement(loader);
+            };
+
+            img.onerror = () => {
+                if (loader) hideElement(loader);
+                if (error) {
+                    error.textContent = 'Failed to generate image. Please try again.';
+                    showElement(error);
+                }
+            };
+
+            img.src = imageUrl;
+
+        } catch (error) {
+            console.error('Error loading image preview:', error);
+            if (loader) hideElement(loader);
+            const errorEl = getElementById('imageError');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to load image preview.';
+                showElement(errorEl);
+            }
+        }
+    }
+
+    /**
+     * Copy share URL to clipboard
+     */
+    async copyShareUrl() {
+        if (!this.currentShareUrl) return;
+
+        try {
+            await navigator.clipboard.writeText(this.currentShareUrl);
+            this.services.notificationService?.showSuccess('Portfolio link copied to clipboard!');
+        } catch (error) {
+            console.error('Failed to copy URL:', error);
+            this.services.notificationService?.showError('Failed to copy link');
+        }
+    }
+
+    /**
+     * Download portfolio image
+     */
+    async downloadPortfolioImage() {
+        if (!this.currentImageUrl || !this.currentSetForgetPortfolio) return;
+
+        try {
+            // Fetch the image
+            const response = await fetch(this.currentImageUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+
+            // Convert to blob
+            const blob = await response.blob();
+
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `portfolio-${this.currentSetForgetPortfolio.portfolio_name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Clean up
+            window.URL.revokeObjectURL(url);
+
+            this.services.notificationService?.showSuccess('Portfolio image downloaded!');
+
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            this.services.notificationService?.showError('Failed to download image');
+        }
+    }
+
+    /**
      * Display portfolio data
      */
     displayPortfolio() {
-        if (!this.services.portfolioService) return;
+        if (!this.services.portfolioService) {
+return;
+}
 
         // Get portfolio data
         const holdings = this.services.portfolioService.getHoldings();
@@ -312,7 +1197,9 @@ export class PortfolioPage {
      * @param {Array} holdings - Array of holdings
      */
     updateHoldingsGrid(holdings) {
-        if (!this.holdingsGrid) return;
+        if (!this.holdingsGrid) {
+return;
+}
 
         clearElement(this.holdingsGrid);
 
@@ -423,6 +1310,8 @@ export class PortfolioPage {
             const validateAssets = () => {
                 const validation = validateAssetPair(fromAssetSelect.value, toAssetSelect.value);
                 this.displayAssetValidation(validation);
+                // Also re-validate amount when asset changes (unit conversion may differ)
+                this.handleTradeAmountInput();
             };
 
             addEventListener(fromAssetSelect, 'change', validateAssets);
@@ -432,11 +1321,14 @@ export class PortfolioPage {
         // Amount validation
         if (tradeAmountInput && fromAssetSelect) {
             const validateAmount = () => {
-                const validation = validateTradeAmount(tradeAmountInput.value, fromAssetSelect.value);
+                const validation = this.validateCurrentTradeAmount();
                 this.displayAmountValidation(validation);
             };
 
             addEventListener(tradeAmountInput, 'input', validateAmount);
+            if (amountUnitSelect) {
+                addEventListener(amountUnitSelect, 'change', validateAmount);
+            }
         }
     }
 
@@ -455,7 +1347,7 @@ export class PortfolioPage {
      * Set up modal close handlers
      */
     setupModalCloseHandlers() {
-        const closeModalBtn = getElementById('closeAssetDetailsModal');
+        const closeModalBtn = getElementById('closeAssetDetailsModal') || getElementById('closeModal');
         if (closeModalBtn) {
             const closeHandler = () => this.hideAssetDetailsModal();
             this.eventListeners.push(
@@ -483,7 +1375,9 @@ export class PortfolioPage {
         const fromAssetSelect = getElementById('fromAsset');
         const toAssetSelect = getElementById('toAsset');
 
-        if (!fromAssetSelect || !toAssetSelect) return;
+        if (!fromAssetSelect || !toAssetSelect) {
+return;
+}
 
         try {
             // Get available assets
@@ -500,13 +1394,20 @@ export class PortfolioPage {
             // Add asset options based on holdings for "from" dropdown
             this.holdings.forEach(holding => {
                 const asset = assets.find(a => a.symbol === holding.asset_symbol);
-                const displayName = asset ? `${asset.name} (${asset.symbol})` : holding.asset_symbol;
-                fromAssetSelect.appendChild(createElement('option', { value: holding.asset_symbol }, displayName));
+                const name = asset && typeof asset.name === 'string' && asset.name.trim()
+                    ? asset.name
+                    : holding.asset_symbol;
+                const symbol = holding.asset_symbol;
+                const displayName = `${name} (${symbol})`;
+                fromAssetSelect.appendChild(createElement('option', { value: symbol }, displayName));
             });
 
-            // Add all assets to "to" dropdown
+            // Add all assets to "to" dropdown (fallback if name missing)
             assets.forEach(asset => {
-                const displayName = `${asset.name} (${asset.symbol})`;
+                const name = asset && typeof asset.name === 'string' && asset.name.trim()
+                    ? asset.name
+                    : asset.symbol;
+                const displayName = `${name} (${asset.symbol})`;
                 toAssetSelect.appendChild(createElement('option', { value: asset.symbol }, displayName));
             });
 
@@ -536,7 +1437,9 @@ export class PortfolioPage {
         // Clear amount input if assets are invalid
         if (fromAsset === toAsset && fromAsset) {
             const tradeAmountInput = getElementById('tradeAmount');
-            if (tradeAmountInput) tradeAmountInput.value = '';
+            if (tradeAmountInput) {
+tradeAmountInput.value = '';
+}
         }
     }
 
@@ -544,12 +1447,55 @@ export class PortfolioPage {
      * Handle trade amount input
      */
     handleTradeAmountInput() {
-        const fromAsset = getElementById('fromAsset')?.value;
-        const amount = getElementById('tradeAmount')?.value;
+        const validation = this.validateCurrentTradeAmount();
+        if (validation) {
+this.displayAmountValidation(validation);
+}
+    }
 
-        if (fromAsset && amount) {
-            const validation = validateTradeAmount(amount, fromAsset);
-            this.displayAmountValidation(validation);
+    /**
+     * Validate current trade amount considering unit selection
+     */
+    validateCurrentTradeAmount() {
+        const fromAsset = getElementById('fromAsset')?.value;
+        const amountInput = getElementById('tradeAmount');
+        if (!fromAsset || !amountInput) {
+return null;
+}
+
+        const unitSelect = getElementById('amountUnit');
+        const unit = unitSelect?.value || 'btc';
+        const raw = amountInput.value;
+
+        // For BTC, convert to sats for validation; for others, raw amount is fine
+        if (fromAsset === 'BTC') {
+            const sats = this.convertToSats(raw, unit);
+            return validateTradeAmount(sats, fromAsset);
+        }
+        return validateTradeAmount(raw, fromAsset);
+    }
+
+    /**
+     * Convert UI amount to satoshis based on unit
+     */
+    convertToSats(amount, unit) {
+        const num = Number(amount);
+        if (isNaN(num)) {
+return 0;
+}
+        switch ((unit || 'btc').toLowerCase()) {
+            case 'btc':
+                return Math.round(num * 100000000);
+            case 'msat':
+                // UI label says mSats but to avoid server mismatch we'll convert to sats here if used
+                // Assume mSats means 1/100 BTC (legacy label). Convert to sats accordingly.
+                return Math.round(num * 1000000);
+            case 'ksat':
+                return Math.round(num * 1000);
+            case 'sat':
+                return Math.round(num);
+            default:
+                return Math.round(num * 100000000);
         }
     }
 
@@ -578,15 +1524,25 @@ export class PortfolioPage {
      * Execute trade
      */
     async executeTrade() {
-        if (this.isTrading) return;
+        if (this.isTrading) {
+return;
+}
 
         const fromAsset = getElementById('fromAsset')?.value;
         const toAsset = getElementById('toAsset')?.value;
-        const amount = parseFloat(getElementById('tradeAmount')?.value);
+        const rawAmount = parseFloat(getElementById('tradeAmount')?.value);
+        const unitSelect = getElementById('amountUnit');
+        const unitChoice = unitSelect?.value || 'btc';
 
         // Validate inputs
         const assetValidation = validateAssetPair(fromAsset, toAsset);
-        const amountValidation = validateTradeAmount(amount, fromAsset);
+        let amountForValidation;
+        if (fromAsset === 'BTC') {
+            amountForValidation = this.convertToSats(rawAmount, unitChoice);
+        } else {
+            amountForValidation = rawAmount;
+        }
+        const amountValidation = validateTradeAmount(amountForValidation, fromAsset);
 
         if (!assetValidation.isValid) {
             this.services.notificationService?.showError(assetValidation.message);
@@ -603,16 +1559,29 @@ export class PortfolioPage {
             this.updateTradeButtonState(true);
 
             // Execute trade through portfolio service
-            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, amount);
-
-            if (result?.success) {
-                this.services.notificationService?.showTradeSuccess(result.trade);
-                this.clearTradeForm();
-
-                // Portfolio will be refreshed through service listener
+            let payloadAmount, payloadUnit;
+            if (fromAsset === 'BTC') {
+                // Send sats to align with server validation and conversion
+                payloadAmount = this.convertToSats(rawAmount, unitChoice);
+                payloadUnit = 'sat';
             } else {
+                // Selling asset: send in asset units with 'asset' unit
+                payloadAmount = rawAmount;
+                payloadUnit = 'asset';
+            }
+
+            const result = await this.services.portfolioService?.executeTrade(fromAsset, toAsset, payloadAmount, payloadUnit);
+
+            // API client unwraps { success, data } → returns data object
+            // Accept either { trade, message } or a raw trade object
+            const tradeDetails = result?.trade || result;
+            if (!tradeDetails) {
                 throw new Error(result?.error || 'Trade failed');
             }
+
+            this.services.notificationService?.showTradeSuccess(tradeDetails);
+            this.clearTradeForm();
+            // Portfolio refresh happens via service listener
 
         } catch (error) {
             console.error('Trade execution failed:', error);
@@ -686,7 +1655,9 @@ export class PortfolioPage {
      */
     updateAvailableBalance(fromAsset) {
         const balanceDisplay = getElementById('availableBalance');
-        if (!balanceDisplay || !fromAsset) return;
+        if (!balanceDisplay || !fromAsset) {
+return;
+}
 
         const holding = this.holdings.find(h => h.asset_symbol === fromAsset);
         if (holding) {
@@ -749,11 +1720,21 @@ export class PortfolioPage {
         const tradeHelper = getElementById('tradeHelper');
         const availableBalance = getElementById('availableBalance');
 
-        if (fromAsset) fromAsset.value = '';
-        if (toAsset) toAsset.value = '';
-        if (tradeAmount) tradeAmount.value = '';
-        if (tradeHelper) setText(tradeHelper, '');
-        if (availableBalance) setText(availableBalance, '');
+        if (fromAsset) {
+fromAsset.value = '';
+}
+        if (toAsset) {
+toAsset.value = '';
+}
+        if (tradeAmount) {
+tradeAmount.value = '';
+}
+        if (tradeHelper) {
+setText(tradeHelper, '');
+}
+        if (availableBalance) {
+setText(availableBalance, '');
+}
     }
 
     /**
@@ -763,8 +1744,88 @@ export class PortfolioPage {
      * @param {string} name - Asset name
      */
     populateAssetDetailsModal(details, symbol, name) {
-        // Modal population logic would go here
-        console.log('Populating asset details modal:', { details, symbol, name });
+        const titleEl = getElementById('modalTitle');
+        const contentEl = getElementById('modalContent');
+        if (titleEl) {
+titleEl.textContent = `${name || symbol} (${symbol}) Purchase History`;
+}
+        if (!contentEl) {
+return;
+}
+
+        const purchases = Array.isArray(details.purchases) ? details.purchases : [];
+        const sales = Array.isArray(details.sales) ? details.sales : [];
+
+        if (purchases.length === 0 && sales.length === 0) {
+            contentEl.innerHTML = '<p class="text-gray-500">No transactions found for this asset.</p>';
+            return;
+        }
+
+        let content = '';
+        if (purchases.length > 0) {
+            content += '<h4 class="font-semibold mb-2">Individual Purchases</h4>';
+            content += '<div class="overflow-x-auto mb-4">';
+            content += '<table class="w-full text-sm">';
+            content += `
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Date</th>
+                        <th class="text-left p-2">Amount</th>
+                        <th class="text-left p-2">BTC Spent</th>
+                        <th class="text-left p-2">Status</th>
+                        <th class="text-left p-2">Unlocks</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            purchases.forEach(p => {
+                const amount = (Number(p.amount) / 100000000).toFixed(8);
+                const btcSpent = (Number(p.btc_spent) / 100000000).toFixed(8);
+                const isLocked = !!p.is_locked;
+                const unlockDate = p.locked_until ? new Date(p.locked_until).toLocaleString() : 'N/A';
+                content += `
+                    <tr class="border-b ${isLocked ? 'bg-red-50' : 'bg-green-50'}">
+                        <td class="p-2">${new Date(p.created_at).toLocaleDateString()}</td>
+                        <td class="p-2">${amount} ${symbol}</td>
+                        <td class="p-2">${btcSpent} BTC</td>
+                        <td class="p-2"><span class="${isLocked ? 'text-red-600' : 'text-green-600'}">${isLocked ? '🔒 Locked' : '✅ Unlocked'}</span></td>
+                        <td class="p-2 text-xs">${isLocked ? unlockDate : 'Available'}</td>
+                    </tr>
+                `;
+            });
+            content += '</tbody></table></div>';
+        }
+
+        if (sales.length > 0) {
+            content += '<h4 class="font-semibold mb-2">Sales History</h4>';
+            content += '<div class="overflow-x-auto">';
+            content += '<table class="w-full text-sm">';
+            content += `
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Date</th>
+                        <th class="text-left p-2">Sold</th>
+                        <th class="text-left p-2">Received</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            sales.forEach(s => {
+                const soldAmount = (Number(s.fromAmount ?? s.from_amount) / 100000000).toFixed(8);
+                const receivedBTC = (Number(s.toAmount ?? s.to_amount) / 100000000).toFixed(8);
+                const dateStr = new Date(s.createdAt ?? s.created_at).toLocaleDateString();
+                content += `
+                    <tr class="border-b">
+                        <td class="p-2">${dateStr}</td>
+                        <td class="p-2">${soldAmount} ${symbol}</td>
+                        <td class="p-2">${receivedBTC} BTC</td>
+                    </tr>
+                `;
+            });
+            content += '</tbody></table></div>';
+        }
+
+        contentEl.innerHTML = content;
     }
 
     /**

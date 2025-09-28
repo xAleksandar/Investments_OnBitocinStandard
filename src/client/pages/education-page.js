@@ -15,33 +15,29 @@ export class EducationPage {
 
         // Educational content state
         this.currentContent = null;
-        this.availableTopics = [
-            {
-                id: 'why-bitcoin',
-                title: 'Why Bitcoin?',
-                description: 'Understanding Bitcoin as neutral, apolitical money',
-                link: '#education/why-bitcoin',
-                estimatedTime: 8
-            },
-            {
-                id: 'why-not-gold',
-                title: 'Why Not Gold?',
-                description: 'The limitations of gold in the digital age',
-                link: '#education/why-not-gold',
-                estimatedTime: 6
-            },
-            {
-                id: 'fiat-experiment',
-                title: 'The Fiat Experiment',
-                description: 'How we moved away from sound money',
-                link: '#education/fiat-experiment',
-                estimatedTime: 10
-            }
-        ];
+        this.availableTopics = null; // Will be loaded from translations
 
         // Reading progress tracking
         this.readingProgressHandler = null;
         this.sectionObserver = null;
+    }
+
+    /**
+     * Show education page content based on params
+     * @param {Object} params - Optional params, e.g., { content: 'why-bitcoin' }
+     */
+    async show(params = {}) {
+        const educationPage = getElementById('educationPage');
+        if (educationPage) {
+            showElement(educationPage);
+        }
+
+        // If a specific article/content is requested, load it; otherwise show overview
+        if (params && params.content) {
+            await this.loadEducationalContent(params.content);
+        } else {
+            this.showEducationOverview();
+        }
     }
 
     /**
@@ -76,6 +72,9 @@ export class EducationPage {
             // Set up event listeners
             this.setupEventListeners();
 
+            // Listen for language changes
+            this.setupLanguageChangeListener();
+
             this.isInitialized = true;
             console.log('Education page initialized successfully');
 
@@ -104,33 +103,131 @@ export class EducationPage {
     }
 
     /**
+     * Load available topics from translation service
+     */
+    loadAvailableTopics() {
+        const t = this.getTranslationFunction();
+
+        try {
+            // Try to get topics from translations
+            const topics = t('education.topics');
+            if (Array.isArray(topics) && topics.length > 0) {
+                this.availableTopics = topics.map(topic => ({
+                    ...topic,
+                    link: `#education/${topic.id}`
+                }));
+            } else {
+                // Fallback to hardcoded English topics if translation not available
+                this.availableTopics = [
+                    {
+                        id: 'fiat-experiment',
+                        title: 'The Fiat Experiment',
+                        description: 'How we moved away from sound money',
+                        link: '#education/fiat-experiment',
+                        estimatedTime: 10
+                    },
+                    {
+                        id: 'why-not-gold',
+                        title: 'Why Not Gold?',
+                        description: 'The limitations of gold in the digital age',
+                        link: '#education/why-not-gold',
+                        estimatedTime: 6
+                    },
+                    {
+                        id: 'why-bitcoin',
+                        title: 'Why Bitcoin?',
+                        description: 'Understanding Bitcoin as neutral, apolitical money',
+                        link: '#education/why-bitcoin',
+                        estimatedTime: 8
+                    }
+                ];
+            }
+        } catch (error) {
+            console.warn('Failed to load topics from translations, using fallback:', error);
+            // Use fallback topics
+            this.availableTopics = [
+                {
+                    id: 'fiat-experiment',
+                    title: 'The Fiat Experiment',
+                    description: 'How we moved away from sound money',
+                    link: '#education/fiat-experiment',
+                    estimatedTime: 10
+                },
+                {
+                    id: 'why-not-gold',
+                    title: 'Why Not Gold?',
+                    description: 'The limitations of gold in the digital age',
+                    link: '#education/why-not-gold',
+                    estimatedTime: 6
+                },
+                {
+                    id: 'why-bitcoin',
+                    title: 'Why Bitcoin?',
+                    description: 'Understanding Bitcoin as neutral, apolitical money',
+                    link: '#education/why-bitcoin',
+                    estimatedTime: 8
+                }
+            ];
+        }
+    }
+
+    /**
      * Show education overview with topic links
      */
     showEducationOverview() {
         const educationContent = getElementById('educationContent');
         if (!educationContent) return;
 
+        // Load topics from translations if not already loaded
+        if (!this.availableTopics) {
+            this.loadAvailableTopics();
+        }
+
         const t = this.getTranslationFunction();
+        const tOr = (key, fallback) => {
+            try {
+                const val = t(key);
+                return (typeof val === 'string' && val !== key) ? val : fallback;
+            } catch (_) {
+                return fallback;
+            }
+        };
+
+        const getTopicIcon = (id) => {
+            switch (id) {
+                case 'fiat-experiment':
+                    return '<div class="text-green-500 text-4xl mb-4">💵</div>';
+                case 'why-not-gold':
+                    return '<div class="text-yellow-500 text-4xl mb-4">🥇</div>';
+                case 'why-bitcoin':
+                    return '<div class="text-orange-500 text-4xl mb-4">₿</div>';
+                default:
+                    return '';
+            }
+        };
 
         // Generate topic cards HTML
         const topicCards = this.availableTopics.map(topic => `
             <div class="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow duration-200 cursor-pointer"
                  data-topic="${topic.id}">
+                ${getTopicIcon(topic.id)}
                 <h3 class="text-xl font-semibold text-gray-800 mb-3">${topic.title}</h3>
                 <p class="text-gray-600 mb-4">${topic.description}</p>
                 <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-500">${topic.estimatedTime} ${t('education.minutesReading')}</span>
-                    <span class="text-orange-500 font-medium">${t('education.readMore')} →</span>
+                    <span class="text-sm text-gray-500">${topic.estimatedTime} ${tOr('education.minutesReading', 'min read')}</span>
+                    <span class="text-orange-500 font-medium">${tOr('education.readMore', 'Read')} →</span>
                 </div>
             </div>
         `).join('');
 
+        const firstTopic = this.availableTopics?.[0] || { id: 'fiat-experiment', title: 'The Fiat Experiment' };
+
         educationContent.innerHTML = `
             <div class="max-w-4xl mx-auto py-8">
                 <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-gray-800 mb-4" data-translate="education.title">Education</h1>
-                    <p class="text-xl text-gray-600 max-w-2xl mx-auto" data-translate="education.subtitle">
-                        Learn about Bitcoin, sound money principles, and why Bitcoin serves as the ultimate measuring stick for value.
+                    <h1 class="text-4xl font-bold text-gray-800 mb-4">${tOr('education.title', 'Education')}</h1>
+                    <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                        ${tOr('education.subtitle', 'Learn about Bitcoin, sound money principles, and why Bitcoin serves as the ultimate measuring stick for value.')}
                     </p>
                 </div>
 
@@ -139,18 +236,18 @@ export class EducationPage {
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-8 text-center">
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-4" data-translate="education.getStarted">Get Started</h2>
-                    <p class="text-gray-600 mb-6" data-translate="education.getStartedDescription">
-                        Begin your journey to understanding Bitcoin as a unit of account. Start with any topic that interests you.
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">${tOr('education.getStarted', 'Get Started')}</h2>
+                    <p class="text-gray-600 mb-6">
+                        ${tOr('education.getStartedDescription', 'Begin your journey to understanding Bitcoin as a unit of account. Start with any topic that interests you.')}
                     </p>
                     <div class="flex flex-wrap justify-center gap-4">
                         <button class="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors"
-                                data-topic="why-bitcoin">
-                            <span data-translate="education.startWithBitcoin">Start with "Why Bitcoin?"</span>
+                                data-topic="${firstTopic.id}">
+                            <span>Start with "${firstTopic.title}"</span>
                         </button>
                         <button class="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
                                 onclick="window.location.hash = '#portfolio'">
-                            <span data-translate="education.tryPortfolio">Try the Portfolio</span>
+                            <span>${tOr('education.tryPortfolio', 'Try the Portfolio')}</span>
                         </button>
                     </div>
                 </div>
@@ -161,6 +258,9 @@ export class EducationPage {
         if (this.services.translationService) {
             this.services.translationService.updatePageTranslations();
         }
+
+        // Bind click handlers for newly rendered topic cards
+        this.setupEventListeners();
     }
 
     /**
@@ -179,15 +279,29 @@ export class EducationPage {
                 </div>
             `;
 
-            // Get current language
-            const currentLang = this.services.translationService?.getCurrentLanguage() || 'en';
+            // Get current language; always fallback to 'en' if specific locale missing
+            const currentLang = this.services.translationService?.getCurrentLanguage?.() || 'en';
 
-            // Dynamically import the appropriate content file from public directory
-            const contentModule = await import(`../../../public/content/educational/${contentType}-${currentLang}.js`);
-            const content = contentModule.default || contentModule.content;
+            // Build candidate module URLs (absolute paths from static /public)
+            const candidates = [
+                `/content/educational/${contentType}-${currentLang}.js`,
+                `/content/educational/${contentType}-en.js`
+            ];
+
+            let content = null;
+            let lastError = null;
+            for (const url of candidates) {
+                try {
+                    const mod = await import(url);
+                    content = mod?.default || mod?.content || null;
+                    if (content) break;
+                } catch (e) {
+                    lastError = e;
+                }
+            }
 
             if (!content) {
-                throw new Error(`Content not found for ${contentType}`);
+                throw new Error(`Content not found for ${contentType} (${currentLang})${lastError ? ': ' + lastError.message : ''}`);
             }
 
             // Store current content
@@ -217,6 +331,14 @@ export class EducationPage {
         if (!educationContent || !content) return;
 
         const t = this.getTranslationFunction();
+        const tOr = (key, fallback) => {
+            try {
+                const val = t(key);
+                return (typeof val === 'string' && val !== key) ? val : fallback;
+            } catch (_) {
+                return fallback;
+            }
+        };
 
         // Generate table of contents
         const tocItems = content.tableOfContents.map(item => `
@@ -270,11 +392,23 @@ export class EducationPage {
                         <span class="mx-2 text-gray-500">→</span>
                         <span class="text-gray-700">${content.title}</span>
                     </nav>
-                    <h1 class="text-4xl font-bold text-gray-800 mb-4">${content.title}</h1>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-3xl">
+                            ${(() => {
+                                const id = (this.availableTopics.find(t => t.title === content.title)?.id) || '';
+                                if (id === 'fiat-experiment') return '💵';
+                                if (id === 'why-not-gold') return '🥇';
+                                if (id === 'why-bitcoin') return '₿';
+                                return '';
+                            })()}
+                        </span>
+                        <h1 class="text-4xl font-bold text-gray-800">${content.title}</h1>
+                    </div>
+                    
                     <p class="text-xl text-gray-600 mb-6">${content.subtitle}</p>
                     <div class="flex items-center space-x-6 text-sm text-gray-500">
-                        <span>${content.readingTime} ${t('education.minutesReading')}</span>
-                        <span>${t('education.lastUpdatedLabel')}: ${content.lastUpdated}</span>
+                        <span>${content.readingTime} ${tOr('education.minutesReading', 'min read')}</span>
+                        <span>${tOr('education.lastUpdatedLabel', 'Last updated')}: ${content.lastUpdated}</span>
                     </div>
                 </div>
 
@@ -316,6 +450,9 @@ export class EducationPage {
         if (this.services.translationService) {
             this.services.translationService.updatePageTranslations();
         }
+
+        // Bind navigation handlers for newly rendered content (back button, TOC links)
+        this.setupEventListeners();
     }
 
     /**
@@ -451,6 +588,28 @@ export class EducationPage {
     }
 
     // ===== EVENT HANDLING =====
+
+    /**
+     * Set up language change listener
+     */
+    setupLanguageChangeListener() {
+        // Listen for language change events
+        const languageChangeHandler = (event) => {
+            console.log('Language changed, refreshing education content:', event.detail?.language);
+
+            // Reset topics to force reload with new language
+            this.availableTopics = null;
+
+            // If we're showing the overview, refresh it
+            const educationContent = getElementById('educationContent');
+            if (educationContent && educationContent.innerHTML.includes('Get Started')) {
+                this.showEducationOverview();
+            }
+        };
+
+        const cleanup = addEventListener(document, 'languageChange', languageChangeHandler);
+        this.eventListeners.push(cleanup);
+    }
 
     /**
      * Set up education page event listeners

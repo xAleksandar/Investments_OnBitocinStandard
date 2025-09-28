@@ -50,6 +50,9 @@ export class HomePage {
             // Update content based on auth state
             this.updateContentForAuthState();
 
+            // Set up language change listener
+            this.setupLanguageChangeListener();
+
             this.isInitialized = true;
             console.log('Home page component initialized successfully');
         } catch (error) {
@@ -162,24 +165,51 @@ export class HomePage {
         try {
             console.log('Initializing mini charts');
 
-            // Define home page chart configurations
+            // Define home page chart configurations (use ratio vs BTC like old app)
             const chartConfigs = [
-                { containerId: 'chartGold', symbol: 'TVC:GOLD/BITSTAMP:BTCUSD', name: 'Gold', assetSymbol: 'XAU' },
-                { containerId: 'chartSPY', symbol: 'AMEX:SPY/BITSTAMP:BTCUSD', name: 'S&P 500', assetSymbol: 'SPY' },
-                { containerId: 'chartAAPL', symbol: 'NASDAQ:AAPL/BITSTAMP:BTCUSD', name: 'Apple', assetSymbol: 'AAPL' },
-                { containerId: 'chartTSLA', symbol: 'NASDAQ:TSLA/BITSTAMP:BTCUSD', name: 'Tesla', assetSymbol: 'TSLA' },
-                { containerId: 'chartVNQ', symbol: 'AMEX:VNQ/BITSTAMP:BTCUSD', name: 'Real Estate', assetSymbol: 'VNQ' },
-                { containerId: 'chartOil', symbol: 'TVC:USOIL/BITSTAMP:BTCUSD', name: 'Oil', assetSymbol: 'WTI' }
+                { containerId: 'chartGold', name: 'Gold', assetSymbol: 'XAU' },
+                { containerId: 'chartSPY', name: 'S&P 500', assetSymbol: 'SPY' },
+                { containerId: 'chartAAPL', name: 'Apple', assetSymbol: 'AAPL' },
+                { containerId: 'chartTSLA', name: 'Tesla', assetSymbol: 'TSLA' },
+                { containerId: 'chartVNQ', name: 'Real Estate', assetSymbol: 'VNQ' },
+                { containerId: 'chartOil', name: 'Oil', assetSymbol: 'WTI' }
             ];
 
-            // Initialize each chart
+            // Ensure TradingView library is loaded before initializing charts
+            await this.ensureTradingViewLoaded();
+
+            // Initialize each chart with ratio symbol (ASSET/BTC)
             chartConfigs.forEach(config => {
-                this.initMiniChart(config.containerId, config.symbol, config.name, config.assetSymbol);
+                const base = this.getTradingViewBaseSymbol(config.assetSymbol);
+                const tvSymbol = `${base}/BITSTAMP:BTCUSD`;
+                this.initMiniChart(config.containerId, tvSymbol, config.name, config.assetSymbol);
             });
 
         } catch (error) {
             console.error('Failed to initialize mini charts:', error);
         }
+    }
+
+    /**
+     * Ensure TradingView tv.js is loaded (once)
+     */
+    ensureTradingViewLoaded() {
+        if (typeof TradingView !== 'undefined') {
+            return Promise.resolve();
+        }
+
+        if (this._tvLoadingPromise) return this._tvLoadingPromise;
+
+        this._tvLoadingPromise = new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/tv.js';
+            script.onload = () => resolve();
+            script.onerror = () => resolve(); // Resolve anyway to allow fallbacks
+            document.head.appendChild(script);
+        });
+
+        return this._tvLoadingPromise;
     }
 
     /**
@@ -247,55 +277,44 @@ export class HomePage {
         // Append overlay to wrapper
         wrapper.appendChild(performanceOverlay);
 
-        // Create TradingView widget
+        // Create TradingView mini symbol embed (external script)
         try {
-            const chartOverlay = document.createElement('div');
-            chartOverlay.id = `${containerId}-chart-overlay`;
-            chartOverlay.style.position = 'absolute';
-            chartOverlay.style.top = '10px';
-            chartOverlay.style.right = '10px';
-            chartOverlay.style.zIndex = '11';
-            chartOverlay.style.fontSize = '14px';
-            chartOverlay.style.fontWeight = '600';
-            chartOverlay.style.color = '#ffffff';
-            chartOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-            chartOverlay.style.padding = '4px 8px';
-            chartOverlay.style.borderRadius = '4px';
-            chartOverlay.textContent = 'Loading...';
-            wrapper.appendChild(chartOverlay);
+            // Embedded mini-symbol-overview widget
+            const chartDiv = document.createElement('div');
+            chartDiv.style.width = '100%';
+            chartDiv.style.height = '100%';
+            chartDiv.style.position = 'absolute';
+            chartDiv.style.top = '0';
+            chartDiv.style.left = '0';
+            chartDiv.style.pointerEvents = 'none';
 
-            // Create TradingView widget container
-            const chartContainer = document.createElement('div');
-            chartContainer.style.height = '100%';
-            chartContainer.style.width = '100%';
-            wrapper.appendChild(chartContainer);
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+            script.innerHTML = JSON.stringify({
+                symbol,
+                width: '100%',
+                height: '100%',
+                locale: 'en',
+                dateRange: '60M',
+                colorTheme: 'light',
+                trendLineColor: 'rgba(251, 146, 60, 1)',
+                underLineColor: 'rgba(251, 146, 60, 0.1)',
+                underLineBottomColor: 'rgba(251, 146, 60, 0)',
+                isTransparent: true,
+                autosize: true,
+                noTimeScale: true,
+                chartOnly: true,
+                hide_top_toolbar: true,
+                hide_legend: true,
+                allow_symbol_change: false
+            });
 
-            // Initialize TradingView widget (if available)
-            if (typeof TradingView !== 'undefined') {
-                new TradingView.widget({
-                    "width": "100%",
-                    "height": "100%",
-                    "symbol": symbol,
-                    "interval": "1D",
-                    "timezone": "Etc/UTC",
-                    "theme": "light",
-                    "style": "1",
-                    "locale": "en",
-                    "toolbar_bg": "#f1f3f6",
-                    "enable_publishing": false,
-                    "hide_top_toolbar": true,
-                    "hide_legend": true,
-                    "save_image": false,
-                    "container_id": chartContainer,
-                    "hide_volume": true
-                });
-            } else {
-                // Fallback for when TradingView is not available
-                chartContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6b7280;">Chart Loading...</div>';
-            }
+            chartDiv.appendChild(script);
+            wrapper.appendChild(chartDiv);
 
         } catch (error) {
-            console.error('Error creating TradingView widget:', error);
+            console.error('Error creating TradingView embed:', error);
         }
 
         // Add wrapper to container
@@ -303,6 +322,65 @@ export class HomePage {
 
         // Load performance data for this asset
         this.loadAssetPerformance(assetSymbol, containerId);
+    }
+
+    /**
+     * Map asset symbol to TradingView base symbol
+     * @param {string} assetSymbol
+     * @returns {string} TradingView base symbol (USD pair or TVC)
+     */
+    getTradingViewBaseSymbol(assetSymbol) {
+        const map = {
+            // Crypto
+            'BTC': 'BITSTAMP:BTCUSD',
+            // Commodities
+            'XAU': 'TVC:GOLD',
+            'XAG': 'TVC:SILVER',
+            'WTI': 'TVC:USOIL',
+            // US stocks and ETFs
+            'SPY': 'AMEX:SPY',
+            'AAPL': 'NASDAQ:AAPL',
+            'TSLA': 'NASDAQ:TSLA',
+            'MSFT': 'NASDAQ:MSFT',
+            'GOOGL': 'NASDAQ:GOOGL',
+            'AMZN': 'NASDAQ:AMZN',
+            'META': 'NASDAQ:META',
+            'NVDA': 'NASDAQ:NVDA',
+            'QQQ': 'NASDAQ:QQQ',
+            'VTI': 'AMEX:VTI',
+            'VOO': 'AMEX:VOO',
+            'VEA': 'AMEX:VEA',
+            'VWO': 'AMEX:VWO',
+            'AGG': 'NASDAQ:AGG',
+            'TLT': 'NASDAQ:TLT',
+            'IEF': 'NASDAQ:IEF',
+            'HYG': 'AMEX:HYG',
+            'LQD': 'AMEX:LQD',
+            'TIP': 'NASDAQ:TIP',
+            'VNQ': 'AMEX:VNQ',
+            'SLV': 'AMEX:SLV',
+            'DBC': 'AMEX:DBC',
+            'USO': 'AMEX:USO',
+            'UNG': 'AMEX:UNG',
+            'ARKK': 'AMEX:ARKK',
+            'COIN': 'NASDAQ:COIN',
+            'MSTR': 'NASDAQ:MSTR',
+            'VXUS': 'NASDAQ:VXUS',
+            'EFA': 'AMEX:EFA',
+            'EWU': 'AMEX:EWU',
+            'EWG': 'AMEX:EWG',
+            'EWJ': 'AMEX:EWJ',
+            'VNO': 'NYSE:VNO',
+            'PLD': 'NYSE:PLD',
+            'EQIX': 'NASDAQ:EQIX',
+            'URA': 'AMEX:URA',
+            'DBA': 'AMEX:DBA',
+            'CPER': 'AMEX:CPER',
+            'WEAT': 'AMEX:WEAT',
+            // Ticker with dot in TradingView
+            'BRK-B': 'NYSE:BRK.B'
+        };
+        return map[assetSymbol] || `NASDAQ:${assetSymbol}`;
     }
 
     /**
@@ -350,15 +428,24 @@ export class HomePage {
         const priceElement = getElementById(`${asset.elementId}Price`);
         const changeElement = getElementById(`${asset.elementId}Change`);
 
-        if (priceElement && pricesInSats[asset.symbol]) {
-            // Convert sats to BTC for display
-            const priceInBTC = pricesInSats[asset.symbol] / 100000000;
-            priceElement.textContent = priceInBTC < 0.001 ? priceInBTC.toFixed(8) : priceInBTC.toFixed(4);
+        if (!priceElement) return;
 
-            // Get performance data and update if available
-            if (changeElement) {
-                this.loadAssetPerformance(asset.symbol, null, changeElement);
-            }
+        let sats = pricesInSats[asset.symbol];
+        // Fallback: compute from USD if sats not present
+        if ((sats === undefined || sats === null) && pricesUsd[asset.symbol] && btcPrice) {
+            sats = Math.round((pricesUsd[asset.symbol] / btcPrice) * 100000000);
+        }
+
+        if (typeof sats === 'number' && sats > 0) {
+            const priceInBTC = sats / 100000000;
+            priceElement.textContent = priceInBTC < 0.001 ? priceInBTC.toFixed(8) : priceInBTC.toFixed(4);
+        } else {
+            priceElement.textContent = '—';
+        }
+
+        // Load and display performance if element exists
+        if (changeElement) {
+            this.loadAssetPerformance(asset.symbol, null, changeElement);
         }
     }
 
@@ -377,14 +464,8 @@ export class HomePage {
                 const sign = performance.performance >= 0 ? '+' : '';
                 const color = performance.performance >= 0 ? '#10B981' : '#EF4444';
 
-                // Update chart overlay if chart container provided
+                // Update 5Y big overlay in the card
                 if (chartContainerId) {
-                    const chartOverlay = getElementById(`${chartContainerId}-chart-overlay`);
-                    if (chartOverlay) {
-                        chartOverlay.textContent = `5Y: ${sign}${perf}%`;
-                        chartOverlay.style.backgroundColor = color;
-                    }
-
                     const perfElement = getElementById(`${chartContainerId}-5y-perf`);
                     if (perfElement) {
                         perfElement.textContent = `${sign}${perf}%`;
@@ -412,15 +493,32 @@ export class HomePage {
         const heroDesc = this.welcomeSection?.querySelector('p');
         const heroBtn = this.heroSection;
 
-        if (heroTitle) {
-            setText(heroTitle, `Welcome back, ${user.username || user.email.split('@')[0]}!`);
+        // Get translation service
+        const translationService = this.services.translationService || window.translationService;
+        const username = user.username || user.email.split('@')[0];
+
+        if (heroTitle && translationService) {
+            const welcomeText = translationService.translate('home.welcomeBack', `Welcome back, ${username}!`, { username });
+            setText(heroTitle, welcomeText);
+        } else if (heroTitle) {
+            // Fallback to English if no translation service
+            setText(heroTitle, `Welcome back, ${username}!`);
         }
 
-        if (heroDesc) {
+        if (heroDesc && translationService) {
+            const trackingText = translationService.translate('home.continueTracking', 'Continue tracking your Bitcoin-denominated portfolio');
+            setText(heroDesc, trackingText);
+        } else if (heroDesc) {
+            // Fallback to English if no translation service
             setText(heroDesc, 'Continue tracking your Bitcoin-denominated portfolio');
         }
 
-        if (heroBtn) {
+        if (heroBtn && translationService) {
+            const buttonText = translationService.translate('home.viewPortfolio', 'View Portfolio');
+            setText(heroBtn, buttonText);
+            heroBtn.setAttribute('data-route', '#portfolio');
+        } else if (heroBtn) {
+            // Fallback to English if no translation service
             setText(heroBtn, 'View Portfolio');
             heroBtn.setAttribute('data-route', '#portfolio');
         }
@@ -435,7 +533,15 @@ export class HomePage {
     updateWelcomeForGuest() {
         const heroBtn = this.heroSection;
 
-        if (heroBtn) {
+        // Get translation service
+        const translationService = this.services.translationService || window.translationService;
+
+        if (heroBtn && translationService) {
+            const buttonText = translationService.translate('home.startYourPortfolio', 'Start Your Portfolio');
+            setText(heroBtn, buttonText);
+            heroBtn.setAttribute('data-route', '#login');
+        } else if (heroBtn) {
+            // Fallback to English if no translation service
             setText(heroBtn, 'Start Your Portfolio');
             heroBtn.setAttribute('data-route', '#login');
         }
@@ -460,8 +566,7 @@ export class HomePage {
             // Create or update quick stats section
             this.createQuickStatsSection();
 
-            // Show recent activity
-            await this.showRecentActivity();
+            // Recent activity removed per user request
         } catch (error) {
             console.error('Failed to show quick stats:', error);
         }
@@ -476,133 +581,10 @@ export class HomePage {
             hideElement(quickStats);
         }
 
-        const recentActivity = getElementById('homeRecentActivity');
-        if (recentActivity) {
-            hideElement(recentActivity);
-        }
+        // Recent activity component removed
     }
 
-    /**
-     * Show recent activity for authenticated users
-     */
-    async showRecentActivity() {
-        try {
-            if (!this.services.portfolioService) return;
-
-            // Load recent trades if needed
-            const trades = this.services.portfolioService.getTradeHistory();
-            if (!trades.length) {
-                await this.services.portfolioService.loadTradeHistory();
-            }
-
-            // Create or update recent activity section
-            this.createRecentActivitySection();
-        } catch (error) {
-            console.error('Failed to show recent activity:', error);
-        }
-    }
-
-    /**
-     * Create recent activity section
-     */
-    createRecentActivitySection() {
-        let recentActivity = getElementById('homeRecentActivity');
-
-        if (!recentActivity) {
-            recentActivity = document.createElement('div');
-            recentActivity.id = 'homeRecentActivity';
-            recentActivity.className = 'bg-white rounded-lg shadow-md p-6 mb-8';
-
-            // Insert after quick stats
-            const quickStats = getElementById('homeQuickStats');
-            if (quickStats && quickStats.nextSibling) {
-                quickStats.parentNode.insertBefore(recentActivity, quickStats.nextSibling);
-            }
-        }
-
-        // Update recent activity content
-        this.updateRecentActivityContent(recentActivity);
-        showElement(recentActivity);
-    }
-
-    /**
-     * Update recent activity content
-     * @param {HTMLElement} activityElement - Activity container element
-     */
-    updateRecentActivityContent(activityElement) {
-        const portfolioService = this.services.portfolioService;
-        if (!portfolioService) return;
-
-        const trades = portfolioService.getTradeHistory().slice(0, 5); // Show last 5 trades
-
-        let activityHTML = `
-            <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
-        `;
-
-        if (trades.length === 0) {
-            activityHTML += `
-                <div class="text-center py-8 text-gray-500">
-                    <div class="text-4xl mb-2">📊</div>
-                    <div>No trades yet</div>
-                    <div class="text-sm">Start trading to see your activity here</div>
-                </div>
-            `;
-        } else {
-            activityHTML += `<div class="space-y-3">`;
-
-            trades.forEach(trade => {
-                const tradeDate = new Date(trade.created_at).toLocaleDateString();
-                const fromAmount = this.formatTradeAmount(trade.from_amount, trade.from_asset);
-                const toAmount = this.formatTradeAmount(trade.to_amount, trade.to_asset);
-
-                activityHTML += `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span class="text-blue-600 text-sm font-semibold">↔</span>
-                            </div>
-                            <div>
-                                <div class="font-medium">${fromAmount} → ${toAmount}</div>
-                                <div class="text-sm text-gray-500">${tradeDate}</div>
-                            </div>
-                        </div>
-                        <div class="text-sm text-gray-400">
-                            <span class="hover:text-gray-600 cursor-pointer" onclick="window.location.hash='#portfolio'">View Details</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            activityHTML += `</div>`;
-
-            // Add view all link
-            activityHTML += `
-                <div class="mt-4 text-center">
-                    <button onclick="window.location.hash='#portfolio'" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View All Trades →
-                    </button>
-                </div>
-            `;
-        }
-
-        activityElement.innerHTML = activityHTML;
-    }
-
-    /**
-     * Format trade amount for display
-     * @param {number} amount - Raw amount
-     * @param {string} asset - Asset symbol
-     * @returns {string} Formatted amount
-     */
-    formatTradeAmount(amount, asset) {
-        if (asset === 'BTC') {
-            const btc = amount / 100000000;
-            return `${btc.toFixed(8)} BTC`;
-        } else {
-            const actualAmount = amount / 100000000;
-            return `${actualAmount.toFixed(2)} ${asset}`;
-        }
-    }
+    // Recent activity section removed per user request
 
     /**
      * Create quick stats section
@@ -628,37 +610,12 @@ export class HomePage {
     }
 
     /**
-     * Update quick stats content
+     * Update quick stats content - Portfolio at a Glance removed per user request
      * @param {HTMLElement} statsElement - Stats container element
      */
     updateQuickStatsContent(statsElement) {
-        const portfolioService = this.services.portfolioService;
-        if (!portfolioService) return;
-
-        const holdings = portfolioService.getHoldings();
-        const totalValue = holdings.reduce((sum, holding) => sum + (holding.current_value_sats || 0), 0);
-        const baseline = portfolioService.getPortfolioBaseline();
-        const performance = portfolioService.calculatePerformance(totalValue);
-
-        const statsHTML = `
-            <h3 class="text-lg font-semibold mb-4">Your Portfolio at a Glance</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">${formatSatoshisForUI(totalValue)}</div>
-                    <div class="text-sm text-gray-600">Current Value</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold ${performance.isPositive ? 'text-green-600' : 'text-red-600'}">${performance.formatted}</div>
-                    <div class="text-sm text-gray-600">Performance</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-gray-700">${holdings.length}</div>
-                    <div class="text-sm text-gray-600">Assets</div>
-                </div>
-            </div>
-        `;
-
-        statsElement.innerHTML = statsHTML;
+        // Portfolio at a Glance section removed per user request
+        statsElement.style.display = 'none';
     }
 
     /**
@@ -893,6 +850,26 @@ export class HomePage {
     }
 
     /**
+     * Set up language change listener
+     */
+    setupLanguageChangeListener() {
+        const languageChangeHandler = (event) => {
+            console.log('Language changed in home page, updating welcome section:', event.detail?.language);
+
+            // Update welcome section based on current auth state
+            if (this.services.authService?.isAuthenticated()) {
+                const user = this.services.authService.getCurrentUser();
+                this.updateWelcomeForUser(user);
+            } else {
+                this.updateWelcomeForGuest();
+            }
+        };
+
+        const cleanup = addEventListener(document, 'languageChange', languageChangeHandler);
+        this.eventListeners.push(cleanup);
+    }
+
+    /**
      * Expand topic section
      * @param {HTMLElement} topicElement - Topic element
      * @param {string} topic - Topic identifier
@@ -949,9 +926,7 @@ export class HomePage {
         // Update dynamic content
         this.updateContentForAuthState();
 
-        if (this.services.authService?.isAuthenticated()) {
-            await this.showQuickStats();
-        }
+        // Portfolio at a Glance and Recent Activity sections removed per user request
 
         console.log('Home page rendered');
     }

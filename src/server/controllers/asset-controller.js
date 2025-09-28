@@ -16,21 +16,10 @@ class AssetController extends BaseController {
     async getAllAssets(req, res) {
         try {
             const assets = await this.priceService.prisma.asset.findMany({
-                where: {
-                    OR: [
-                        { isActive: true },
-                        { isActive: null } // Handle legacy data
-                    ]
-                },
                 select: {
                     symbol: true,
-                    name: true,
-                    type: true,
-                    exchange: true,
-                    description: true,
                     currentPriceUsd: true,
-                    lastUpdated: true,
-                    isActive: true
+                    lastUpdated: true
                 },
                 orderBy: { symbol: 'asc' }
             });
@@ -107,6 +96,126 @@ class AssetController extends BaseController {
             });
         } catch (error) {
             this.handleError(error, res, 'getAssetPrice');
+        }
+    }
+
+    /**
+     * Get current prices for all assets
+     * GET /api/assets/prices
+     */
+    async getAllPrices(req, res) {
+        try {
+            // Get all assets with their current prices
+            const assets = await this.priceService.prisma.asset.findMany({
+                select: {
+                    symbol: true,
+                    currentPriceUsd: true,
+                    lastUpdated: true
+                },
+                orderBy: { symbol: 'asc' }
+            });
+
+            // Convert to key-value format for easier frontend consumption
+            const prices = {};
+            let lastUpdate = null;
+
+            assets.forEach(asset => {
+                prices[asset.symbol] = {
+                    usd: asset.currentPriceUsd,
+                    lastUpdated: asset.lastUpdated
+                };
+
+                // Track the most recent update
+                if (!lastUpdate || (asset.lastUpdated && asset.lastUpdated > lastUpdate)) {
+                    lastUpdate = asset.lastUpdated;
+                }
+            });
+
+            this.sendSuccess(res, {
+                prices,
+                lastUpdated: lastUpdate || new Date().toISOString(),
+                count: assets.length
+            });
+        } catch (error) {
+            this.handleError(error, res, 'getAllPrices');
+        }
+    }
+
+    /**
+     * Get asset performance vs BTC over a period
+     * GET /api/assets/performance/:symbol/:period
+     */
+    async getAssetPerformance(req, res) {
+        try {
+            const { symbol, period = '5y' } = req.params;
+            if (!symbol || typeof symbol !== 'string') {
+                throw new Error('Invalid asset symbol');
+            }
+
+            const sanitizedSymbol = this.sanitizeInput(symbol).toUpperCase();
+
+            // Map app symbols to Yahoo Finance symbols
+            const yahooMap = {
+                'XAU': 'GC=F', // Gold futures
+                'XAG': 'SI=F', // Silver futures
+                'WTI': 'CL=F', // Crude oil futures
+                'BTC': 'BTC-USD'
+            };
+            const assetYahoo = yahooMap[sanitizedSymbol] || sanitizedSymbol;
+            const btcYahoo = 'BTC-USD';
+
+            // Fetch historical closes
+            const PriceService = require('../services/price-service');
+            const ps = new PriceService();
+
+            const assetHist = await ps.getYahooHistoricalCloses(assetYahoo, period);
+            const btcHist = await ps.getYahooHistoricalCloses(btcYahoo, period);
+
+            if (!assetHist || !assetHist.first || !assetHist.last) {
+                throw new Error('Asset history not available');
+            }
+            if (!btcHist || !btcHist.first || !btcHist.last) {
+                throw new Error('BTC history not available');
+            }
+
+            // Compute performance vs BTC as ratio change
+            const startRatio = assetHist.first / btcHist.first;
+            const endRatio = assetHist.last / btcHist.last;
+            const performance = (endRatio / startRatio - 1) * 100;
+
+            // Get start date for period
+            const now = new Date();
+            let startDate;
+            switch(period) {
+                case '24h':
+                    startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    break;
+                case '1y':
+                    startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                    break;
+                case '5y':
+                    startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+                    break;
+                case '10y':
+                    startDate = new Date(now.getFullYear() - 10, now.getMonth(), now.getDate());
+                    break;
+                default:
+                    startDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+            }
+
+            this.sendSuccess(res, {
+                performance,
+                period,
+                startDate: startDate.toISOString(),
+                details: {
+                    assetPriceOld: assetHist.first,
+                    btcPriceOld: btcHist.first,
+                    assetPriceCurrent: assetHist.last,
+                    btcPriceCurrent: btcHist.last
+                }
+            });
+        } catch (error) {
+            this.handleError(error, res, 'getAssetPerformance');
         }
     }
 

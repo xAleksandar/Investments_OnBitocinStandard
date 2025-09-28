@@ -106,12 +106,31 @@ class PortfolioService {
      */
     async loadTradeHistory() {
         try {
-            const trades = await this.apiClient.getTradeHistory();
+            const resp = await this.apiClient.getTradeHistory();
+            const rawTrades = Array.isArray(resp) ? resp : (resp?.trades || []);
 
-            // Check if response contains an error
-            if (trades.error) {
-                throw new Error(trades.error);
-            }
+            // Normalize trade objects for UI components expecting snake_case
+            const trades = rawTrades.map(t => {
+                // If already in expected shape, return as-is
+                if (t && (t.from_asset || t.created_at)) return t;
+
+                const fromAmount = typeof t.fromAmount === 'string' ? Number(t.fromAmount) : (t.fromAmount ?? 0);
+                const toAmount = typeof t.toAmount === 'string' ? Number(t.toAmount) : (t.toAmount ?? 0);
+                const createdAt = t.executedAt || t.createdAt || t.created_at || null;
+                const btcPriceUsd = t.btc_price_usd ?? t.btcPriceUsd ?? null;
+                const assetPriceUsd = t.asset_price_usd ?? t.assetPriceUsd ?? null;
+
+                return {
+                    id: t.id,
+                    from_asset: t.fromAsset || t.from_asset,
+                    to_asset: t.toAsset || t.to_asset,
+                    from_amount: fromAmount,
+                    to_amount: toAmount,
+                    created_at: createdAt,
+                    btc_price_usd: btcPriceUsd !== null ? Number(btcPriceUsd) : null,
+                    asset_price_usd: assetPriceUsd !== null ? Number(assetPriceUsd) : null
+                };
+            });
 
             this.tradeHistory = trades;
             return trades;
@@ -429,12 +448,19 @@ class PortfolioService {
      * Execute a trade
      * @param {string} fromAsset - Source asset symbol
      * @param {string} toAsset - Target asset symbol
-     * @param {number} amount - Amount to trade
+     * @param {number|string} amount - Amount to trade (raw, paired with unit)
+     * @param {string} unit - Unit of amount ('btc'|'sat'|'ksat'|'msat'|'asset')
      * @returns {Promise<Object>} Trade result
      */
-    async executeTrade(fromAsset, toAsset, amount) {
+    async executeTrade(fromAsset, toAsset, amount, unit) {
         try {
-            const result = await this.apiClient.executeTrade(fromAsset, toAsset, amount);
+            // Support object-style payload for backward compatibility
+            if (typeof fromAsset === 'object' && fromAsset !== null) {
+                const data = fromAsset;
+                return await this.apiClient.executeTrade(data.fromAsset, data.toAsset, data.amount, data.unit);
+            }
+
+            const result = await this.apiClient.executeTrade(fromAsset, toAsset, amount, unit);
 
             // Reload portfolio after successful trade
             await this.loadPortfolio();
@@ -511,8 +537,8 @@ class PortfolioService {
      * Trade and conversion methods for user actions
      */
     async convertAsset(data) {
-        // Alias for executeTrade with specific conversion logic
-        return await this.executeTrade(data.fromAsset, data.toAsset, data.amount);
+        // Alias for executeTrade with explicit unit
+        return await this.executeTrade(data.fromAsset, data.toAsset, data.amount, data.unit);
     }
 
     async exportPortfolio(format = 'json') {

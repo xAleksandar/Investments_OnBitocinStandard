@@ -44,6 +44,39 @@ export class Router {
     }
 
     /**
+     * Early initialization to show correct page immediately
+     * Called before full app initialization to prevent flash
+     */
+    earlyInit() {
+        console.log('🚀 Early router init - preventing page flash');
+
+        // Hide all pages first
+        this.hideAllPages();
+
+        // Get current hash and show the appropriate page immediately
+        const currentHash = window.location.hash || '#home';
+        const routeInfo = this.parseRoute(currentHash);
+        const route = this.findMatchingRoute(routeInfo);
+
+        if (route) {
+            console.log('🚀 Early showing page:', route.pageId);
+            const pageElement = getElementById(route.pageId);
+            if (pageElement) {
+                showElement(pageElement);
+                pageElement.style.display = 'block'; // Ensure it's visible
+            }
+        } else {
+            // Fallback to home page
+            console.log('🚀 Early fallback to home page');
+            const homePage = getElementById('homePage');
+            if (homePage) {
+                showElement(homePage);
+                homePage.style.display = 'block';
+            }
+        }
+    }
+
+    /**
      * Set up default application routes
      */
     setupDefaultRoutes() {
@@ -318,13 +351,18 @@ export class Router {
         const pageElement = getElementById(route.pageId);
 
         if (pageElement) {
-            showElement(pageElement);
+            console.log(`📄 Showing page: ${route.pageId}`);
 
-            // Fallback to inline style if needed
-            const computedStyle = window.getComputedStyle(pageElement);
-            if (computedStyle.display === 'none') {
-                pageElement.style.display = 'block';
-            }
+            // Multiple methods to ensure page is visible
+            showElement(pageElement);
+            pageElement.style.display = 'block';
+            pageElement.classList.remove('hidden');
+
+            // Ensure visibility
+            pageElement.style.visibility = 'visible';
+            pageElement.style.opacity = '1';
+
+            console.log(`📄 Page ${route.pageId} is now visible`);
         } else {
             console.error('Page element not found:', route.pageId);
         }
@@ -364,16 +402,21 @@ export class Router {
             'componentsPage'
         ];
 
+        console.log('🧹 Hiding all pages for clean navigation');
+
         pageIds.forEach(pageId => {
             const element = getElementById(pageId);
             if (element) {
+                // Use multiple methods to ensure element is hidden
                 hideElement(element);
+                element.style.display = 'none';
+                element.classList.add('hidden');
 
-                // Fallback to inline style if needed
-                const computedStyle = window.getComputedStyle(element);
-                if (computedStyle.display !== 'none') {
-                    element.style.display = 'none';
-                }
+                // Remove any conflicting display styles
+                element.style.visibility = '';
+                element.style.opacity = '';
+
+                console.log(`🧹 Hidden page: ${pageId}`);
             }
         });
     }
@@ -521,10 +564,12 @@ export class Router {
      */
     handleEducationContent(params) {
         console.log('Loading education content:', params.content);
-
-        if (params.content) {
-            // This would be handled by education service
-            console.log('Loading educational content:', params.content);
+        if (params.content && this.pages && this.pages.education) {
+            if (this.pages.education.show) {
+                this.pages.education.show({ content: params.content });
+            } else if (this.pages.education.loadEducationalContent) {
+                this.pages.education.loadEducationalContent(params.content);
+            }
         }
     }
 

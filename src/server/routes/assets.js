@@ -17,6 +17,16 @@ router.get('/search', asyncHandler(async (req, res) => {
     await assetController.searchAssets(req, res);
 }));
 
+// Get current prices for all assets (GET) - Must come BEFORE /:symbol
+router.get('/prices', asyncHandler(async (req, res) => {
+    await assetController.getAllPrices(req, res);
+}));
+
+// Get asset performance vs BTC for a period
+router.get('/performance/:symbol/:period', asyncHandler(async (req, res) => {
+    await assetController.getAssetPerformance(req, res);
+}));
+
 // Get specific asset information
 router.get('/:symbol', asyncHandler(async (req, res) => {
     await assetController.getAsset(req, res);
@@ -32,7 +42,7 @@ router.get('/:symbol/history', asyncHandler(async (req, res) => {
     await assetController.getAssetHistory(req, res);
 }));
 
-// Get prices for multiple assets
+// Get prices for multiple assets (POST)
 router.post('/prices', asyncHandler(async (req, res) => {
     await assetController.getMultiplePrices(req, res);
 }));

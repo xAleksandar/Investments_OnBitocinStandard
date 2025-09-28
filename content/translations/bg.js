@@ -581,6 +581,7 @@ export const translations = {
         backToEducation: 'Назад към образованието',
         tableOfContents: 'Съдържание',
         minutesReading: 'мин четене',
+        readMore: 'Прочети',
         lastUpdatedLabel: 'Последна актуализация',
         readingTime: '{minutes} мин четене',
         lastUpdated: 'Последна актуализация: {date}',

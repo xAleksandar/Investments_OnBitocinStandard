@@ -45,7 +45,17 @@ class ApiClient {
 
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
-                return await response.json();
+                const payload = await response.json();
+                // Unwrap standardized API envelope { success, data }
+                if (payload && typeof payload === 'object') {
+                    if (payload.error) {
+                        throw new Error(payload.message || 'Request failed');
+                    }
+                    if (Object.prototype.hasOwnProperty.call(payload, 'success') && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                        return payload.data;
+                    }
+                }
+                return payload;
             }
 
             return await response.text();
@@ -112,7 +122,16 @@ class ApiClient {
      * @returns {Promise<Array>} Array of assets
      */
     async getAssets() {
-        return this.get('/api/assets');
+        const resp = await this.get('/api/assets');
+        if (Array.isArray(resp)) return resp;
+        if (resp && resp.assets) {
+            try {
+                return Object.values(resp.assets).flat();
+            } catch (_) {
+                return [];
+            }
+        }
+        return [];
     }
 
     /**
@@ -188,11 +207,12 @@ class ApiClient {
      * Execute a trade
      * @param {string} fromAsset - Source asset symbol
      * @param {string} toAsset - Target asset symbol
-     * @param {number} amount - Amount to trade
+     * @param {number|string} amount - Amount to trade (raw number based on unit)
+     * @param {string} unit - Unit of amount ('btc'|'sat'|'ksat'|'msat'|'asset')
      * @returns {Promise<Object>} Trade result
      */
-    async executeTrade(fromAsset, toAsset, amount) {
-        return this.post('/api/trades/execute', { fromAsset, toAsset, amount });
+    async executeTrade(fromAsset, toAsset, amount, unit) {
+        return this.post('/api/trades/execute', { fromAsset, toAsset, amount, unit });
     }
 
     /**

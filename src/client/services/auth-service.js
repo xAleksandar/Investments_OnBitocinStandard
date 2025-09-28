@@ -7,9 +7,21 @@ class AuthService {
         this.apiClient = apiClient;
         this.notificationService = notificationService;
         this.token = localStorage.getItem('token');
-        this.user = JSON.parse(localStorage.getItem('user') || '{}');
+        // Robustly parse stored user, guarding against string "undefined"/"null" and invalid JSON
+        const rawUser = localStorage.getItem('user');
+        if (rawUser && rawUser !== 'undefined' && rawUser !== 'null') {
+            try {
+                this.user = JSON.parse(rawUser);
+            } catch (e) {
+                console.warn('Invalid user JSON in localStorage, resetting. Raw:', rawUser);
+                this.user = {};
+                localStorage.removeItem('user');
+            }
+        } else {
+            this.user = {};
+        }
 
-        // Event listeners for auth state changes
+        // Event listeners for auth state changes (service-level)
         this.authStateListeners = [];
     }
 
@@ -19,6 +31,14 @@ class AuthService {
      */
     onAuthStateChange(listener) {
         this.authStateListeners.push(listener);
+    }
+
+    /**
+     * Backward-compat alias used by components
+     * @param {Function} listener - (isAuthenticated, user) => void
+     */
+    onAuthChange(listener) {
+        this.onAuthStateChange(({ isAuthenticated, user }) => listener(isAuthenticated, user));
     }
 
     /**
@@ -37,6 +57,7 @@ class AuthService {
      * @param {Object} authState - Current authentication state
      */
     notifyAuthStateChange(authState) {
+        // Notify registered service listeners
         this.authStateListeners.forEach(listener => {
             try {
                 listener(authState);
@@ -44,6 +65,14 @@ class AuthService {
                 console.error('Error in auth state listener:', error);
             }
         });
+
+        // Also broadcast as DOM event for app-wide listeners
+        try {
+            const evt = new CustomEvent('authStateChanged', { detail: authState });
+            document.dispatchEvent(evt);
+        } catch (err) {
+            // In non-DOM contexts this may fail; ignore silently
+        }
     }
 
     /**
@@ -87,13 +116,28 @@ class AuthService {
     async requestMagicLink(email, username = null) {
         try {
             const data = await this.apiClient.requestMagicLink(email, username);
+            console.log('🔍 Magic link response:', data);
+            console.log('🔍 Data structure:', JSON.stringify(data, null, 2));
 
             if (this.notificationService) {
-                this.notificationService.showMessage(data.message, 'success');
+                const fallbackMsg = 'Magic link sent. Please check your email.';
+                const msg = typeof data?.message === 'string' ? data.message
+                    : (typeof data?.data?.message === 'string' ? data.data.message : fallbackMsg);
+                this.notificationService.showMessage(msg, 'success');
 
-                // If we have a magic link URL, show the open button
-                if (data.magicLink) {
-                    this.showMagicLinkButton(data.magicLink);
+                // Check for magic link URL - server returns nested in data.data.magicLinkUrl
+                const magicLink = data.magicLink || data.magicLinkUrl || data.data?.magicLinkUrl || data.data?.magicLink;
+                console.log('🔍 Magic link found:', magicLink);
+
+                if (magicLink) {
+                    console.log('🔗 Showing magic link button for:', magicLink);
+                    this.showMagicLinkButton(magicLink);
+                } else {
+                    console.log('❌ No magic link found in response');
+                    console.log('❌ Available keys:', Object.keys(data));
+                    if (data.data) {
+                        console.log('❌ data.data keys:', Object.keys(data.data));
+                    }
                 }
             }
 
@@ -119,20 +163,28 @@ class AuthService {
      * @param {string} magicLink - Magic link URL
      */
     showMagicLinkButton(magicLink) {
+        console.log('🔍 Looking for authMessage element...');
         const messageDiv = document.getElementById('authMessage');
-        if (!messageDiv) return;
 
+        if (!messageDiv) {
+            console.log('❌ authMessage element not found');
+            return;
+        }
+
+        console.log('✅ authMessage element found, adding magic link button');
+        // Replace content with message + button to avoid leftover values like 'true'
         const buttonHtml = `
-            <button
-                type="button"
-                onclick="window.open('${magicLink}', '_blank')"
-                class="mt-2 w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-            >
-                Open Magic Link
-            </button>
-        `;
-
-        messageDiv.innerHTML = messageDiv.innerHTML + buttonHtml;
+            <div class="mt-2">
+                <button type="button"
+                    onclick="window.open('${magicLink}', '_blank')"
+                    class="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Open Magic Link
+                </button>
+            </div>`;
+        // Preserve current message text (already set by showMessage)
+        const currentText = messageDiv.textContent || '';
+        messageDiv.innerHTML = `<div class="${messageDiv.className}">${currentText}</div>${buttonHtml}`;
+        console.log('🔗 Magic link button added to DOM');
     }
 
     /**
@@ -154,15 +206,23 @@ class AuthService {
         console.log('Verifying token:', token);
 
         try {
-            const data = await this.apiClient.verifyMagicLink(token);
+            const apiResponse = await this.apiClient.verifyMagicLink(token);
+            console.log('Verification response:', apiResponse);
 
-            console.log('Verification response:', data);
+            // Support standardized API envelope { success, data: { token, user, message } }
+            const payload = apiResponse?.data || apiResponse;
+            if (!payload?.token || !payload?.user) {
+                throw new Error('Invalid verification response');
+            }
 
             // Store authentication data
-            this.token = data.token;
-            this.user = data.user;
+            this.token = payload.token;
+            this.user = payload.user;
             localStorage.setItem('token', this.token);
             localStorage.setItem('user', JSON.stringify(this.user));
+
+            // Update nav/UI immediately
+            this.updateNavigationAuthState(true);
 
             // Notify listeners of successful authentication
             this.notifyAuthStateChange({
@@ -171,7 +231,7 @@ class AuthService {
                 isAdmin: this.isCurrentUserAdmin()
             });
 
-            return data;
+            return payload;
         } catch (error) {
             console.error('Verification error:', error);
 
@@ -242,8 +302,9 @@ class AuthService {
      * Synchronize mobile navigation authentication state
      */
     syncMobileAuthState() {
-        const mobileLoginBtn = document.getElementById('mobileLoginBtn');
-        const mobileUserInfo = document.getElementById('mobileUserInfo');
+        // Support both legacy and current IDs
+        const mobileLoginBtn = document.getElementById('mobileLoginBtn') || document.getElementById('mobileNavLoginBtn');
+        const mobileUserInfo = document.getElementById('mobileUserInfo') || document.getElementById('mobileNavUserInfo');
 
         if (mobileLoginBtn && mobileUserInfo) {
             if (this.isAuthenticated()) {

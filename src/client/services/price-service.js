@@ -103,19 +103,96 @@ class PriceService {
         try {
             const data = await this.apiClient.getPrices();
 
-            // Check if response contains valid data
-            if (data.error) {
-                console.error('Server error loading prices:', data.error);
-                if (this.notificationService) {
-                    this.notificationService.showNotification('Failed to load current prices', 'error');
+            // Normalize various server response shapes
+            let pricesInSats = {};
+            let pricesUsd = {};
+            let btcPrice = this.btcPrice;
+
+            if (data && (data.pricesInSats || data.pricesUsd || data.btcPrice)) {
+                // Legacy/expected shape
+                pricesInSats = data.pricesInSats || {};
+                pricesUsd = data.pricesUsd || {};
+                btcPrice = data.btcPrice || btcPrice;
+            } else if (data && data.prices) {
+                // Server envelope from /api/assets/prices: { prices: {SYM: {usd, lastUpdated}}, lastUpdated }
+                const pricesObj = data.prices || {};
+                const btcEntry = pricesObj['BTC'];
+                if (btcEntry && typeof btcEntry.usd === 'number') {
+                    btcPrice = btcEntry.usd;
                 }
-                return null;
+
+                Object.entries(pricesObj).forEach(([symbol, info]) => {
+                    if (info && typeof info.usd === 'number') {
+                        pricesUsd[symbol] = info.usd;
+                    }
+                });
+
+                // Compute sats if we have btcPrice
+                if (btcPrice && btcPrice > 0) {
+                    Object.entries(pricesUsd).forEach(([symbol, usd]) => {
+                        pricesInSats[symbol] = Math.round((usd / btcPrice) * 100000000);
+                    });
+                }
+            } else {
+                console.warn('Unexpected prices payload shape:', data);
+            }
+
+            // Fallback: if prices maps are empty, attempt to fetch from /api/assets
+            if (Object.keys(pricesUsd).length === 0 || Object.keys(pricesInSats).length === 0) {
+                try {
+                    const assets = await this.apiClient.getAssets();
+                    assets.forEach(a => {
+                        if (typeof a.currentPriceUsd === 'number') {
+                            pricesUsd[a.symbol] = a.currentPriceUsd;
+                        }
+                    });
+                    // Ensure BTC price set if available
+                    if ((!btcPrice || btcPrice <= 0) && typeof pricesUsd['BTC'] === 'number') {
+                        btcPrice = pricesUsd['BTC'];
+                    }
+                    if (btcPrice && btcPrice > 0) {
+                        Object.entries(pricesUsd).forEach(([symbol, usd]) => {
+                            pricesInSats[symbol] = Math.round((usd / btcPrice) * 100000000);
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Fallback to /api/assets failed:', e);
+                }
+            }
+
+            // Augment missing symbols with /api/assets data
+            try {
+                const assetsList = await this.apiClient.getAssets();
+                assetsList.forEach(asset => {
+                    const sym = asset.symbol;
+                    const usd = typeof asset.currentPriceUsd === 'number' ? asset.currentPriceUsd : parseFloat(asset.currentPriceUsd);
+                    if (!isNaN(usd)) {
+                        if (pricesUsd[sym] === undefined) {
+                            pricesUsd[sym] = usd;
+                        }
+                    }
+                });
+                // If btcPrice still missing, derive from BTC entry
+                if ((!btcPrice || btcPrice <= 0) && typeof pricesUsd['BTC'] === 'number') {
+                    btcPrice = pricesUsd['BTC'];
+                }
+                // Recompute sats for any symbols without sats
+                if (btcPrice && btcPrice > 0) {
+                    Object.entries(pricesUsd).forEach(([sym, usd]) => {
+                        if (pricesInSats[sym] === undefined) {
+                            pricesInSats[sym] = Math.round((usd / btcPrice) * 100000000);
+                        }
+                    });
+                }
+            } catch (e) {
+                // Non-fatal; continue with what we have
+                console.warn('Augmenting prices from /api/assets failed:', e);
             }
 
             // Update price data
-            this.prices = data.pricesInSats || {};
-            this.pricesUsd = data.pricesUsd || {};
-            this.btcPrice = data.btcPrice || this.btcPrice;
+            this.prices = pricesInSats;
+            this.pricesUsd = pricesUsd;
+            this.btcPrice = btcPrice;
 
             // Notify listeners of price update
             this.notifyPriceChange({

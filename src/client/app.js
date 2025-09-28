@@ -47,12 +47,18 @@ class BitcoinApp {
     }
 
     async init() {
-        if (this.isInitialized) return;
+        if (this.isInitialized) {
+return;
+}
 
         try {
             this.showLoadingState();
 
+
             await this.initializeServices();
+            // Process magic-link token from URL early and initialize auth state
+            await this.services.authService.initializeFromUrlToken();
+            this.services.authService.initializeAuthState();
             await this.initializeComponents();
             await this.initializePages();
             await this.initializeRouter();
@@ -62,12 +68,10 @@ class BitcoinApp {
 
             this.setupGlobalErrorHandling();
             this.setupEventCoordination();
+            this.setupAuthenticationForm();
 
             this.hideLoadingState();
             this.isInitialized = true;
-
-            console.log('✅ Bitcoin App initialized successfully');
-            this.services.notificationService?.show('Application loaded successfully', 'success');
 
         } catch (error) {
             console.error('❌ Failed to initialize Bitcoin App:', error);
@@ -137,7 +141,9 @@ class BitcoinApp {
         const currentUser = await this.services.authService.getCurrentUser();
 
         for (const [name, PageClass] of pageClasses) {
-            if (name === 'admin' && (!currentUser || !this.isAdminUser(currentUser))) continue;
+            if (name === 'admin' && (!currentUser || !this.isAdminUser(currentUser))) {
+continue;
+}
             const page = new PageClass(this.services);
             await page.init();
             this.pages[name] = page;
@@ -150,6 +156,9 @@ class BitcoinApp {
         console.log('🗺️ Initializing router...');
 
         this.router = new Router(this.services.authService, this.services.notificationService);
+
+        // Add router to services so other components can access it
+        this.services.router = this.router;
 
         // Store page references for router handlers
         this.router.pages = this.pages;
@@ -171,12 +180,22 @@ class BitcoinApp {
         ];
 
         for (const [name, FeatureClass] of features) {
-            const feature = new FeatureClass(this.services);
-            await feature.init();
-            this.components[name] = feature;
+            try {
+                console.log(`🔥 Initializing feature: ${name}`);
+                const feature = new FeatureClass(this.services);
+                console.log(`🔥 ${name} instance created`);
+
+                await feature.init();
+                console.log(`🔥 ${name} initialized successfully`);
+
+                this.components[name] = feature;
+            } catch (error) {
+                console.error(`🔥 Failed to initialize feature ${name}:`, error);
+            }
         }
 
         console.log('✅ Global features initialized');
+        console.log('🔥 Available components:', Object.keys(this.components));
     }
 
     async startApplication() {
@@ -280,6 +299,84 @@ class BitcoinApp {
         events.forEach(([event, handler]) => {
             document.addEventListener(event, handler.bind(this));
         });
+    }
+
+    setupAuthenticationForm() {
+        console.log('🔐 Setting up authentication form...');
+
+        // Set up authentication form event handler
+        const authForm = document.getElementById('authForm');
+        if (authForm) {
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleAuthFormSubmit();
+            });
+        }
+
+        // Set up email field event handler for checking user existence
+        const emailInput = document.getElementById('email');
+        if (emailInput) {
+            emailInput.addEventListener('blur', async () => {
+                await this.handleEmailBlur();
+            });
+        }
+
+        console.log('✅ Authentication form setup complete');
+    }
+
+    async handleAuthFormSubmit() {
+        try {
+            const email = document.getElementById('email').value.trim();
+            const username = document.getElementById('username').value.trim();
+
+            if (!email) {
+                this.services.notificationService?.showError('Please enter your email address');
+                return;
+            }
+
+            // Use the auth service to request magic link
+            await this.services.authService.requestMagicLink(email, username || null);
+
+        } catch (error) {
+            console.error('Auth form submit error:', error);
+            this.services.notificationService?.showError(error.message || 'Authentication failed');
+        }
+    }
+
+    async handleEmailBlur() {
+        try {
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+return;
+}
+
+            // Check if user exists (API client unwraps {success,data})
+            const response = await this.services.apiClient.checkUser(email);
+            const usernameField = document.getElementById('usernameField');
+
+            console.log('🔍 User existence check:', { email, response });
+
+            if (response && response.exists === false && usernameField) {
+                // Show username field for new users
+                usernameField.style.display = 'block';
+                const usernameInput = document.getElementById('username');
+                if (usernameInput) {
+                    usernameInput.required = true;
+                }
+            } else if (usernameField) {
+                // Hide username field for existing users
+                usernameField.style.display = 'none';
+                const usernameInput = document.getElementById('username');
+                if (usernameInput) {
+                    usernameInput.required = false;
+                    usernameInput.value = '';
+                }
+            }
+
+        } catch (error) {
+            console.error('Error checking user existence:', error);
+            // Non-critical error, don't show notification
+        }
     }
 
     handleAuthStateChange(event) {
@@ -434,11 +531,106 @@ class BitcoinApp {
         this.cleanup();
         this.isInitialized = false;
     }
+
+    // ===== BACKWARD COMPATIBILITY METHODS =====
+
+    /**
+     * Navigate to asset detail page (backward compatibility)
+     * @param {string} assetSymbol - Asset symbol to navigate to
+     */
+    navigateToAsset(assetSymbol) {
+        if (this.router) {
+            this.router.navigate(`#assets/${assetSymbol}`);
+        }
+    }
+
+    /**
+     * Show login form (backward compatibility)
+     */
+    showLoginForm() {
+        if (this.router) {
+            this.router.showLoginForm();
+        }
+    }
+
+    /**
+     * Navigate to specific hash (backward compatibility)
+     * @param {string} hash - Hash to navigate to
+     */
+    navigate(hash) {
+        if (this.router) {
+            this.router.navigate(hash);
+        }
+    }
 }
 
+console.log('🔥 APP.JS LOADED - Top of file');
+
 window.addEventListener('DOMContentLoaded', async () => {
-    window.bitcoinApp = new BitcoinApp();
-    await window.bitcoinApp.init();
+    console.log('🔥 DOMContentLoaded - Starting BitcoinApp initialization');
+
+    try {
+        // Immediate early router init to prevent any page flash
+        console.log('🚀 Immediate early router init to prevent page flash');
+        const { Router: RouterClass } = await import('./routing/router.js');
+        const earlyRouter = new RouterClass(null, null);
+        earlyRouter.earlyInit();
+
+        console.log('🔥 Creating BitcoinApp instance...');
+        window.bitcoinApp = new BitcoinApp();
+        console.log('🔥 BitcoinApp instance created successfully');
+
+        console.log('🔥 Starting BitcoinApp initialization...');
+        await window.bitcoinApp.init();
+        console.log('🔥 BitcoinApp initialization completed');
+
+        // Backward compatibility - create window.app reference
+        window.app = window.bitcoinApp;
+        console.log('🔥 window.app reference created, login button should now work');
+
+        // Add fallback login button handler in case MainNavigation fails
+        console.log('🔥 Adding fallback login button handler...');
+        const loginBtn = document.getElementById('navLoginBtn');
+        if (loginBtn) {
+            console.log('🔥 Fallback: Login button found, adding click handler');
+            loginBtn.addEventListener('click', (e) => {
+                console.log('🔥 Fallback: Login button clicked!');
+                e.preventDefault();
+
+                // Hide all pages
+                const pageIds = ['homePage', 'assetsPage', 'mainApp', 'adminPage', 'educationPage', 'componentsPage'];
+                pageIds.forEach(pageId => {
+                    const pageEl = document.getElementById(pageId);
+                    if (pageEl) {
+                        pageEl.style.display = 'none';
+                        pageEl.classList.add('hidden');
+                    }
+                });
+
+                // Show login form
+                const loginForm = document.getElementById('loginForm');
+                console.log('🔥 Fallback: Login form element found:', !!loginForm);
+                if (loginForm) {
+                    loginForm.style.display = 'block';
+                    loginForm.classList.remove('hidden');
+                    console.log('🔥 Fallback: Login form should now be visible');
+                } else {
+                    console.error('🔥 Fallback: Login form element not found!');
+                }
+            });
+            console.log('🔥 Fallback login handler added successfully');
+        } else {
+            console.error('🔥 Fallback: Login button not found!');
+        }
+
+        if (loginBtn) {
+            console.log('🔥 Login button element:', loginBtn);
+        }
+
+    } catch (error) {
+        console.error('🔥 Failed to initialize BitcoinApp:', error);
+        console.error('🔥 Error stack:', error.stack);
+    }
 });
 
 window.addEventListener('beforeunload', () => {

@@ -1,4 +1,4 @@
-# Bitcoin Investment Game - Project Goals & Vision
+# Measure Everything in Bitcoin - Project Goals & Vision
 
 ## 🎯 Core Concept
 
@@ -7,11 +7,12 @@
 ## 🚀 Current Functionality (MVP)
 
 ### ✅ Implemented Features
+
 - **Magic Link Authentication**: Passwordless login via email
 - **Starting Balance**: 1 BTC (100M sats) per new user
 - **Real-time Trading**: Trade BTC for stocks (AAPL, TSLA, MSFT, GOOGL, AMZN, NVDA) and commodities (Gold, Silver, Oil)
 - **24-hour Lock**: Assets can't be traded back to BTC for 24 hours (prevents day trading)
-- **Portfolio Tracking**: 
+- **Portfolio Tracking**:
   - Current value vs cost basis
   - P&L tracking in BTC and percentage
   - Trade history with detailed breakdowns
@@ -20,6 +21,7 @@
 - **Responsive UI**: Clean interface with custom notifications
 
 ### 🔧 Technical Stack
+
 - **Backend**: Node.js + Express + PostgreSQL
 - **Frontend**: Vanilla JS + Tailwind CSS
 - **APIs**: CoinGecko for real-time pricing
@@ -28,6 +30,7 @@
 ## 💡 Your Ideas (Monetization & Features)
 
 ### 🏦 Freemium Model
+
 - **Free Tier**: 1 portfolio per email
 - **Premium Wallets**: Pay 1,000 sats for additional portfolios
   - Compare different strategies side-by-side
@@ -35,20 +38,23 @@
   - Dollar-cost averaging vs lump sum strategies
 
 ### 🏆 Competitive Features
+
 - **Leaderboards**: Top performers over different time periods
-- **Challenges/Races**: 
+- **Challenges/Races**:
   - 1 month, 6 months, 1 year competitions
   - Awards for top 3 performers
   - Entry fees create prize pools
 
 ### 🎲 Strategy Challenges
-- **Set & Forget Challenge**: 
+
+- **Set & Forget Challenge**:
   - 1-week window to allocate portfolio
   - Then locked for 10-20 years
   - See long-term results of different strategies
 - **Theme Challenges**: Tech stocks only, commodities only, etc.
 
 ### ⚡ Lightning Integration
+
 - **Donation Button**: QR codes for Lightning Network tips
 - **Sats Payments**: Premium features paid in Bitcoin
 - **Withdrawal**: Winners can withdraw sats to real wallets
@@ -56,6 +62,7 @@
 ## 🚀 My Additional Ideas
 
 ### 📊 Advanced Analytics
+
 - **Performance Metrics**:
   - Sharpe ratio vs Bitcoin
   - Maximum drawdown analysis
@@ -65,6 +72,7 @@
 - **Correlation Heatmaps**: Show how different assets move vs Bitcoin
 
 ### 🎮 Gamification
+
 - **Achievement System**:
   - "Diamond Hands" - Hold for 1 year
   - "Contrarian" - Buy during market crashes
@@ -73,24 +81,28 @@
 - **Risk Levels**: Conservative, Moderate, Aggressive player types
 
 ### 🌍 Social Features
+
 - **Public Profiles**: Optional portfolio sharing
 - **Copy Trading**: Follow successful traders' moves
 - **Discussion Forums**: Strategy discussions per asset
 - **Portfolio Sharing**: Share your allocation as image/link
 
 ### 📈 Advanced Trading
+
 - **DCA Automation**: Set recurring BTC→asset trades
 - **Rebalancing**: Automatic portfolio rebalancing
 - **Stop Losses**: Automatic sell triggers
 - **Limit Orders**: Buy/sell at specific price levels
 
 ### 🏛️ Institutional Features
+
 - **Team Competitions**: Companies compete internally
 - **Educational Mode**: Paper trading for learning
 - **Backtesting**: Test strategies on historical data
 - **API Access**: For algorithmic traders
 
 ### 🔮 Future Asset Classes
+
 - **More Cryptocurrencies**: ETH, SOL, ADA, etc.
 - **Real Estate**: REITs and property indices
 - **Bonds**: Government and corporate bonds
@@ -98,6 +110,7 @@
 - **Commodities**: Wheat, corn, copper, etc.
 
 ### 📱 Mobile & Integrations
+
 - **Mobile App**: Native iOS/Android apps
 - **Telegram Bot**: Quick portfolio checks
 - **Twitter Integration**: Share wins/losses
@@ -106,26 +119,31 @@
 ## 🎯 Roadmap Phases
 
 ### Phase 1: Core Platform (Current)
+
 - ✅ Basic trading functionality
 - ✅ Portfolio tracking
 - ✅ User authentication
 
 ### Phase 2: Competition & Social
+
 - 🔄 Leaderboards
 - 🔄 Public profiles
 - 🔄 Basic challenges
 
 ### Phase 3: Monetization
+
 - 🔄 Lightning payments
 - 🔄 Premium wallets
 - 🔄 Donation system
 
 ### Phase 4: Advanced Features
+
 - 🔄 Advanced analytics
 - 🔄 More asset classes
 - 🔄 Automation features
 
 ### Phase 5: Scale & Mobile
+
 - 🔄 Mobile apps
 - 🔄 API access
 - 🔄 Institutional features
@@ -141,6 +159,7 @@
 ## 🌟 Long-term Vision
 
 Create the world's most engaging way to learn about Bitcoin's role as a store of value while having fun with investment strategies. Users develop intuition about:
+
 - Opportunity cost of not holding Bitcoin
 - Risk/reward of different asset classes
 - Long-term thinking vs short-term trading
@@ -150,4 +169,4 @@ The platform becomes a gateway drug to Bitcoin adoption and sound money principl
 
 ---
 
-*This document will evolve as we build and discover new opportunities. The goal is to create something genuinely useful and fun that also promotes Bitcoin adoption.*
+_This document will evolve as we build and discover new opportunities. The goal is to create something genuinely useful and fun that also promotes Bitcoin adoption._
