@@ -203,6 +203,46 @@ Required in `.env`:
 
 ## Development Workflow Principles
 
+### User Confirmation Requirements
+
+**🚨 CRITICAL: Always Seek User Confirmation Before Making Assumptions**
+
+**Mandatory Confirmation Scenarios**:
+- **Underspecified Requirements**: When task details are vague or incomplete, ASK for clarification instead of assuming intent
+- **Proactive Improvements**: Before adding features, optimizations, or enhancements not explicitly requested, ASK for permission
+- **Architecture Decisions**: When multiple implementation approaches exist, PRESENT options and wait for user choice
+- **Scope Expansion**: If implementation requires additional changes beyond the original request, EXPLAIN and seek approval first
+- **Code Style Choices**: When coding conventions aren't clear from existing code, ASK about preferred patterns
+- **Technology Selections**: Before introducing new libraries, frameworks, or tools, CONFIRM with user first
+
+**Required Confirmation Format**:
+```
+"I notice [specific situation]. I could [proposed approach/improvement].
+Would you like me to proceed with this approach, or would you prefer something different?"
+```
+
+**Examples of When to Ask**:
+- "The component could benefit from error boundaries - should I add them?"
+- "I could optimize this database query, but it would change the existing pattern - proceed?"
+- "The styling could be improved with CSS Grid instead of Flexbox - your preference?"
+- "Should I add TypeScript types to this JavaScript file while fixing the bug?"
+- "I could refactor this to use a custom hook - would that be helpful?"
+
+**Never Assume**:
+- User wants additional features beyond the request
+- Code should be optimized unless performance is the stated goal
+- Existing patterns should be changed without explicit direction
+- Dependencies should be updated or added
+- File structure should be reorganized
+- Testing strategies should be modified
+
+**When NOT to Ask** (proceed directly):
+- Fixing obvious bugs or errors
+- Following explicitly stated requirements
+- Using existing established patterns in the codebase
+- Standard formatting/linting corrections
+- Following documented conventions in CLAUDE.md
+
 ### Task Management and Planning
 **Automatic Todo List Creation**: Claude MUST automatically create todo lists for complex tasks using the TodoWrite tool:
 - **When to create**: Any task requiring 3+ distinct steps, multi-file changes, or systematic operations
@@ -270,7 +310,10 @@ Required in `.env`:
 - **Use Descriptive Prefixes**: `🔍 Routing:`, `📄 Page load:`, `❌ Error:`
 
 ### Commit Guidelines
-- **Meaningful commits**: Separate unrelated changes into different commits
+- **NEVER commit without explicit user request**: Only create commits when the user specifically asks you to commit
+- **Wait for approval**: After making changes, present them to the user and wait for their decision to commit
+- **User-initiated only**: Do not proactively commit changes, even after completing tasks
+- **Meaningful commits**: When asked to commit, separate unrelated changes into different commits
 - **CLAUDE.md updates**: Keep AI instruction changes in separate commits
 - **Team coordination**: Document required actions in commit messages
 - **Task tracking**: Reference Kiro task completion when applicable
