@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Context Preservation Philosophy
+
+**🚨 CRITICAL: Use Agents to Preserve Context**
+The main Claude instance has limited context. To work effectively on complex projects:
+- **ALWAYS** use specialized agents for exploration, research, and analysis
+- **NEVER** load extensive files into main context when an agent can summarize
+- **DELEGATE** specialized tasks to appropriate agents
+- **PRESERVE** main context for implementation and decision-making
+
+**Mandatory Agent Usage**:
+- Use `codebase-analyzer` BEFORE implementing new features to understand project structure
+- Use `investigator` WHEN debugging complex issues instead of loading multiple files
+- Use `docs-explorer` WHEN researching documentation instead of reading all docs
+- Run agents in PARALLEL when possible for maximum efficiency
+
+## Available Commands
+
+### Core Development Commands
+- `/plan [description]` - Create comprehensive strategic plan for complex features
+- `/status [verbose|brief]` - Get comprehensive project status overview
+- `/test [pattern|watch|coverage]` - Smart test execution with various modes
+- `/fix [all|lint|format]` - Auto-fix common code issues
+- `/deps [check|update|audit]` - Manage dependencies and security
+- `/commit [instructions]` - Smart commit with logical grouping
+
 ## Project Overview
 
 Measured in Bitcoin - An educational platform that teaches users about Bitcoin as a unit of account and alternative measure of wealth. Users explore how asset values change when measured in satoshis instead of dollars, demonstrating the difference between inflationary (dollar) and deflationary (Bitcoin) monetary systems.
@@ -52,6 +77,7 @@ test('Minimal reproduction', async ({ page }) => {
 
 ## Quick References
 
+- **Code Standards**: See `.claude/docs/CODE_REVIEW_STANDARDS.md` for DRY/KISS principles and financial code quality guidelines
 - **Architecture**: See `.claude/docs/ARCHITECTURE.md` for detailed Prisma ORM integration and database schema
 - **Testing**: See `.claude/docs/TESTING.md` for testing strategies, Prisma testing, and database validation
 - **Rapid Debugging**: See `.claude/docs/RAPID_DEBUGGING.md` for fast error-first debugging methodology
@@ -94,6 +120,48 @@ Required in `.env`:
 - `EMAIL_*` - SMTP settings for magic links (optional in dev)
 
 ## Expert Consultation Agents
+
+### Essential Context-Preserving Agents
+
+#### Codebase Analyzer Agent (`codebase-analyzer`)
+**Use BEFORE implementing new features to understand project structure**:
+- Map architecture and module relationships
+- Identify coding patterns and conventions
+- Find where to add new functionality
+- Understand dependency relationships
+- **When to invoke**: "Let me analyze the codebase structure first to understand where this should go"
+
+#### Investigator Agent (`investigator`)
+**Use for deep research that returns only essential findings**:
+- Debug complex issues and find root causes
+- Research API integrations and best practices
+- Investigate performance bottlenecks
+- Trace execution flow and data paths
+- **When to invoke**: "Let me investigate why this error is happening"
+
+#### Documentation Explorer Agent (`docs-explorer`)
+**Use to research documentation without loading it all**:
+- Explore API documentation efficiently
+- Find configuration options and environment variables
+- Research library usage patterns
+- Understand project conventions
+- **When to invoke**: "Let me explore the documentation for this library"
+
+#### Test Generator Agent (`test-generator`)
+**Use to create comprehensive test suites**:
+- Generate unit and integration tests
+- Create tests for financial calculations
+- Improve test coverage systematically
+- Generate test fixtures and mocks
+- **When to invoke**: "I'll generate tests for this new feature"
+
+#### Documentation Maintainer Agent (`docs-maintainer`)
+**Use to keep documentation current**:
+- Update architecture documentation after changes
+- Document new patterns and conventions
+- Capture lessons learned from bugs
+- Update API documentation
+- **When to invoke**: "Let me update the documentation with this new pattern"
 
 ### Senior Developer Consultant Agent
 
