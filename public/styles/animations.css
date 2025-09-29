@@ -1,0 +1,241 @@
+/* Animations CSS Module - All animations, transitions, and keyframes */
+
+/* Floating Action Button Animation */
+@keyframes float-glow {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(249, 115, 22, 0.7), 0 0 30px rgba(249, 115, 22, 0.3);
+    }
+}
+
+/* Success Message Animations */
+@keyframes slideInSuccess {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOutSuccess {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Mobile Navigation Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* Mobile Menu Transitions */
+.hamburger-line {
+    transform-origin: center;
+    transition: all 0.3s ease;
+}
+
+#mobileMenuBtn.active .hamburger-line:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+#mobileMenuBtn.active .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+#mobileMenuBtn.active .hamburger-line:nth-child(3) {
+    transform: rotate(-45deg) translate(7px, -6px);
+}
+
+#mobileMenu {
+    animation: fadeIn 0.3s ease-out;
+}
+
+#mobileMenu.closing {
+    animation: fadeOut 0.3s ease-out;
+}
+
+/* Navigation Link Transitions */
+.mobile-nav-link {
+    transition: all 0.2s ease;
+}
+
+.mobile-nav-link:hover {
+    transform: translateX(8px);
+}
+
+.mobile-lang-option {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.mobile-lang-option:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-lang-option.active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Global Transition Classes */
+.transition-all {
+    transition: all 0.2s ease;
+}
+
+.transition-colors {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.transition-transform {
+    transition: transform 0.2s ease;
+}
+
+.transition-opacity {
+    transition: opacity 0.2s ease;
+}
+
+/* Hover Effects */
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Loading Animations */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Fade Transitions */
+.fade-enter {
+    opacity: 0;
+}
+
+.fade-enter-active {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.fade-exit {
+    opacity: 1;
+}
+
+.fade-exit-active {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Slide Transitions */
+.slide-up-enter {
+    transform: translateY(100%);
+    opacity: 0;
+}
+
+.slide-up-enter-active {
+    transform: translateY(0);
+    opacity: 1;
+    transition: all 0.3s ease;
+}
+
+.slide-up-exit {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.slide-up-exit-active {
+    transform: translateY(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+/* Component-specific Animations */
+.asset-card {
+    transition: all 0.2s ease;
+}
+
+.asset-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.asset-card.clicked {
+    transform: scale(0.98);
+}
+
+/* Modal Animations - already included in modals.css but keeping here for completeness */
+.modal-backdrop {
+    transition: opacity 0.3s ease;
+}
+
+.modal-content {
+    transition: transform 0.3s ease;
+}
+
+/* Notification Animations */
+.notification-enter {
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+.notification-enter-active {
+    transform: translateX(0);
+    opacity: 1;
+    transition: all 0.3s ease;
+}
+
+.notification-exit {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-exit-active {
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
